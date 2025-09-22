@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Log Activity - Taskforce Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-clipboard-list me-2"></i>Log Member Activity
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="member_id" class="form-label">Select Member <span class="text-danger">*</span></label>
+                        <select class="form-select" id="member_id" name="member_id" required>
+                            <option value="">Choose a member...</option>
+                            {% for member in members %}
+                                <option value="{{ member.id }}"
+                                        {% if request.args.get('member_id') == member.id|string %}selected{% endif %}>
+                                    {{ member.discord_username }} ({{ member.current_rank }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="activity_type" class="form-label">Activity Type <span class="text-danger">*</span></label>
+                        <select class="form-select" id="activity_type" name="activity_type" required>
+                            <option value="">Choose activity type...</option>
+                            <option value="Training">Training</option>
+                            <option value="Operation">Operation</option>
+                            <option value="Event">Event</option>
+                            <option value="Meeting">Meeting</option>
+                            <option value="Patrol">Patrol</option>
+                            <option value="Exercise">Exercise</option>
+                            <option value="Assessment">Assessment</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" 
+                                  placeholder="Provide details about the activity..."></textarea>
+                        <div class="form-text">Optional - provide additional context or notes</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="logged_by" class="form-label">Logged By <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="logged_by" name="logged_by" required 
+                               placeholder="Your username">
+                        <div class="form-text">Enter your Discord username</div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('home') }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-times me-2"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Log Activity
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Activity Types Guide
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <ul class="list-unstyled">
+                            <li><strong>Training:</strong> Skill development sessions</li>
+                            <li><strong>Operation:</strong> Mission or combat activities</li>
+                            <li><strong>Event:</strong> Special events or ceremonies</li>
+                            <li><strong>Meeting:</strong> Briefings or discussions</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <ul class="list-unstyled">
+                            <li><strong>Patrol:</strong> Routine patrol duties</li>
+                            <li><strong>Exercise:</strong> Practice drills</li>
+                            <li><strong>Assessment:</strong> Performance evaluations</li>
+                            <li><strong>Other:</strong> Miscellaneous activities</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
