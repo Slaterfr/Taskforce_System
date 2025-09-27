@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Remove Member - Taskforce Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-user-slash me-2"></i>Remove Member
+                </h4>
+            </div>
+            <div class="card-body">
+                <p>Are you sure you want to remove <strong>{{ member.discord_username }}</strong> from the active members list? This will mark the member as inactive.</p>
+                <form method="POST">
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ url_for('member_detail', member_id=member.id) }}" class="btn btn-outline-secondary me-2">Cancel</a>
+                        <button type="submit" class="btn btn-danger">Yes, Remove</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -112,6 +112,47 @@ def add_member():
     
     return render_template('add_member.html')
 
+
+@app.route('/member/<int:member_id>/edit', methods=['GET', 'POST'])
+def edit_member(member_id):
+    member = Member.query.get_or_404(member_id)
+    if request.method == 'POST':
+        discord_username = request.form.get('discord_username')
+        roblox_username = request.form.get('roblox_username')
+        current_rank = request.form.get('current_rank')
+
+        # Ensure discord username uniqueness
+        existing = Member.query.filter(Member.discord_username == discord_username, Member.id != member.id).first()
+        if existing:
+            flash('Another member with this Discord username already exists!', 'error')
+            return redirect(url_for('edit_member', member_id=member.id))
+
+        member.discord_username = discord_username
+        member.roblox_username = roblox_username or None
+        member.current_rank = current_rank
+        member.last_updated = datetime.utcnow()
+
+        db.session.commit()
+
+        flash('Member updated successfully!', 'success')
+        return redirect(url_for('member_detail', member_id=member.id))
+
+    return render_template('edit_member.html', member=member)
+
+
+@app.route('/member/<int:member_id>/delete', methods=['GET', 'POST'])
+def delete_member(member_id):
+    member = Member.query.get_or_404(member_id)
+    if request.method == 'POST':
+        # Soft-delete: mark inactive
+        member.is_active = False
+        member.last_updated = datetime.utcnow()
+        db.session.commit()
+        flash(f'Member {member.discord_username} has been removed.', 'success')
+        return redirect(url_for('members'))
+
+    return render_template('confirm_delete.html', member=member)
+
 @app.route('/log_activity', methods=['GET', 'POST'])
 def log_activity():
     if request.method == 'POST':

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Member - Taskforce Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-user-edit me-2"></i>Edit Member
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="roblox_username" class="form-label">Roblox Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-gamepad"></i></span>
+                            <input type="text" class="form-control" id="roblox_username" name="roblox_username" placeholder="username" value="{{ member.roblox_username }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="discord_username" class="form-label">Discord Username <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fab fa-discord"></i></span>
+                            <input type="text" class="form-control" id="discord_username" name="discord_username" required placeholder="username" value="{{ member.discord_username }}">
+                        </div>
+                        <div class="form-text">Enter the Discord username without @</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="current_rank" class="form-label">Current Rank</label>
+                        <select class="form-select" id="current_rank" name="current_rank">
+                            <option value="Aspirant" {% if member.current_rank == 'Aspirant' %}selected{% endif %}>Aspirant</option>
+                            <option value="Novice" {% if member.current_rank == 'Novice' %}selected{% endif %}>Novice</option>
+                            <option value="Adept" {% if member.current_rank == 'Adept' %}selected{% endif %}>Adept</option>
+                            <option value="Crusader" {% if member.current_rank == 'Crusader' %}selected{% endif %}>Crusader</option>
+                            <option value="Paladin" {% if member.current_rank == 'Paladin' %}selected{% endif %}>Paladin</option>
+                            <option value="Exemplar" {% if member.current_rank == 'Exemplar' %}selected{% endif %}>Exemplar</option>
+                            <option value="Prospect" {% if member.current_rank == 'Prospect' %}selected{% endif %}>Prospect</option>
+                            <option value="Commander" {% if member.current_rank == 'Commander' %}selected{% endif %}>Commander</option>
+                            <option value="Marshall" {% if member.current_rank == 'Marshall' %}selected{% endif %}>Marshall</option>
+                            <option value="General" {% if member.current_rank == 'General' %}selected{% endif %}>General</option>
+                            <option value="Chief General" {% if member.current_rank == 'Chief General' %}selected{% endif %}>Chief General</option>
+                        </select>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('member_detail', member_id=member.id) }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-arrow-left me-2"></i>Back
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
