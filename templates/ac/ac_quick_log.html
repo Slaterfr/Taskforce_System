@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Quick AC Logging - Taskforce Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-0">
+            <i class="fas fa-bolt me-2"></i>Quick AC Logging
+        </h1>
+        <p class="text-muted">Log activities fast - no more Discord scrolling!</p>
+        <small class="text-muted">Period: {{ current_period.period_name }} ({{ current_period.start_date.strftime('%m/%d') }} - {{ current_period.end_date.strftime('%m/%d') }})</small>
+    </div>
+</div>
+
+<div class="row">
+    <!-- RAPID FIRE LOGGING -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-fire me-2"></i>Rapid Fire Mode
+                </h5>
+                <small>Select member → Click activity → Instant log</small>
+            </div>
+            <div class="card-body">
+                <form id="rapidFireForm">
+                    <!-- Member Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fs-5">1. Select Member</label>
+                        <select class="form-select form-select-lg" id="rapid_member" autofocus required>
+                            <option value="">Choose a member...</option>
+                            {% for member in members %}
+                                <option value="{{ member.id }}" data-username="{{ member.discord_username }}">
+                                    {{ member.discord_username }} ({{ member.current_rank }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Activity Type Buttons -->
+                    <div class="mb-4">
+                        <label class="form-label fs-5">2. Click Activity Type</label>
+                        <div class="row g-3">
+                            {% set activity_colors = {
+                                'Training': 'primary',
+                                'Raid': 'danger',
+                                'Patrol': 'success',
+                                'Mission': 'info',
+                                'Tryout': 'warning',
+                                'Supervision': 'secondary',
+                                'Evaluation': 'dark',
+                                'Canceled Training': 'outline-secondary'
+                            } %}
+                            
+                            {% for activity_type, details in activity_types.items() %}
+                                <div class="col-md-3 col-6">
+                                    <button type="button" 
+                                            class="btn btn-{{ activity_colors.get(activity_type, 'primary') }} w-100 activity-btn"
+                                            data-activity="{{ activity_type }}"
+                                            data-points="{{ details.points }}"
+                                            data-limited="{{ details.limited|lower }}"
+                                            style="height: 85px; font-size: 0.9rem;">
+                                        <div><strong>{{ activity_type }}</strong></div>
+                                        <div class="mt-1"><span class="badge bg-light text-dark">{{ details.points }} pts</span></div>
+                                        {% if details.limited %}
+                                            <div><small class="text-warning">⚠ Limited</small></div>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Date Selection -->
+                    <div class="mb-3">
+                        <label class="form-label">3. Activity Date</label>
+                        <input type="date" class="form-control" id="rapid_date" 
+                               value="{{ today }}"
+                               min="{{ current_period.start_date.strftime('%Y-%m-%d') }}"
+                               max="{{ current_period.end_date.strftime('%Y-%m-%d') }}">
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Tip:</strong> Select a member once, then click activity buttons to log multiple activities for that person!
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- RECENTLY LOGGED SIDEBAR -->
+    <div class="col-md-4">
+        <!-- Session Counter -->
+        <div class="card mb-3 bg-success text-white">
+            <div class="card-body text-center">
+                <h2 class="mb-0" id="sessionCounter">0</h2>
+                <p class="mb-0">Activities Logged This Session</p>
+            </div>
+        </div>
+
+        <!-- Recent Activities -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-history me-2"></i>Just Logged
+                </h6>
+            </div>
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                <div id="recentlyLogged">
+                    <p class="text-muted text-center mb-0">
+                        <i class="fas fa-info-circle"></i><br>
+                        Activities you log will appear here
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Reference -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>AC Quotas
+                </h6>
+            </div>
+            <div class="card-body">
+                <small>
+                    <div class="mb-2"><strong>Prospect:</strong> 1.0 pts / 2 weeks</div>
+                    <div class="mb-2"><strong>Commander:</strong> 2.0 pts / 2 weeks</div>
+                    <div><strong>Marshall:</strong> 3.0 pts / 2 weeks</div>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let sessionCount = 0;
+
+// Activity button click handler
+document.querySelectorAll('.activity-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const memberId = document.getElementById('rapid_member').value;
+        const activityType = this.getAttribute('data-activity');
+        const points = this.getAttribute('data-points');
+        const date = document.getElementById('rapid_date').value;
+        
+        if (!memberId) {
+            alert('⚠️ Please select a member first!');
+            document.getElementById('rapid_member').focus();
+            return;
+        }
+        
+        const memberName = document.getElementById('rapid_member').selectedOptions[0].getAttribute('data-username');
+        
+        // Visual feedback - button pulse
+        this.style.transform = 'scale(0.95)';
+        setTimeout(() => { this.style.transform = 'scale(1)'; }, 100);
+        
+        // Log activity via AJAX
+        logActivity(memberId, memberName, activityType, points, date);
+    });
+});
+
+function logActivity(memberId, memberName, activityType, points, date) {
+    // Show loading state
+    document.body.style.cursor = 'wait';
+    
+    fetch('{{ url_for("quick_log_activity") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            member_id: memberId,
+            activity_type: activityType,
+            activity_date: date,
+            logged_by: 'HC Staff'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.body.style.cursor = 'default';
+        
+        if (data.success) {
+            // Update session counter
+            sessionCount++;
+            document.getElementById('sessionCounter').textContent = sessionCount;
+            
+            // Add to recently logged
+            addToRecentlyLogged(memberName, activityType, points);
+            
+            // Show success toast
+            showSuccessToast(memberName, activityType, points);
+            
+            // Play success sound (optional)
+            playSuccessSound();
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        document.body.style.cursor = 'default';
+        console.error('Error:', error);
+        alert('❌ Failed to log activity. Check console for details.');
+    });
+}
+
+function addToRecentlyLogged(memberName, activityType, points) {
+    const container = document.getElementById('recentlyLogged');
+    
+    // Clear placeholder on first log
+    if (sessionCount === 1) {
+        container.innerHTML = '';
+    }
+    
+    const entry = document.createElement('div');
+    entry.className = 'alert alert-success mb-2 py-2';
+    entry.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>${memberName}</strong><br>
+                <small>${activityType} (${points} pts)</small>
+            </div>
+            <div>
+                <i class="fas fa-check-circle fa-2x text-success"></i>
+            </div>
+        </div>
+    `;
+    
+    // Add with animation
+    entry.style.opacity = '0';
+    entry.style.transform = 'translateY(-10px)';
+    container.insertBefore(entry, container.firstChild);
+    
+    // Fade in
+    setTimeout(() => {
+        entry.style.transition = 'all 0.3s';
+        entry.style.opacity = '1';
+        entry.style.transform = 'translateY(0)';
+    }, 10);
+}
+
+function showSuccessToast(memberName, activityType, points) {
+    // Create toast notification
+    const toast = document.createElement('div');
+    toast.className = 'position-fixed bottom-0 end-0 p-3';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <div class="toast show" role="alert">
+            <div class="toast-header bg-success text-white">
+                <strong class="me-auto">✓ Activity Logged</strong>
+                <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.parentElement.remove()"></button>
+            </div>
+            <div class="toast-body">
+                <strong>${memberName}</strong><br>
+                ${activityType} (${points} pts)
+            </div>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function playSuccessSound() {
+    // Optional: Add a subtle success sound
+    // Uncomment if you want audio feedback:
+    // const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBCl4yOvTgjMGHmnA6OekUhILTKXh8bllHgU2jdXux3QlBS97yOzagTQGHmS95++nVBQLTaLi8bZjHwU5kdnwyXcnBSl3w+vdgzYGHmu67e6oUxILSqPi8L1iIQU5jdPuwXUtBSt7xuvZgzgGHmq46+6pVRQLSaDh8L5jIAU5ktPuwXYnBSx6xevdgzoGH2y46+2oUxMMSaLh77xiIAQ4kNPuv3YpBSx7xurZgzsGH22467SoVBIMSZ/h8bxhIAU3j9TuvncrBSx6xuvcgz0GH2256+6nVRMNSp3h8bxiIAU3jdTuvnQrBSt6xuvcgz0GH227…');
+    // audio.play();
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Press 'm' to focus member select
+    if (e.key === 'm' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+        e.preventDefault();
+        document.getElementById('rapid_member').focus();
+    }
+});
+
+// Auto-focus member select on page load
+window.addEventListener('load', function() {
+    document.getElementById('rapid_member').focus();
+});
+</script>
+
+<style>
+.activity-btn {
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.activity-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+.activity-btn:active {
+    transform: scale(0.95);
+}
+.toast {
+    min-width: 250px;
+}
+</style>
+{% endblock %}

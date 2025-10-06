@@ -26,7 +26,7 @@ class MemberSyncer:
         # Rank hierarchy for filtering (Aspirant and above only)
         self.eligible_ranks = [
             'Aspirant', 'Novice', 'Adept', 'Crusader', 'Paladin', 
-            'Exemplar', 'Prospect', 'Commander', 'Marshall', 'General', 'Chief General'
+            'Exemplar', 'Prospect', 'Commander', 'Marshal', 'General', 'Chief General'
         ]
         
         # Statistics

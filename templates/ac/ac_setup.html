@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}AC Setup - Taskforce Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-clipboard-check fa-5x text-muted mb-4"></i>
+                <h2 class="mb-3">Welcome to Activity Checks!</h2>
+                <p class="lead text-muted mb-4">
+                    No active AC period found. Let's create your first one to get started.
+                </p>
+                
+                <a href="{{ url_for('create_ac_period') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-plus me-2"></i>Create First AC Period
+                </a>
+                
+                <hr class="my-5">
+                
+                <div class="text-start">
+                    <h5 class="mb-3"><i class="fas fa-info-circle me-2"></i>What are Activity Checks?</h5>
+                    <p>Activity Checks (ACs) track member participation through a points-based system:</p>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <h6>📊 Points System</h6>
+                            <ul>
+                                <li><strong>Training:</strong> 1.0 pts</li>
+                                <li><strong>Raid/Patrol:</strong> 1.0 pts</li>
+                                <li><strong>Tryout:</strong> 1.5 pts</li>
+                                <li><strong>Mission:</strong> 0.5 pts</li>
+                                <li><strong>Supervision:</strong> 1.0 pts</li>
+                                <li><strong>Evaluation:</strong> 0.5 pts (limited)</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>🎯 Requirements</h6>
+                            <ul>
+                                <li><strong>Prospect:</strong> 1.0 pts / 2 weeks</li>
+                                <li><strong>Commander:</strong> 2.0 pts / 2 weeks</li>
+                                <li><strong>Marshall+:</strong> 3.0 pts / 2 weeks</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-4">
+                        <strong>💡 Pro Tip:</strong> Use the Quick Log feature to log activities in seconds instead of scrolling through Discord!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

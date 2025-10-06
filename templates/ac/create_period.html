@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Create AC Period - Taskforce Management{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-calendar-plus me-2"></i>Create New AC Period
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="period_name" class="form-label">Period Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="period_name" name="period_name" required 
+                               placeholder="e.g., AC Period 1 - January 2025">
+                        <div class="form-text">Give this AC period a descriptive name</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="start_date" class="form-label">Start Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" required
+                               onchange="updateEndDate()">
+                        <div class="form-text">Period automatically ends 2 weeks from this date</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">End Date</label>
+                        <input type="text" class="form-control" id="end_date_display" readonly 
+                               placeholder="Select start date first...">
+                    </div>
+
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>AC Period Information</h6>
+                        <ul class="mb-0">
+                            <li>Each period lasts exactly <strong>2 weeks</strong></li>
+                            <li>Creating a new period will deactivate the current one</li>
+                            <li>Members can log activities immediately</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('ac_dashboard') }}" class="btn btn-outline-secondary me-md-2">
+                            <i class="fas fa-times me-2"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Create AC Period
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateEndDate() {
+    const startDate = document.getElementById('start_date').value;
+    const endDateDisplay = document.getElementById('end_date_display');
+    
+    if (startDate) {
+        const start = new Date(startDate);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 13);
+        
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        endDateDisplay.value = end.toLocaleDateString('en-US', options);
+    } else {
+        endDateDisplay.value = '';
+    }
+}
+
+// Set default to next Monday
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + (1 + 7 - today.getDay()) % 7);
+    
+    document.getElementById('start_date').value = nextMonday.toISOString().split('T')[0];
+    updateEndDate();
+});
+</script>
+{% endblock %}

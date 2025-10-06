@@ -12,7 +12,7 @@ class ACPeriod(db.Model):
     __tablename__ = 'ac_periods'
     
     id = db.Column(db.Integer, primary_key=True)
-    period_name = db.Column(db.String(100), nullable=False)  # "AC Period 1 - Jan 2025"
+    period_name = db.Column(db.String(100), nullable=False)
     start_date = db.Column(db.DateTime, nullable=False)
     end_date = db.Column(db.DateTime, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
@@ -61,18 +61,20 @@ class ActivityEntry(db.Model):
     member_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=False)
     ac_period_id = db.Column(db.Integer, db.ForeignKey('ac_periods.id'), nullable=False)
     
-    activity_type = db.Column(db.String(50), nullable=False)  # Mission, Training, Tryout, etc.
-    points = db.Column(db.Float, nullable=False)  # 0.5, 1, 1.5, etc.
+    activity_type = db.Column(db.String(50), nullable=False)
+    points = db.Column(db.Float, nullable=False)
     description = db.Column(db.Text)
     activity_date = db.Column(db.DateTime, nullable=False)
     logged_by = db.Column(db.String(100), nullable=False)
     logged_date = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # For limited activities (evaluation, canceled training - only 1 per cycle)
     is_limited_activity = db.Column(db.Boolean, default=False)
     
+    # Add relationship to member
+    member = db.relationship('Member', backref='activity_entries')
+    
     def __repr__(self):
-        return f'<ActivityEntry {self.member.discord_username}: {self.activity_type} ({self.points}pts)>'
+        return f'<ActivityEntry {self.activity_type} ({self.points}pts)>'
     
     def to_dict(self):
         return {
@@ -94,26 +96,22 @@ class InactivityNotice(db.Model):
     ac_period_id = db.Column(db.Integer, db.ForeignKey('ac_periods.id'), nullable=False)
     
     start_date = db.Column(db.DateTime, nullable=False)
-    end_date = db.Column(db.DateTime, nullable=False)  # Can be up to 1 month
+    end_date = db.Column(db.DateTime, nullable=False)
     reason = db.Column(db.Text)
     approved_by = db.Column(db.String(100), nullable=False)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Protection logic
-    protects_ac = db.Column(db.Boolean, default=False)  # Calculated based on timing
+    protects_ac = db.Column(db.Boolean, default=False)
+    
+    # Add relationship to member
+    member = db.relationship('Member', backref='inactivity_notices')
     
     def __repr__(self):
-        return f'<InactivityNotice {self.member.discord_username}: {self.start_date.strftime("%m/%d")} - {self.end_date.strftime("%m/%d")}>'
+        return f'<InactivityNotice {self.start_date.strftime("%m/%d")} - {self.end_date.strftime("%m/%d")}>'
     
     def calculate_protection(self, ac_period):
-        """
-        Calculate if this IA protects from AC requirements
-        Rules: Only protects if went IA in week 1 OR came back during week 2
-        """
-        # Went IA during week 1
+        """Calculate if this IA protects from AC requirements"""
         went_ia_week1 = ac_period.is_week1(self.start_date)
-        
-        # Came back during week 2  
         came_back_week2 = ac_period.is_week2(self.end_date)
         
         self.protects_ac = went_ia_week1 or came_back_week2
@@ -138,7 +136,7 @@ ACTIVITY_TYPES = {
     },
     'Evaluation': {
         'points': 0.5,
-        'limited': True,  # Only 1 per cycle
+        'limited': True,
         'description': 'Conducted member evaluation'
     },
     'Supervision': {
@@ -168,18 +166,18 @@ ACTIVITY_TYPES = {
     },
     'Canceled Training': {
         'points': 0.5,
-        'limited': True,  # Only 1 per cycle
+        'limited': True,
         'description': 'Training session that was canceled'
     }
 }
 
 # Quota requirements by rank
 AC_QUOTAS = {
-    'Prospect': 1.0,      # 1 point every 2 weeks
-    'Commander': 2.0,     # 2 points every 2 weeks  
-    'Marshall': 3.0,      # 3 points every 2 weeks
-    'General': 3.0,       # Same as Marshall
-    'Chief General': 3.0  # Same as Marshall
+    'Prospect': 1.0,
+    'Commander': 2.0,
+    'Marshal': 3.0,
+    'General': 3.0,
+    'Chief General': 3.0
 }
 
 def get_member_quota(rank):
