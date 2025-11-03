@@ -168,6 +168,11 @@ ACTIVITY_TYPES = {
         'points': 0.5,
         'limited': True,
         'description': 'Training session that was canceled'
+    },
+    'Cancelled Tryout': {
+        'points': 0.5,
+        'limited': True,
+        'description': 'Tryout that was cancelled'
     }
 }
 
@@ -186,8 +191,24 @@ def get_member_quota(rank):
 
 def get_activity_points(activity_type):
     """Get point value for an activity type"""
-    return ACTIVITY_TYPES.get(activity_type, {}).get('points', 0.0)
+    pts_map = {
+        "Mission": 0.5,
+        "Evaluation": 0.5,
+        "Supervision": 1.0,
+        "Tryout": 1.5,
+        "Raid": 1.0,
+        "Patrol": 1.0,
+        "Training": 1.0,
+        "Canceled Training": 0.5,
+        "Cancelled Tryout": 0.5,
+    }
+    return pts_map.get(activity_type, 0.0)
 
 def is_limited_activity(activity_type):
     """Check if activity type is limited to 1 per cycle"""
-    return ACTIVITY_TYPES.get(activity_type, {}).get('limited', False)
+    limited = {
+        "Evaluation",
+        "Canceled Training",
+        "Cancelled Tryout",
+    }
+    return activity_type in limited

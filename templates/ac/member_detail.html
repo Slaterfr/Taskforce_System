@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ member.discord_username }} — AC{% endblock %}
+{% block content %}
+<h3 class="d-flex justify-content-between align-items-center">
+  <span>{{ member.discord_username }} — AC for {{ current_period.period_name if current_period else '' }}</span>
+  <span>
+    {% if is_staff %}
+      <button id="ia-toggle" class="btn btn-sm btn-outline-info">Toggle IA</button>
+      <button id="exempt-toggle" class="btn btn-sm btn-outline-primary">Toggle Exempt</button>
+    {% endif %}
+  </span>
+</h3>
+
+<div class="mb-3">
+  {% if is_staff %}
+  <form method="post" action="{{ url_for('clear_member_activities', member_id=member.id) }}" onsubmit="return confirm('Delete all activities for this member in the current period?');" style="display:inline">
+    <input type="hidden" name="period_id" value="{{ current_period.id if current_period }}">
+    <button class="btn btn-sm btn-danger">Clear Activities (current period)</button>
+  </form>
+  {% endif %}
+</div>
+
+<h4 class="mt-4">Recent (summary)</h4>
+{% if aggregated_activities %}
+  <ul class="list-group mb-3">
+    {% for a in aggregated_activities %}
+      <li class="list-group-item">
+        {{ a.activity_date.strftime('%Y-%m-%d') if a.activity_date else '' }} — {{ a.count }} {{ a.activity_type }} ({{ a.points }})
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="text-muted">No recent activity.</p>
+{% endif %}
+
+{% if activities %}
+  <p>
+    <a class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" href="#detailedActivities" role="button" aria-expanded="false" aria-controls="detailedActivities">
+      Show detailed activities
+    </a>
+  </p>
+
+  <div class="collapse" id="detailedActivities">
+    <div class="card card-body">
+      <ul class="list-group">
+        {% for a in activities %}
+          <li class="list-group-item d-flex justify-content-between align-items-start">
+            <div>
+              <div><strong>{{ a.activity_date.strftime('%Y-%m-%d') if a.activity_date else '' }}</strong> — {{ a.activity_type }} — {{ a.points }}</div>
+              {% if a.description %}<div class="text-muted small">{{ a.description }}</div>{% endif %}
+            </div>
+            {% if is_staff %}
+            <div class="btn-group btn-group-sm">
+              <form method="post" action="{{ url_for('delete_ac_activity', activity_id=a.id) }}" onsubmit="return confirm('Delete this activity?');">
+                <button type="submit" class="btn btn-outline-danger">Delete</button>
+              </form>
+            </div>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

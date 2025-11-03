@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Title Rewards - Taskforce Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1 class="mb-0">
+            <i class="fas fa-trophy me-2"></i>Title Rewards
+        </h1>
+        <p class="text-muted">{{ current_period.period_name }}</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('ac_dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+{% if titles %}
+    <!-- Title Winners Display -->
+    <div class="row mb-4">
+        {% for title, info in titles.items() %}
+            <div class="col-md-6 mb-3">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-medal me-2"></i>@{{ title }}
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-crown fa-3x text-warning"></i>
+                        </div>
+                        <h4 class="text-center mb-3">
+                            <strong>{{ info.winner }}</strong>
+                        </h4>
+                        <div class="d-flex justify-content-between">
+                            <span class="text-muted">Achievement:</span>
+                            <strong>{{ info.count }} ({{ info.requirement }})</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Discord Message Preview -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fab fa-discord me-2"></i>Discord Message Preview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="bg-light p-3 rounded mb-3" style="white-space: pre-wrap; font-family: monospace;">{{ discord_message }}</div>
+                    
+                    <form method="POST" action="{{ url_for('send_title_webhook') }}">
+                        <div class="mb-3">
+                            <label for="webhook_url" class="form-label">Discord Webhook URL</label>
+                            <input type="url" class="form-control" id="webhook_url" name="webhook_url" 
+                                   placeholder="https://discord.com/api/webhooks/..." required>
+                            <div class="form-text">Paste your Discord webhook URL to post title rewards automatically</div>
+                        </div>
+                        
+                        <input type="hidden" name="message" value="{{ discord_message }}">
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard()">
+                                <i class="fas fa-copy me-2"></i>Copy Message
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fab fa-discord me-2"></i>Send to Discord
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% else %}
+    <!-- No Winners -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-trophy fa-5x text-muted mb-4"></i>
+                    <h3 class="text-muted">No Title Winners This Cycle</h3>
+                    <p class="lead">
+                        No members met the minimum requirements for any title rewards.
+                    </p>
+                    
+                    <div class="alert alert-info mt-4 mx-auto" style="max-width: 600px;">
+                        <h6><strong>Title Requirements:</strong></h6>
+                        <ul class="text-start mb-0">
+                            <li><strong>Host with the Most:</strong> 5+ trainings hosted</li>
+                            <li><strong>Taskmaster:</strong> 5+ missions posted</li>
+                            <li><strong>Legionnaire:</strong> 5+ raids hosted</li>
+                            <li><strong>Scout:</strong> 5+ tryouts hosted</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Title Requirements Reference -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Title Reward System
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><strong>Available Titles:</strong></h6>
+                        <ul>
+                            <li><strong>@Host with the Most:</strong> Most trainings hosted (min 5)</li>
+                            <li><strong>@Taskmaster:</strong> Most missions posted (min 5)</li>
+                            <li><strong>@Legionnaire:</strong> Most raids hosted (min 5)</li>
+                            <li><strong>@Scout:</strong> Most tryouts hosted (min 5)</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><strong>Not Yet Implemented:</strong></h6>
+                        <ul>
+                            <li><strong>@Executor:</strong> Most missions completed (requires mission completion tracking)</li>
+                            <li><strong>@Challenger:</strong> Most duels won (requires duel tracking)</li>
+                        </ul>
+                        <small class="text-muted">These will be added when the tracking systems are implemented.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const message = `{{ discord_message }}`;
+    navigator.clipboard.writeText(message).then(function() {
+        alert('✅ Message copied to clipboard!');
+    }, function(err) {
+        alert('❌ Failed to copy message');
+    });
+}
+</script>
+{% endblock %}

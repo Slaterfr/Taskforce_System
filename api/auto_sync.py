@@ -10,10 +10,15 @@ import os
 from datetime import datetime
 from typing import Optional
 
-# Add parent directory to path
+# Ensure package-relative imports work when run as a package
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sync_members import MemberSyncer
+# Try package-relative import first (when imported as package),
+# fall back to direct import (when run as script)
+try:
+    from .sync_members import MemberSyncer  # package mode
+except ImportError:
+    from sync_members import MemberSyncer  # script mode
 
 class AutoSyncManager:
     """Manages automated syncing of Roblox members"""

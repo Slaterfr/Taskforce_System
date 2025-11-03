@@ -4,7 +4,12 @@ Run automated Roblox sync to catch new Aspirant promotions
 Usage: python run_auto_sync.py [options]
 """
 
-from auto_sync import AutoSyncManager, QuickSyncChecker
+try:
+    # Prefer package-relative import when used as part of the `api` package
+    from .auto_sync import AutoSyncManager, QuickSyncChecker
+except Exception:
+    # Fallback for running the script directly
+    from auto_sync import AutoSyncManager, QuickSyncChecker
 
 def main():
     GROUP_ID = 8482555  # Your Jedi Taskforce group
