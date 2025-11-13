@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      - STAFF_PASSWORD=${STAFF_PASSWORD:-task2025}
+      - DATABASE_URL=sqlite:///instance/taskforce.db
+    volumes:
+      - ./instance:/app/instance
+    restart: unless-stopped
+

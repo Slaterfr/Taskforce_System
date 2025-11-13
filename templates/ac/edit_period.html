@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Edit AC Period{% endblock %}
+
+{% block content %}
+<h3>Edit AC Period</h3>
+<form method="post">
+  <div class="mb-3">
+    <label>Period Name</label>
+    <input name="period_name" class="form-control" value="{{ period.period_name }}" required>
+  </div>
+  <div class="mb-3">
+    <small class="text-muted">Current period: {{ period.start_date.strftime('%Y-%m-%d') }} to {{ period.end_date.strftime('%Y-%m-%d') }}</small>
+  </div>
+  <button class="btn btn-primary" type="submit">Update Name</button>
+  <a href="{{ url_for('ac_dashboard') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}
+

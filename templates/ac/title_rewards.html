@@ -17,9 +17,9 @@
     </div>
 </div>
 
-{% if titles %}
-    <!-- Title Winners Display -->
-    <div class="row mb-4">
+<!-- Title Winners Display -->
+<div class="row mb-4">
+    {% if titles %}
         {% for title, info in titles.items() %}
             <div class="col-md-6 mb-3">
                 <div class="card border-warning">
@@ -30,7 +30,11 @@
                     </div>
                     <div class="card-body">
                         <div class="text-center mb-3">
-                            <i class="fas fa-crown fa-3x text-warning"></i>
+                            {% if info.qualified %}
+                                <i class="fas fa-crown fa-3x text-warning"></i>
+                            {% else %}
+                                <i class="fas fa-trophy fa-3x text-muted"></i>
+                            {% endif %}
                         </div>
                         <h4 class="text-center mb-3">
                             <strong>{{ info.winner }}</strong>
@@ -39,12 +43,30 @@
                             <span class="text-muted">Achievement:</span>
                             <strong>{{ info.count }} ({{ info.requirement }})</strong>
                         </div>
+                        {% if not info.qualified and info.count > 0 %}
+                            <div class="alert alert-warning mt-2 mb-0 py-2">
+                                <small><i class="fas fa-exclamation-triangle me-1"></i>Minimum requirement not met</small>
+                            </div>
+                        {% elif info.count == 0 %}
+                            <div class="alert alert-info mt-2 mb-0 py-2">
+                                <small><i class="fas fa-info-circle me-1"></i>No activities logged yet</small>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         {% endfor %}
-    </div>
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>No activity data available for this period.
+            </div>
+        </div>
+    {% endif %}
+</div>
 
+{% set qualified_count = titles.values()|selectattr('qualified')|list|length if titles else 0 %}
+{% if qualified_count > 0 %}
     <!-- Discord Message Preview -->
     <div class="row">
         <div class="col-12">
@@ -80,29 +102,13 @@
             </div>
         </div>
     </div>
-
-{% else %}
-    <!-- No Winners -->
-    <div class="row">
+{% elif qualified_count == 0 and titles %}
+    <!-- No Qualified Winners Message -->
+    <div class="row mb-4">
         <div class="col-12">
-            <div class="card">
-                <div class="card-body text-center py-5">
-                    <i class="fas fa-trophy fa-5x text-muted mb-4"></i>
-                    <h3 class="text-muted">No Title Winners This Cycle</h3>
-                    <p class="lead">
-                        No members met the minimum requirements for any title rewards.
-                    </p>
-                    
-                    <div class="alert alert-info mt-4 mx-auto" style="max-width: 600px;">
-                        <h6><strong>Title Requirements:</strong></h6>
-                        <ul class="text-start mb-0">
-                            <li><strong>Host with the Most:</strong> 5+ trainings hosted</li>
-                            <li><strong>Taskmaster:</strong> 5+ missions posted</li>
-                            <li><strong>Legionnaire:</strong> 5+ raids hosted</li>
-                            <li><strong>Scout:</strong> 5+ tryouts hosted</li>
-                        </ul>
-                    </div>
-                </div>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>No Qualified Winners:</strong> Some members are leading but haven't met the minimum requirements yet.
             </div>
         </div>
     </div>
@@ -122,19 +128,18 @@
                     <div class="col-md-6">
                         <h6><strong>Available Titles:</strong></h6>
                         <ul>
-                            <li><strong>@Host with the Most:</strong> Most trainings hosted (min 5)</li>
+                            <li><strong>@Host with the Most:</strong> Most events hosted (Training + Raid + Patrol, min 5)</li>
                             <li><strong>@Taskmaster:</strong> Most missions posted (min 5)</li>
                             <li><strong>@Legionnaire:</strong> Most raids hosted (min 5)</li>
                             <li><strong>@Scout:</strong> Most tryouts hosted (min 5)</li>
                         </ul>
                     </div>
                     <div class="col-md-6">
-                        <h6><strong>Not Yet Implemented:</strong></h6>
+                        <h6><strong>Excluded:</strong></h6>
                         <ul>
-                            <li><strong>@Executor:</strong> Most missions completed (requires mission completion tracking)</li>
-                            <li><strong>@Challenger:</strong> Most duels won (requires duel tracking)</li>
+                            <li><strong>@Executor:</strong> Most missions completed (excluded - requires mission completion tracking)</li>
                         </ul>
-                        <small class="text-muted">These will be added when the tracking systems are implemented.</small>
+                        <small class="text-muted">Executor title is excluded as it requires tracking mission completions separately from mission postings.</small>
                     </div>
                 </div>
             </div>

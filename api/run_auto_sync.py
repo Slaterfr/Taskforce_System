@@ -27,7 +27,7 @@ def main():
     print("3. Custom interval auto-sync")
     print()
     
-    choice = input("Choose option (1-3): ").strip()
+    choice = "1"
     
     if choice == "1":
         # Standard auto-sync every hour

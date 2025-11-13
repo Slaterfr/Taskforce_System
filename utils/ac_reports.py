@@ -138,12 +138,11 @@ class ACReportGenerator:
         Calculate title reward winners based on activity counts
         
         Title Requirements:
-        - Host with the Most: Most trainings (min 5)
-        - Taskmaster: Most missions posted (min 5)
-        - Legionnaire: Most raids hosted (min 5)
-        - Executor: Most missions completed (min 5) - NOT TRACKED YET
-        - Scout: Most tryouts hosted (min 5)
-        - Challenger: Most duels won (min 3) - NOT TRACKED YET
+        - Host with the Most: Most events (Raid + Patrol) per quota cycle (min 5)
+        - Taskmaster: Most missions posted per quota cycle (min 5)
+        - Legionnaire: Most raids hosted per quota cycle (min 5)
+        - Scout: Most tryouts hosted per quota cycle (min 5)
+        - Executor: Excluded (requires mission completion tracking)
         """
         
         # Count activities by type for each member
@@ -157,37 +156,43 @@ class ACReportGenerator:
             if member_id not in member_stats:
                 member_stats[member_id] = {
                     'name': member_name,
-                    'trainings': 0,
+                    'events': 0,  # Training + Raid + Patrol for HWTM
                     'missions': 0,
                     'raids': 0,
+                    'patrols': 0,
                     'tryouts': 0,
                     'total': 0
                 }
             
             member_stats[member_id]['total'] += 1
             
-            if activity_type == 'Training':
-                member_stats[member_id]['trainings'] += 1
+            # Track specific activity types
+            if activity_type == 'Raid':
+                member_stats[member_id]['raids'] += 1
+                member_stats[member_id]['events'] += 1  # Events = Training + Raid + Patrol
+            elif activity_type == 'Patrol':
+                member_stats[member_id]['patrols'] += 1
+                member_stats[member_id]['events'] += 1  # Events = Training + Raid + Patrol
+            elif activity_type == 'Training':
+                member_stats[member_id]['events'] += 1  # Events = Training + Raid + Patrol
             elif activity_type == 'Mission':
                 member_stats[member_id]['missions'] += 1
-            elif activity_type == 'Raid':
-                member_stats[member_id]['raids'] += 1
             elif activity_type == 'Tryout':
                 member_stats[member_id]['tryouts'] += 1
         
         # Calculate winners
         titles = {}
         
-        # Host with the Most (most trainings, min 5)
-        training_leaders = [(mid, stats['trainings'], stats['name']) 
-                           for mid, stats in member_stats.items() 
-                           if stats['trainings'] >= 5]
-        if training_leaders:
-            winner = max(training_leaders, key=lambda x: x[1])
+        # Host with the Most (most events = Training + Raid + Patrol, min 5)
+        event_leaders = [(mid, stats['events'], stats['name']) 
+                        for mid, stats in member_stats.items() 
+                        if stats['events'] >= 5]
+        if event_leaders:
+            winner = max(event_leaders, key=lambda x: x[1])
             titles['Host with the Most'] = {
                 'winner': winner[2],
                 'count': winner[1],
-                'requirement': '5+ trainings hosted'
+                'requirement': '5+ events hosted (Training + Raid + Patrol)'
             }
         
         # Taskmaster (most missions, min 5)
@@ -226,9 +231,7 @@ class ACReportGenerator:
                 'requirement': '5+ tryouts hosted'
             }
         
-        # Note: Executor and Challenger require tracking that doesn't exist yet
-        # Executor: Mission completions (not just postings)
-        # Challenger: Duel wins
+        # Executor is excluded (requires mission completion tracking)
         
         self.title_winners = titles
         return titles

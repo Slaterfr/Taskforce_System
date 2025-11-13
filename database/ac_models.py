@@ -22,6 +22,7 @@ class ACPeriod(db.Model):
     # Relationships
     activity_entries = db.relationship('ActivityEntry', backref='ac_period', lazy=True)
     inactivity_notices = db.relationship('InactivityNotice', backref='ac_period', lazy=True)
+    exemptions = db.relationship('ACExemption', backref='ac_period', lazy=True)
     
     def __repr__(self):
         return f'<ACPeriod {self.period_name}>'
@@ -125,6 +126,34 @@ class InactivityNotice(db.Model):
             'reason': self.reason,
             'approved_by': self.approved_by,
             'protects_ac': self.protects_ac
+        }
+
+class ACExemption(db.Model):
+    """Exemptions from quota requirements for a specific AC period"""
+    __tablename__ = 'ac_exemptions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    member_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=False)
+    ac_period_id = db.Column(db.Integer, db.ForeignKey('ac_periods.id'), nullable=False)
+    
+    reason = db.Column(db.Text)
+    approved_by = db.Column(db.String(100), nullable=False)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Add relationship to member
+    member = db.relationship('Member', backref='ac_exemptions')
+    
+    def __repr__(self):
+        return f'<ACExemption for member {self.member_id} in period {self.ac_period_id}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'member_id': self.member_id,
+            'ac_period_id': self.ac_period_id,
+            'reason': self.reason,
+            'approved_by': self.approved_by,
+            'created_date': self.created_date.strftime('%Y-%m-%d %H:%M')
         }
 
 # Activity types and their point values
