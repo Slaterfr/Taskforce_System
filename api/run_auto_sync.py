@@ -1,63 +1,44 @@
 #!/usr/bin/env python3
 """
-Run automated Roblox sync to catch new Aspirant promotions
-Usage: python run_auto_sync.py [options]
+Manual Roblox sync trigger (optional)
+NOTE: Auto-sync is now built into the Flask app and runs automatically!
+This script is only needed if you want to manually trigger a sync outside the web app.
+
+The main auto-sync runs automatically when you start your Flask app (if ROBLOX_SYNC_ENABLED=true).
+It syncs every hour and also runs once on startup.
 """
 
-try:
-    # Prefer package-relative import when used as part of the `api` package
-    from .auto_sync import AutoSyncManager, QuickSyncChecker
-except Exception:
-    # Fallback for running the script directly
-    from auto_sync import AutoSyncManager, QuickSyncChecker
+import sys
+import os
+
+# Add parent directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app import create_app
+from utils.roblox_sync import sync_from_roblox
 
 def main():
-    GROUP_ID = 8482555  # Your Jedi Taskforce group
-    
-    print("🎯 Jedi Taskforce - Automated Member Sync")
+    print("🔄 Manual Roblox Sync Trigger")
     print("=" * 50)
-    print("This will automatically detect when someone gets promoted to Aspirant")
-    print("and add them to your management system.")
+    print("NOTE: Auto-sync is built into the Flask app!")
+    print("This will run a one-time sync now.")
     print()
     
-    # Ask user what they want to do
-    print("Options:")
-    print("1. Run continuous auto-sync (checks every hour)")
-    print("2. Quick check for new Aspirants (run once)")
-    print("3. Custom interval auto-sync")
-    print()
+    app = create_app()
     
-    choice = "1"
-    
-    if choice == "1":
-        # Standard auto-sync every hour
-        print("\n🚀 Starting hourly auto-sync...")
-        auto_sync = AutoSyncManager(GROUP_ID, sync_interval_minutes=60)
-        auto_sync.start_scheduler()
+    with app.app_context():
+        print("🔄 Starting sync from Roblox...")
+        result = sync_from_roblox()
         
-    elif choice == "2":
-        # Quick check
-        print("\n🔍 Running quick check for new Aspirants...")
-        checker = QuickSyncChecker(GROUP_ID)
-        results = checker.check_for_new_aspirants()
-        
-        if results['new_members'] > 0:
-            print(f"🎉 Found {results['new_members']} new Aspirant+ members!")
+        if result.get('success'):
+            stats = result.get('stats', {})
+            print(f"\n✅ Sync completed successfully!")
+            print(f"   - {stats.get('added', 0)} new members added")
+            print(f"   - {stats.get('updated', 0)} members updated")
+            print(f"   - {stats.get('rank_changes', 0)} rank changes")
+            print(f"   - {stats.get('errors', 0)} errors")
         else:
-            print("✅ No new Aspirants found")
-            
-    elif choice == "3":
-        # Custom interval
-        try:
-            interval = int(input("\nEnter sync interval in minutes (default 60): ") or "60")
-            print(f"\n🚀 Starting auto-sync every {interval} minutes...")
-            auto_sync = AutoSyncManager(GROUP_ID, sync_interval_minutes=interval)
-            auto_sync.start_scheduler()
-        except ValueError:
-            print("❌ Invalid interval. Please enter a number.")
-    
-    else:
-        print("❌ Invalid choice")
+            print(f"\n❌ Sync failed: {result.get('message', 'Unknown error')}")
 
 if __name__ == "__main__":
     try:
@@ -66,3 +47,5 @@ if __name__ == "__main__":
         print("\n👋 Goodbye!")
     except Exception as e:
         print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()

@@ -79,3 +79,27 @@ class PromotionLog(db.Model):
             'promoted_by': self.promoted_by,
             'promotion_date': self.promotion_date.strftime('%Y-%m-%d %H:%M')
         }
+
+class RankMapping(db.Model):
+    """Maps system ranks to Roblox group role IDs"""
+    __tablename__ = 'rank_mappings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    system_rank = db.Column(db.String(100), nullable=False, unique=True)
+    roblox_role_id = db.Column(db.Integer, nullable=False)
+    roblox_role_name = db.Column(db.String(100), nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<RankMapping {self.system_rank} -> Role {self.roblox_role_id}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'system_rank': self.system_rank,
+            'roblox_role_id': self.roblox_role_id,
+            'roblox_role_name': self.roblox_role_name,
+            'is_active': self.is_active
+        }

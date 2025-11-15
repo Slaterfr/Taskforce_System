@@ -9,6 +9,8 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///database/taskforce.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
-    # Roblox API settings (for later phases)
+    # Roblox API settings
     ROBLOX_GROUP_ID = os.environ.get('ROBLOX_GROUP_ID') or ''
-    ROBLOX_API_KEY = os.environ.get('ROBLOX_API_KEY') or ''
+    ROBLOX_COOKIE = os.environ.get('ROBLOX_COOKIE') or ''  # .ROBLOSECURITY cookie for write operations
+    ROBLOX_SYNC_ENABLED = os.environ.get('ROBLOX_SYNC_ENABLED', 'false').lower() == 'true'
+    ROBLOX_SYNC_INTERVAL = int(os.environ.get('ROBLOX_SYNC_INTERVAL', '3600'))  # Default 1 hour (3600 seconds)

@@ -37,3 +37,4 @@
 - Free tier: Shows a warning page (teammates click "Visit Site" to continue)
 - For fixed URL: Upgrade to paid plan or use Railway instead
 
+

@@ -3,7 +3,7 @@ from flask import (
     send_file, session, current_app, Response, make_response
 )
 from config import Config
-from database.models import db, Member, ActivityLog, PromotionLog
+from database.models import db, Member, ActivityLog, PromotionLog, RankMapping
 from database.ac_models import (
     ACPeriod,
     ActivityEntry,
@@ -18,6 +18,7 @@ from database.ac_models import (
 from utils.ac_reports import ACReportGenerator, send_discord_webhook
 from utils.excel_reports import generate_ac_workbook_bytes, merge_into_uploaded_workbook_bytes
 from utils.auth import staff_required, is_staff, check_password
+from utils.roblox_sync import sync_member_to_roblox, add_member_to_roblox, remove_member_from_roblox, sync_from_roblox
 from sqlalchemy import func
 from datetime import datetime, timedelta
 import os
@@ -74,6 +75,87 @@ def create_app():
     # Create tables if missing
     with app.app_context():
         db.create_all()
+
+    # Set up background sync task if enabled
+    sync_enabled = app.config.get('ROBLOX_SYNC_ENABLED', False)
+    print(f"\n{'='*60}")
+    print(f"🔍 Roblox Sync Status: {'✅ ENABLED' if sync_enabled else '❌ DISABLED'}")
+    print(f"{'='*60}")
+    
+    if sync_enabled:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.interval import IntervalTrigger
+        
+        scheduler = BackgroundScheduler()
+        sync_interval = app.config.get('ROBLOX_SYNC_INTERVAL', 3600)  # Default 1 hour
+        group_id = app.config.get('ROBLOX_GROUP_ID', 'Not set')
+        has_cookie = bool(app.config.get('ROBLOX_COOKIE'))
+        
+        print(f"📊 Configuration:")
+        print(f"   - Group ID: {group_id}")
+        print(f"   - Cookie set: {'✅ Yes' if has_cookie else '❌ No'}")
+        print(f"   - Sync interval: {sync_interval}s ({sync_interval // 60} minutes)")
+        print()
+        
+        def sync_job():
+            with app.app_context():
+                try:
+                    print(f"\n{'='*60}")
+                    print(f"🔄 [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting automatic Roblox sync...")
+                    print(f"{'='*60}")
+                    app.logger.info("🔄 Starting automatic Roblox sync...")
+                    
+                    result = sync_from_roblox()
+                    
+                    if result.get('success'):
+                        stats = result.get('stats', {})
+                        message = (
+                            f"✅ Roblox sync completed: {stats.get('added', 0)} added, "
+                            f"{stats.get('updated', 0)} updated, {stats.get('rank_changes', 0)} rank changes"
+                        )
+                        print(message)
+                        app.logger.info(message)
+                    else:
+                        error_msg = f"⚠️ Roblox sync failed: {result.get('message', 'Unknown error')}"
+                        print(error_msg)
+                        app.logger.warning(error_msg)
+                except Exception as e:
+                    error_msg = f"❌ Background Roblox sync error: {e}"
+                    print(error_msg)
+                    app.logger.error(error_msg, exc_info=True)
+        
+        # Add recurring sync job (every hour)
+        scheduler.add_job(
+            func=sync_job,
+            trigger=IntervalTrigger(seconds=sync_interval),
+            id='roblox_sync_job',
+            name='Roblox Group Sync',
+            replace_existing=True
+        )
+        
+        scheduler.start()
+        startup_msg = f"✅ Roblox sync scheduler started - will sync every {sync_interval}s ({sync_interval // 60} minutes)"
+        print(startup_msg)
+        app.logger.info(startup_msg)
+        
+        # Run initial sync after a short delay to let app fully start
+        initial_run_time = datetime.now() + timedelta(seconds=5)
+        scheduler.add_job(
+            func=sync_job,
+            trigger='date',
+            run_date=initial_run_time,
+            id='roblox_sync_initial',
+            name='Initial Roblox Sync',
+            replace_existing=True
+        )
+        initial_msg = "🔄 Initial sync scheduled (will run in 5 seconds)"
+        print(initial_msg)
+        app.logger.info(initial_msg)
+        print(f"{'='*60}\n")
+    else:
+        print("⚠️  Auto-sync is DISABLED")
+        print("   To enable, set ROBLOX_SYNC_ENABLED=true in your .env file")
+        print(f"{'='*60}\n")
 
     # inject helpful template globals
     @app.context_processor
@@ -209,6 +291,13 @@ def add_member():
         m = Member(discord_username=discord_username, roblox_username=roblox_username, current_rank=current_rank)
         db.session.add(m)
         db.session.commit()
+        
+        # Sync to Roblox if enabled and member has Roblox username
+        if current_app.config.get('ROBLOX_SYNC_ENABLED') and m.roblox_username:
+            result = add_member_to_roblox(m)
+            if not result['success']:
+                flash(f"Member added, but Roblox sync failed: {result['message']}", 'warning')
+        
         flash('Member added', 'success')
         return redirect(url_for('member_detail', member_id=m.id))
     return render_template('add_member.html')
@@ -217,20 +306,45 @@ def add_member():
 @staff_required
 def edit_member(member_id):
     member = Member.query.get_or_404(member_id)
+    
+    # Get available ranks from RankMapping, or use default list
+    rank_mappings = RankMapping.query.filter_by(is_active=True).order_by(RankMapping.system_rank).all()
+    if rank_mappings:
+        available_ranks = [mapping.system_rank for mapping in rank_mappings]
+    else:
+        # Fallback to default ranks if no mappings exist
+        available_ranks = ['Aspirant', 'Novice', 'Adept', 'Crusader', 'Paladin', 
+                          'Exemplar', 'Prospect', 'Commander', 'Marshal', 'General', 'Chief General']
+    
     if request.method == 'POST':
+        old_rank = member.current_rank
         member.discord_username = request.form.get('discord_username', member.discord_username).strip()
         member.roblox_username = request.form.get('roblox_username', member.roblox_username).strip() or None
         member.current_rank = request.form.get('current_rank', member.current_rank).strip()
         member.last_updated = datetime.utcnow()
         db.session.commit()
+        
+        # Sync to Roblox if enabled and rank changed
+        if current_app.config.get('ROBLOX_SYNC_ENABLED') and old_rank != member.current_rank and member.roblox_id:
+            result = sync_member_to_roblox(member)
+            if not result['success']:
+                flash(f"Member updated, but Roblox sync failed: {result['message']}", 'warning')
+        
         flash('Member updated', 'success')
         return redirect(url_for('member_detail', member_id=member.id))
-    return render_template('edit_member.html', member=member)
+    return render_template('edit_member.html', member=member, available_ranks=available_ranks)
 
 @app.route('/member/<int:member_id>/delete', methods=['POST'])
 @staff_required
 def delete_member(member_id):
     member = Member.query.get_or_404(member_id)
+    
+    # Sync removal to Roblox if enabled
+    if current_app.config.get('ROBLOX_SYNC_ENABLED') and member.roblox_id:
+        result = remove_member_from_roblox(member)
+        if not result['success']:
+            flash(f"Member removed from system, but Roblox sync failed: {result['message']}", 'warning')
+    
     member.is_active = False
     member.last_updated = datetime.utcnow()
     db.session.commit()
@@ -914,6 +1028,15 @@ def ac_member_detail(member_id):
 @staff_required
 def promote_member():
     """Promote a member and record a PromotionLog"""
+    # Get available ranks from RankMapping, or use default list
+    rank_mappings = RankMapping.query.filter_by(is_active=True).order_by(RankMapping.system_rank).all()
+    if rank_mappings:
+        available_ranks = [mapping.system_rank for mapping in rank_mappings]
+    else:
+        # Fallback to default ranks if no mappings exist
+        available_ranks = ['Aspirant', 'Novice', 'Adept', 'Crusader', 'Paladin', 
+                          'Exemplar', 'Prospect', 'Commander', 'Marshal', 'General', 'Chief General']
+    
     if request.method == 'POST':
         member_id = request.form.get('member_id', type=int)
         new_rank = request.form.get('new_rank', '').strip()
@@ -941,12 +1064,18 @@ def promote_member():
         db.session.add(promotion)
         db.session.commit()
 
+        # Sync to Roblox if enabled
+        if current_app.config.get('ROBLOX_SYNC_ENABLED') and member.roblox_id:
+            result = sync_member_to_roblox(member)
+            if not result['success']:
+                flash(f"Promotion saved, but Roblox sync failed: {result['message']}", 'warning')
+
         flash(f'{member.discord_username} promoted from {old_rank} to {new_rank}', 'success')
         return redirect(url_for('member_detail', member_id=member.id))
 
     # GET: show form
     members_list = Member.query.filter_by(is_active=True).order_by(Member.discord_username).all()
-    return render_template('promote_member.html', members=members_list)
+    return render_template('promote_member.html', members=members_list, available_ranks=available_ranks)
 
 # ensure delete/clear endpoints exist (idempotent if already present)
 @app.route('/ac/activity/<int:activity_id>/delete', methods=['POST'])
@@ -975,6 +1104,102 @@ def clear_member_activities(member_id):
     db.session.commit()
     flash(f'Deleted {deleted_count} activity entries for member.', 'success')
     return redirect(url_for('ac_member_detail', member_id=member_id))
+
+# ========== ROBLOX SYNC ROUTES ==========
+
+@app.route('/roblox/rank_mappings', methods=['GET', 'POST'])
+@staff_required
+def manage_rank_mappings():
+    """Manage rank mappings between system ranks and Roblox role IDs"""
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'add':
+            system_rank = request.form.get('system_rank', '').strip()
+            roblox_role_id = request.form.get('roblox_role_id', type=int)
+            roblox_role_name = request.form.get('roblox_role_name', '').strip() or None
+            
+            if not system_rank or not roblox_role_id:
+                flash('System rank and Roblox role ID are required', 'error')
+                return redirect(url_for('manage_rank_mappings'))
+            
+            # Check if mapping already exists
+            existing = RankMapping.query.filter_by(system_rank=system_rank).first()
+            if existing:
+                existing.roblox_role_id = roblox_role_id
+                existing.roblox_role_name = roblox_role_name
+                existing.is_active = True
+                existing.last_updated = datetime.utcnow()
+                flash(f'Updated mapping for {system_rank}', 'success')
+            else:
+                mapping = RankMapping(
+                    system_rank=system_rank,
+                    roblox_role_id=roblox_role_id,
+                    roblox_role_name=roblox_role_name
+                )
+                db.session.add(mapping)
+                flash(f'Added mapping for {system_rank}', 'success')
+            
+            db.session.commit()
+        
+        elif action == 'delete':
+            mapping_id = request.form.get('mapping_id', type=int)
+            if mapping_id:
+                mapping = RankMapping.query.get(mapping_id)
+                if mapping:
+                    db.session.delete(mapping)
+                    db.session.commit()
+                    flash('Mapping deleted', 'success')
+        
+        elif action == 'toggle':
+            mapping_id = request.form.get('mapping_id', type=int)
+            if mapping_id:
+                mapping = RankMapping.query.get(mapping_id)
+                if mapping:
+                    mapping.is_active = not mapping.is_active
+                    mapping.last_updated = datetime.utcnow()
+                    db.session.commit()
+                    flash('Mapping updated', 'success')
+        
+        return redirect(url_for('manage_rank_mappings'))
+    
+    # GET: show all mappings
+    mappings = RankMapping.query.order_by(RankMapping.system_rank).all()
+    
+    # Get available roles from Roblox if configured
+    roblox_roles = []
+    if current_app.config.get('ROBLOX_GROUP_ID'):
+        try:
+            from utils.roblox_sync import get_roblox_api
+            roblox_api = get_roblox_api()
+            if roblox_api:
+                roblox_roles = roblox_api.get_group_roles()
+        except Exception as e:
+            current_app.logger.error(f"Error fetching Roblox roles: {e}")
+    
+    # Pass config values to template
+    config_info = {
+        'ROBLOX_SYNC_ENABLED': current_app.config.get('ROBLOX_SYNC_ENABLED', False),
+        'ROBLOX_SYNC_INTERVAL': current_app.config.get('ROBLOX_SYNC_INTERVAL', 600),
+        'ROBLOX_GROUP_ID': current_app.config.get('ROBLOX_GROUP_ID', '')
+    }
+    
+    return render_template('roblox/rank_mappings.html', mappings=mappings, roblox_roles=roblox_roles, config=config_info)
+
+@app.route('/roblox/sync_now', methods=['POST'])
+@staff_required
+def sync_now():
+    """Manually trigger a sync from Roblox"""
+    try:
+        result = sync_from_roblox()
+        if result['success']:
+            flash(result['message'], 'success')
+        else:
+            flash(f"Sync failed: {result['message']}", 'error')
+    except Exception as e:
+        flash(f"Sync error: {str(e)}", 'error')
+    
+    return redirect(request.referrer or url_for('dashboard'))
 
 if __name__ == '__main__':
     # use 0.0.0.0 if you want external access

@@ -9,7 +9,14 @@
       {% for m in members %}<option value="{{ m.id }}">{{ m.discord_username }} — {{ m.current_rank }}</option>{% endfor %}
     </select>
   </div>
-  <div class="mb-3"><label>New Rank</label><input name="new_rank" class="form-control"></div>
+  <div class="mb-3">
+    <label>New Rank</label>
+    <select name="new_rank" class="form-select">
+      {% for rank in available_ranks %}
+        <option value="{{ rank }}">{{ rank }}</option>
+      {% endfor %}
+    </select>
+  </div>
   <div class="mb-3"><label>Reason</label><input name="reason" class="form-control"></div>
   <button class="btn btn-primary" type="submit">Promote</button>
 </form>
