@@ -9,8 +9,35 @@ services:
       - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
       - STAFF_PASSWORD=${STAFF_PASSWORD:-task2025}
       - DATABASE_URL=sqlite:///instance/taskforce.db
+      - ROBLOX_SYNC_ENABLED=true
+      - ROBLOX_BACKGROUND_SYNC_ENABLED=false
+      - ROBLOX_GROUP_ID=${ROBLOX_GROUP_ID}
+      - ROBLOX_COOKIE=${ROBLOX_COOKIE}
     volumes:
       - ./instance:/app/instance
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+
+  scheduler:
+    build: .
+    command: python run_scheduler.py
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      - DATABASE_URL=sqlite:///instance/taskforce.db
+      - ROBLOX_SYNC_ENABLED=true
+      - ROBLOX_BACKGROUND_SYNC_ENABLED=true
+      - ROBLOX_GROUP_ID=${ROBLOX_GROUP_ID}
+      - ROBLOX_COOKIE=${ROBLOX_COOKIE}
+      - ROBLOX_SYNC_INTERVAL=${ROBLOX_SYNC_INTERVAL:-3600}
+    volumes:
+      - ./instance:/app/instance
+    restart: unless-stopped
+    depends_on:
+      - web
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
 

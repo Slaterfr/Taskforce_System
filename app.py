@@ -82,7 +82,16 @@ def create_app():
     print(f"🔍 Roblox Sync Status: {'✅ ENABLED' if sync_enabled else '❌ DISABLED'}")
     print(f"{'='*60}")
     
-    if sync_enabled:
+    # Set up background sync task if enabled (and specifically configured for background execution)
+    sync_enabled = app.config.get('ROBLOX_SYNC_ENABLED', False)
+    background_sync = app.config.get('ROBLOX_BACKGROUND_SYNC_ENABLED', False)
+    
+    print(f"\n{'='*60}")
+    print(f"🔍 Roblox Sync Status: {'✅ ENABLED' if sync_enabled else '❌ DISABLED'}")
+    print(f"🕰️ Background Scheduler: {'✅ ENABLED' if background_sync else '❌ DISABLED'}")
+    print(f"{'='*60}")
+    
+    if sync_enabled and background_sync:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.interval import IntervalTrigger
         
@@ -325,10 +334,26 @@ def edit_member(member_id):
         db.session.commit()
         
         # Sync to Roblox if enabled and rank changed
-        if current_app.config.get('ROBLOX_SYNC_ENABLED') and old_rank != member.current_rank and member.roblox_id:
+        sync_enabled = current_app.config.get('ROBLOX_SYNC_ENABLED', False)
+        rank_changed = old_rank != member.current_rank
+        has_roblox_id = bool(member.roblox_id)
+        
+        current_app.logger.info(f"Edit member: sync_enabled={sync_enabled}, rank_changed={rank_changed}, has_roblox_id={has_roblox_id}")
+        
+        if sync_enabled and rank_changed and has_roblox_id:
+            current_app.logger.info(f"Syncing {member.discord_username} rank change: {old_rank} -> {member.current_rank}")
             result = sync_member_to_roblox(member)
             if not result['success']:
-                flash(f"Member updated, but Roblox sync failed: {result['message']}", 'warning')
+                error_msg = f"Member updated, but Roblox sync failed: {result['message']}"
+                current_app.logger.error(error_msg)
+                flash(error_msg, 'warning')
+            else:
+                current_app.logger.info(f"Successfully synced {member.discord_username} to Roblox")
+        elif sync_enabled and rank_changed and not has_roblox_id:
+            current_app.logger.warning(f"Cannot sync {member.discord_username} - no Roblox ID set")
+            flash('Member updated, but cannot sync to Roblox (no Roblox ID)', 'warning')
+        elif not sync_enabled:
+            current_app.logger.debug(f"Roblox sync is disabled - skipping sync for {member.discord_username}")
         
         flash('Member updated', 'success')
         return redirect(url_for('member_detail', member_id=member.id))
@@ -1065,10 +1090,25 @@ def promote_member():
         db.session.commit()
 
         # Sync to Roblox if enabled
-        if current_app.config.get('ROBLOX_SYNC_ENABLED') and member.roblox_id:
+        sync_enabled = current_app.config.get('ROBLOX_SYNC_ENABLED', False)
+        has_roblox_id = bool(member.roblox_id)
+        
+        current_app.logger.info(f"Promote member: sync_enabled={sync_enabled}, has_roblox_id={has_roblox_id}, rank: {old_rank} -> {new_rank}")
+        
+        if sync_enabled and has_roblox_id:
+            current_app.logger.info(f"Syncing {member.discord_username} promotion: {old_rank} -> {new_rank}")
             result = sync_member_to_roblox(member)
             if not result['success']:
-                flash(f"Promotion saved, but Roblox sync failed: {result['message']}", 'warning')
+                error_msg = f"Promotion saved, but Roblox sync failed: {result['message']}"
+                current_app.logger.error(error_msg)
+                flash(error_msg, 'warning')
+            else:
+                current_app.logger.info(f"Successfully synced {member.discord_username} promotion to Roblox")
+        elif sync_enabled and not has_roblox_id:
+            current_app.logger.warning(f"Cannot sync {member.discord_username} - no Roblox ID set")
+            flash('Promotion saved, but cannot sync to Roblox (no Roblox ID)', 'warning')
+        elif not sync_enabled:
+            current_app.logger.debug(f"Roblox sync is disabled - skipping sync for {member.discord_username}")
 
         flash(f'{member.discord_username} promoted from {old_rank} to {new_rank}', 'success')
         return redirect(url_for('member_detail', member_id=member.id))

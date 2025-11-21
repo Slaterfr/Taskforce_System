@@ -1,0 +1,32 @@
+# fly.toml app configuration file generated for taskforce-system-solitary on 2025-11-20T20:45:01-06:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'taskforce-system-solitary'
+primary_region = 'dfw'
+
+[build]
+
+[env]
+  ROBLOX_BACKGROUND_SYNC_ENABLED = 'true'
+  ROBLOX_SYNC_ENABLED = 'true'
+  ROBLOX_SYNC_INTERVAL = '3600'
+
+[[mounts]]
+  source = 'taskforce_data'
+  destination = '/app/instance'
+
+[http_service]
+  internal_port = 5000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1

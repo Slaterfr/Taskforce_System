@@ -17,5 +17,8 @@ README.md
 .DS_Store
 .vscode
 .idea
+.env
+.env.*
+!env.example
 
 
