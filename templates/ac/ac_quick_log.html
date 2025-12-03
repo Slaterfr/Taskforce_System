@@ -1,149 +1,151 @@
 {% extends "base.html" %}
 {% block title %}AC Quick Log{% endblock %}
 {% block content %}
-<h3>Quick Log — {{ current_period.period_name if current_period else '' }}</h3>
-<p>Today: {{ today }}</p>
+<h3 style="color: white;">Quick Log — {{ current_period.period_name if current_period else '' }}</h3>
+<p style="color: white;">Today: {{ today }}</p>
 
 <table class="table">
   <thead>
     <tr>
-      <th>Member</th>
-      <th>Activity Summary</th>
-      <th>Recent Activities</th>
-      <th>Quick Actions</th>
-      <th>Actions</th>
+      <th style="color: white;">Member</th>
+      <th style="color: white;">Activity Summary</th>
+      <th style="color: white;">Recent Activities</th>
+      <th style="color: white;">Quick Actions</th>
+      <th style="color: white;">Actions</th>
     </tr>
   </thead>
   <tbody>
     {% for m in members %}
-      {% set recent = member_activities.get(m.id, []) %}
-      {% set counts = member_activity_counts.get(m.id, {}) %}
-      <tr id="member-row-{{ m.id }}">
-        <td>
-          <a href="{{ url_for('ac_member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
-          <div class="text-muted small">{{ m.current_rank }}</div>
-        </td>
-        <td>
-          {% for type in activity_types %}
-            {% if counts.get(type, 0) > 0 %}
-              <div class="badge bg-secondary me-1 mb-1">
-                {{ counts.get(type, 0) }} {{ type }}
-              </div>
-            {% endif %}
-          {% endfor %}
-        </td>
-        <td style="max-width: 300px">
-          {% if recent %}
-            {% for activity in recent %}
-              <div class="d-flex justify-content-between align-items-center mb-1">
-                <span>{{ activity.activity_date.strftime('%Y-%m-%d') }} — {{ activity.activity_type }} ({{ activity.points }})</span>
-                <form method="post" action="{{ url_for('delete_ac_activity', activity_id=activity.id) }}" class="d-inline" 
-                      onsubmit="return confirm('Delete this activity?');">
-                  <button type="submit" class="btn btn-sm btn-outline-danger">
-                    <i class="fas fa-times"></i>
-                  </button>
-                </form>
-              </div>
-            {% endfor %}
-          {% else %}
-            <span class="text-muted">No recent activities</span>
-          {% endif %}
-        </td>
-        <td>
-          {% for t in activity_types %}
-            <button class="btn btn-sm btn-outline-secondary quick-log-btn mb-1" 
-                    data-member="{{ m.id }}" 
-                    data-activity="{{ t }}">{{ t }}</button>
-          {% endfor %}
-          <br>
-          <button class="btn btn-sm {% if member_ia_status.get(m.id, False) %}btn-info{% else %}btn-outline-info{% endif %} quick-log-ia-btn mb-1" 
-                  data-member="{{ m.id }}">{% if member_ia_status.get(m.id, False) %}IA ✓{% else %}IA{% endif %}</button>
-          <button class="btn btn-sm {% if member_exempt_status.get(m.id, False) %}btn-primary{% else %}btn-outline-primary{% endif %} quick-log-exempt-btn mb-1" 
-                  data-member="{{ m.id }}">{% if member_exempt_status.get(m.id, False) %}Exempt ✓{% else %}Exempt{% endif %}</button>
-        </td>
+    {% set recent = member_activities.get(m.id, []) %}
+    {% set counts = member_activity_counts.get(m.id, {}) %}
+    <tr id="member-row-{{ m.id }}">
+      <td>
+        <a href="{{ url_for('ac_member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
+        <div class="text-muted small">{{ m.current_rank }}</div>
+      </td>
+      <td>
+        {% for type in activity_types %}
+        {% if counts.get(type, 0) > 0 %}
+        <div class="badge bg-secondary me-1 mb-1">
+          {{ counts.get(type, 0) }} {{ type }}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </td>
+      <td style="max-width: 300px">
+        {% if recent %}
+        {% for activity in recent %}
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span>{{ activity.activity_date.strftime('%Y-%m-%d') }} — {{ activity.activity_type }} ({{ activity.points
+            }})</span>
+          <form method="post" action="{{ url_for('delete_ac_activity', activity_id=activity.id) }}" class="d-inline"
+            onsubmit="return confirm('Delete this activity?');">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+              <i class="fas fa-times"></i>
+            </button>
+          </form>
+        </div>
+        {% endfor %}
+        {% else %}
+        <span class="text-muted">No recent activities</span>
+        {% endif %}
+      </td>
+      <td>
+        {% for t in activity_types %}
+        <button class="btn btn-sm btn-outline-secondary quick-log-btn mb-1" data-member="{{ m.id }}"
+          data-activity="{{ t }}">{{ t }}</button>
+        {% endfor %}
+        <br>
+        <button
+          class="btn btn-sm {% if member_ia_status.get(m.id, False) %}btn-info{% else %}btn-outline-info{% endif %} quick-log-ia-btn mb-1"
+          data-member="{{ m.id }}">{% if member_ia_status.get(m.id, False) %}IA ✓{% else %}IA{% endif %}</button>
+        <button
+          class="btn btn-sm {% if member_exempt_status.get(m.id, False) %}btn-primary{% else %}btn-outline-primary{% endif %} quick-log-exempt-btn mb-1"
+          data-member="{{ m.id }}">{% if member_exempt_status.get(m.id, False) %}Exempt ✓{% else %}Exempt{% endif
+          %}</button>
+      </td>
 
-        <td>
-          {% if is_staff %}
-            <form method="post" action="{{ url_for('clear_member_activities', member_id=m.id) }}" 
-                  class="d-inline"
-                  onsubmit="return confirm('Clear all activities for {{ m.discord_username }} in this period?');">
-              <input type="hidden" name="period_id" value="{{ current_period.id if current_period }}">
-              <button type="submit" class="btn btn-sm btn-danger">Clear All</button>
-            </form>
-          {% endif %}
-        </td>
-      </tr>
+      <td>
+        {% if is_staff %}
+        <form method="post" action="{{ url_for('clear_member_activities', member_id=m.id) }}" class="d-inline"
+          onsubmit="return confirm('Clear all activities for {{ m.discord_username }} in this period?');">
+          <input type="hidden" name="period_id" value="{{ current_period.id if current_period }}">
+          <button type="submit" class="btn btn-sm btn-danger">Clear All</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
     {% endfor %}
   </tbody>
 </table>
 
 <script>
-document.addEventListener('DOMContentLoaded', function(){
-  // Existing quick-log buttons...
-  document.querySelectorAll('.quick-log-btn').forEach(btn=>{
-    btn.addEventListener('click', async function(){
-      const memberId = Number(this.dataset.member);
-      const activityType = this.dataset.activity;
-      this.disabled = true;
-      try {
-        const res = await fetch("{{ url_for('quick_log_activity') }}", {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({member_id: memberId, activity_type: activityType, activity_date: "{{ today }}", logged_by: "HC Team"})
-        });
-        const data = await res.json();
-        if (res.ok && data.success) window.location.reload();
-        else alert(data.message || 'Error logging activity');
-      } catch (err) {
-        console.error(err);
-        alert('Network error');
-      } finally { this.disabled = false; }
+  document.addEventListener('DOMContentLoaded', function () {
+    // Existing quick-log buttons...
+    document.querySelectorAll('.quick-log-btn').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const memberId = Number(this.dataset.member);
+        const activityType = this.dataset.activity;
+        this.disabled = true;
+        try {
+          const res = await fetch("{{ url_for('quick_log_activity') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: memberId, activity_type: activityType, activity_date: "{{ today }}", logged_by: "HC Team" })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) window.location.reload();
+          else alert(data.message || 'Error logging activity');
+        } catch (err) {
+          console.error(err);
+          alert('Network error');
+        } finally { this.disabled = false; }
+      });
     });
-  });
 
-  // IA toggle buttons
-  document.querySelectorAll('.quick-log-ia-btn').forEach(btn=>{
-    btn.addEventListener('click', async function(){
-      const memberId = Number(this.dataset.member);
-      this.disabled = true;
-      try {
-        const res = await fetch("{{ url_for('quick_log_ia') }}", {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({member_id: memberId, reason: 'Quick log IA', approved_by: 'HC Team'})
-        });
-        const data = await res.json();
-        if (res.ok && data.success) window.location.reload();
-        else alert(data.message || 'Error toggling IA');
-      } catch (err) {
-        console.error(err);
-        alert('Network error');
-      } finally { this.disabled = false; }
+    // IA toggle buttons
+    document.querySelectorAll('.quick-log-ia-btn').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const memberId = Number(this.dataset.member);
+        this.disabled = true;
+        try {
+          const res = await fetch("{{ url_for('quick_log_ia') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: memberId, reason: 'Quick log IA', approved_by: 'HC Team' })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) window.location.reload();
+          else alert(data.message || 'Error toggling IA');
+        } catch (err) {
+          console.error(err);
+          alert('Network error');
+        } finally { this.disabled = false; }
+      });
     });
-  });
 
-  // Exempt toggle buttons
-  document.querySelectorAll('.quick-log-exempt-btn').forEach(btn=>{
-    btn.addEventListener('click', async function(){
-      const memberId = Number(this.dataset.member);
-      this.disabled = true;
-      try {
-        const res = await fetch("{{ url_for('quick_log_exempt') }}", {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({member_id: memberId, reason: 'Quick log exemption', approved_by: 'HC Team'})
-        });
-        const data = await res.json();
-        if (res.ok && data.success) window.location.reload();
-        else alert(data.message || 'Error toggling exemption');
-      } catch (err) {
-        console.error(err);
-        alert('Network error');
-      } finally { this.disabled = false; }
+    // Exempt toggle buttons
+    document.querySelectorAll('.quick-log-exempt-btn').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const memberId = Number(this.dataset.member);
+        this.disabled = true;
+        try {
+          const res = await fetch("{{ url_for('quick_log_exempt') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ member_id: memberId, reason: 'Quick log exemption', approved_by: 'HC Team' })
+          });
+          const data = await res.json();
+          if (res.ok && data.success) window.location.reload();
+          else alert(data.message || 'Error toggling exemption');
+        } catch (err) {
+          console.error(err);
+          alert('Network error');
+        } finally { this.disabled = false; }
+      });
     });
-  });
 
-});
+  });
 
   // example quick-log fetch
   async function quickLog(memberId, activityType) {
@@ -161,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function(){
       alert('Authentication required. Please login.');
       return;
     }
-    const data = await res.json().catch(()=>null);
+    const data = await res.json().catch(() => null);
     if (res.ok && data && data.success) {
       window.location.reload();
     } else {

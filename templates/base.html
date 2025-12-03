@@ -1,50 +1,63 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>{% block title %}Taskforce{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
   <script defer src="https://use.fontawesome.com/releases/v6.4.0/js/all.js"></script>
 </head>
-<body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <div class="container">
-    <a class="navbar-brand" href="{{ url_for('public_roster') }}">Taskforce</a>
-    <div class="collapse navbar-collapse">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('public_roster') }}">Roster</a></li>
-        {% if is_staff %}
+
+<body class="d-flex flex-column min-vh-100">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-custom-purple">
+    <div class="container">
+      <a class="navbar-brand" href="{{ url_for('public_roster') }}">
+        <img src="{{ url_for('static', filename='img/TaskLogo.jpeg') }}" alt="Taskforce Logo" class="navbar-logo">
+        Taskforce
+      </a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('public_roster') }}">Roster</a></li>
+          {% if is_staff %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('members') }}">Manage</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('ac_dashboard') }}">AC</a></li>
-        {% endif %}
-      </ul>
-      <ul class="navbar-nav">
-        {% if is_staff %}
+          {% endif %}
+        </ul>
+        <ul class="navbar-nav">
+          {% if is_staff %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_logout') }}">Logout</a></li>
-        {% else %}
+          {% else %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('staff_login') }}">Staff Login</a></li>
-        {% endif %}
-      </ul>
+          {% endif %}
+        </ul>
+      </div>
     </div>
-  </div>
-</nav>
+  </nav>
 
-<div class="container my-4">
-  {% with messages = get_flashed_messages(with_categories=true) %}
+  <div class="container my-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-      {% for cat, msg in messages %}
-        <div class="alert alert-{{ 'danger' if cat == 'error' else cat }} alert-dismissible fade show" role="alert">
-          {{ msg }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-      {% endfor %}
+    {% for cat, msg in messages %}
+    <div class="alert alert-{{ 'danger' if cat == 'error' else cat }} alert-dismissible fade show" role="alert">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
     {% endif %}
-  {% endwith %}
-  {% block content %}{% endblock %}
-</div>
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <footer class="bg-custom-purple text-center">
+    <div class="container">
+      <small>&copy; 2025 Taskforce System</small>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

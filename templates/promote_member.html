@@ -1,23 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Promote Member{% endblock %}
 {% block content %}
-<h3>Promote Member</h3>
+<h3 style="color: white;">Change Member's Rank</h3>
 <form method="post">
   <div class="mb-3">
-    <label>Member</label>
+    <label style="color: white;">Member</label>
     <select name="member_id" class="form-select">
-      {% for m in members %}<option value="{{ m.id }}">{{ m.discord_username }} — {{ m.current_rank }}</option>{% endfor %}
+      {% for m in members %}<option value="{{ m.id }}">{{ m.discord_username }} — {{ m.current_rank }}</option>{% endfor
+      %}
     </select>
   </div>
   <div class="mb-3">
-    <label>New Rank</label>
+    <label style="color: white;">New Rank</label>
     <select name="new_rank" class="form-select">
       {% for rank in available_ranks %}
-        <option value="{{ rank }}">{{ rank }}</option>
+      <option value="{{ rank }}">{{ rank }}</option>
       {% endfor %}
     </select>
   </div>
-  <div class="mb-3"><label>Reason</label><input name="reason" class="form-control"></div>
+  <div class="mb-3"><label style="color: white;">Reason</label><input name="reason" class="form-control"></div>
   <button class="btn btn-primary" type="submit">Promote</button>
 </form>
 {% endblock %}

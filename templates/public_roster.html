@@ -3,7 +3,7 @@
 {% block title %}Roster{% endblock %}
 
 {% block content %}
-<h1>Roster</h1>
+<h1 style="color: white;">Roster</h1>
 <form class="mb-3" method="get">
   <div class="input-group">
     <input class="form-control" name="search" value="{{ search }}" placeholder="Search members...">
@@ -12,22 +12,29 @@
 </form>
 
 <table class="table table-hover">
-  <thead><tr><th>Rank</th><th>Discord</th><th>Roblox</th><th></th></tr></thead>
+  <thead>
+    <tr>
+      <th>Rank</th>
+      <th>Discord</th>
+      <th>Roblox</th>
+      <th></th>
+    </tr>
+  </thead>
   <tbody>
     {% for m in members %}
     <tr>
       <td>{{ m.current_rank }}</td>
       <td>
         {% if is_staff %}
-          <a href="{{ url_for('member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
+        <a href="{{ url_for('member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
         {% else %}
-          <a href="{{ url_for('public_member', member_id=m.id) }}">{{ m.discord_username }}</a>
+        <a href="{{ url_for('public_member', member_id=m.id) }}">{{ m.discord_username }}</a>
         {% endif %}
       </td>
       <td>{{ m.roblox_username or 'N/A' }}</td>
       <td>
         {% if is_staff %}
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('edit_member', member_id=m.id) }}">Edit</a>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('edit_member', member_id=m.id) }}">Edit</a>
         {% endif %}
       </td>
     </tr>

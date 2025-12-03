@@ -1,24 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Log AC Activity{% endblock %}
 {% block content %}
-<h3>Log Activity — {{ current_period.period_name if current_period else '' }}</h3>
+<h3 style="color: white;">Log Activity — {{ current_period.period_name if current_period else '' }}</h3>
 <form method="post">
   <div class="mb-3">
-    <label>Member</label>
+    <label style="color: white;">Member</label>
     <select name="member_id" class="form-select">
       {% for m in members %}
-        <option value="{{ m.id }}" {% if selected_member_id and selected_member_id == m.id %}selected{% endif %}>{{ m.discord_username }} — {{ m.current_rank }}</option>
+      <option value="{{ m.id }}" {% if selected_member_id and selected_member_id==m.id %}selected{% endif %}>{{
+        m.discord_username }} — {{ m.current_rank }}</option>
       {% endfor %}
     </select>
   </div>
   <div class="mb-3">
-    <label>Activity Type</label>
+    <label style="color: white;">Activity Type</label>
     <select name="activity_type" class="form-select">
       {% for t in activity_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
     </select>
   </div>
-  <div class="mb-3"><label>Date</label><input type="date" name="activity_date" class="form-control" value="{{ current_period.start_date.strftime('%Y-%m-%d') if current_period }}"/></div>
-  <div class="mb-3"><label>Description</label><input name="description" class="form-control"></div>
+  <div class="mb-3"><label style="color: white;">Date</label><input type="date" name="activity_date"
+      class="form-control" value="{{ current_period.start_date.strftime('%Y-%m-%d') if current_period }}" /></div>
+  <div class="mb-3"><label style="color: white;">Description</label><input name="description" class="form-control">
+  </div>
   <button class="btn btn-primary" type="submit">Log</button>
 </form>
 {% endblock %}

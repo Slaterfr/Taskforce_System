@@ -4,6 +4,8 @@ Handles fetching group members and their ranks from Roblox
 """
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import time
 from typing import List, Dict, Optional
 from dataclasses import dataclass
@@ -31,11 +33,29 @@ class RobloxAPI:
         self.last_request = 0
         self.min_delay = 0.1  # 100ms between requests
         
+        # Initialize session with retries
+        self.session = requests.Session()
+        
+        # Configure robust retry strategy
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "OPTIONS", "POST", "PATCH", "DELETE"]
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
+        
     def _get_headers(self) -> Dict:
         """Get headers for authenticated requests"""
         headers = {
             'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.roblox.com/',
+            'Origin': 'https://www.roblox.com'
         }
         return headers
     
@@ -57,7 +77,7 @@ class RobloxAPI:
         # Method 1: Try using the logout endpoint (most reliable)
         try:
             url = "https://auth.roblox.com/v2/logout"
-            response = requests.post(
+            response = self.session.post(
                 url,
                 headers=self._get_headers(),
                 cookies=self._get_cookies(),
@@ -73,7 +93,7 @@ class RobloxAPI:
         try:
             # Make a PATCH request that will likely fail, but will return the CSRF token
             url = f"{self.base_url}/groups/{self.group_id}/users/1"
-            response = requests.patch(
+            response = self.session.patch(
                 url,
                 json={"roleId": 1},
                 headers=self._get_headers(),
@@ -89,7 +109,7 @@ class RobloxAPI:
         return None
     
     def _make_request(self, url: str, method: str = 'GET', params: Dict = None, 
-                     json_data: Dict = None, headers: Dict = None) -> Optional[Dict]:
+                     json_data: Dict = None, headers: Dict = None, retry_count: int = 0) -> Optional[Dict]:
         """Make a rate-limited request to Roblox API"""
         
         # Rate limiting
@@ -104,17 +124,16 @@ class RobloxAPI:
         request_cookies = self._get_cookies()
         
         try:
-            if method == 'GET':
-                response = requests.get(url, params=params, headers=request_headers, cookies=request_cookies, timeout=10)
-            elif method == 'POST':
-                response = requests.post(url, json=json_data, headers=request_headers, cookies=request_cookies, timeout=10)
-            elif method == 'PATCH':
-                response = requests.patch(url, json=json_data, headers=request_headers, cookies=request_cookies, timeout=10)
-            elif method == 'DELETE':
-                response = requests.delete(url, headers=request_headers, cookies=request_cookies, timeout=10)
-            else:
-                response = requests.request(method, url, params=params, json=json_data, 
-                                          headers=request_headers, cookies=request_cookies, timeout=10)
+            # Use session instead of direct requests
+            response = self.session.request(
+                method=method,
+                url=url,
+                params=params,
+                json=json_data,
+                headers=request_headers,
+                cookies=request_cookies,
+                timeout=30  # Increased timeout
+            )
             
             self.last_request = time.time()
             
@@ -123,20 +142,47 @@ class RobloxAPI:
                     return response.json()
                 return {'success': True}
             elif response.status_code == 429:  # Rate limited
-                print("⚠️  Rate limited by Roblox API, waiting 60 seconds...")
-                time.sleep(60)
-                return self._make_request(url, method, params, json_data, headers)  # Retry
+                if retry_count < 3:
+                    print("⚠️  Rate limited by Roblox API, waiting 60 seconds...")
+                    time.sleep(60)
+                    return self._make_request(url, method, params, json_data, headers, retry_count + 1)
+                else:
+                    print("❌ Max retries reached for rate limit")
+                    return None
             elif response.status_code == 401:
                 print("❌ Authentication failed - check your Roblox cookie")
                 return None
             elif response.status_code == 403:
-                print(f"❌ Permission denied - you may not have permission to perform this action")
+                # Don't print for CSRF checks which expect failure
+                if 'X-CSRF-TOKEN' not in request_headers:
+                    print(f"❌ Permission denied - you may not have permission to perform this action")
                 return None
             else:
                 error_msg = response.text if hasattr(response, 'text') else 'Unknown error'
-                print(f"❌ API request failed: {response.status_code} - {error_msg}")
+                print(f"❌ API request failed: {response.status_code} - {error_msg[:200]}")
                 return None
                 
+        except (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError, requests.exceptions.Timeout) as e:
+            if retry_count < 3:
+                wait_time = 2 * (retry_count + 1)
+                print(f"⚠️  Connection error: {e}. Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+                # Re-initialize session on connection error
+                self.session = requests.Session()
+                retry_strategy = Retry(
+                    total=3,
+                    backoff_factor=1,
+                    status_forcelist=[500, 502, 503, 504],
+                    allowed_methods=["HEAD", "GET", "OPTIONS", "POST", "PATCH", "DELETE"]
+                )
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+                self.session.mount("https://", adapter)
+                self.session.mount("http://", adapter)
+                
+                return self._make_request(url, method, params, json_data, headers, retry_count + 1)
+            else:
+                print(f"❌ Request error after retries: {e}")
+                return None
         except requests.exceptions.RequestException as e:
             print(f"❌ Request error: {e}")
             return None
@@ -237,7 +283,8 @@ class RobloxAPI:
         }
         
         try:
-            response = requests.post(url, json=payload, timeout=10)
+            # Use session
+            response = self.session.post(url, json=payload, timeout=10)
             self.last_request = time.time()
             
             if response.status_code == 200:
@@ -275,7 +322,9 @@ class RobloxAPI:
             print(f"🔄 Attempting to update user {user_id} to role {role_id}...")
             if csrf_token:
                 print(f"🔐 Using CSRF token: {csrf_token[:20]}...")
-            response = requests.patch(
+            
+            # Use session
+            response = self.session.patch(
                 url,
                 json=payload,
                 headers=headers,
@@ -294,7 +343,7 @@ class RobloxAPI:
                     print(f"🔐 Got CSRF token from 403 response, retrying...")
                     csrf_token = new_csrf_token
                     headers['X-CSRF-TOKEN'] = csrf_token
-                    response = requests.patch(
+                    response = self.session.patch(
                         url,
                         json=payload,
                         headers=headers,
@@ -373,7 +422,7 @@ class RobloxAPI:
             headers['X-CSRF-TOKEN'] = csrf_token
         
         try:
-            response = requests.post(
+            response = self.session.post(
                 url,
                 json=payload,
                 headers=headers,
@@ -388,7 +437,7 @@ class RobloxAPI:
                     print(f"🔐 Got CSRF token from 403 response, retrying...")
                     csrf_token = new_csrf_token
                     headers['X-CSRF-TOKEN'] = csrf_token
-                    response = requests.post(
+                    response = self.session.post(
                         url,
                         json=payload,
                         headers=headers,
@@ -419,7 +468,7 @@ class RobloxAPI:
             headers['X-CSRF-TOKEN'] = csrf_token
         
         try:
-            response = requests.delete(
+            response = self.session.delete(
                 url,
                 headers=headers,
                 cookies=self._get_cookies(),
@@ -433,7 +482,7 @@ class RobloxAPI:
                     print(f"🔐 Got CSRF token from 403 response, retrying...")
                     csrf_token = new_csrf_token
                     headers['X-CSRF-TOKEN'] = csrf_token
-                    response = requests.delete(
+                    response = self.session.delete(
                         url,
                         headers=headers,
                         cookies=self._get_cookies(),
@@ -458,7 +507,7 @@ class RobloxAPI:
         
         url = "https://users.roblox.com/v1/users/authenticated"
         try:
-            response = requests.get(
+            response = self.session.get(
                 url,
                 headers=self._get_headers(),
                 cookies=self._get_cookies(),
@@ -474,7 +523,7 @@ class RobloxAPI:
         """Get a user's role in the group"""
         url = f"{self.base_url}/groups/{self.group_id}/users/{user_id}"
         try:
-            response = requests.get(
+            response = self.session.get(
                 url,
                 headers=self._get_headers(),
                 cookies=self._get_cookies(),

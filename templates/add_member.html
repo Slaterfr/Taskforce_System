@@ -3,11 +3,13 @@
 {% block title %}Add Member{% endblock %}
 
 {% block content %}
-<h3>Add Member</h3>
+<h3 style="color: white;">Add Member</h3>
 <form method="post">
-  <div class="mb-3"><label>Discord</label><input name="discord_username" class="form-control" required></div>
-  <div class="mb-3"><label>Roblox</label><input name="roblox_username" class="form-control"></div>
-  <div class="mb-3"><label>Rank</label><input name="current_rank" class="form-control" value="Aspirant"></div>
+  <div class="mb-3"><label style="color: white;">Discord</label><input name="discord_username" class="form-control"
+      required></div>
+  <div class="mb-3"><label style="color: white;">Roblox</label><input name="roblox_username" class="form-control"></div>
+  <div class="mb-3"><label style="color: white;">Rank</label><input name="current_rank" class="form-control"
+      value="Aspirant"></div>
   <button class="btn btn-primary" type="submit">Create</button>
 </form>
 {% endblock %}

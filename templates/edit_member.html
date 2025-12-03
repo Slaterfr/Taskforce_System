@@ -3,15 +3,17 @@
 {% block title %}Edit {{ member.discord_username }}{% endblock %}
 
 {% block content %}
-<h3>Edit Member</h3>
+<h3 style="color: white;">Edit Member</h3>
 <form method="post">
-  <div class="mb-3"><label>Discord</label><input name="discord_username" class="form-control" value="{{ member.discord_username }}"></div>
-  <div class="mb-3"><label>Roblox</label><input name="roblox_username" class="form-control" value="{{ member.roblox_username }}"></div>
+  <div class="mb-3"><label style="color: white;">Discord</label><input name="discord_username" class="form-control"
+      value="{{ member.discord_username }}"></div>
+  <div class="mb-3"><label style="color: white;">Roblox</label><input name="roblox_username" class="form-control"
+      value="{{ member.roblox_username }}"></div>
   <div class="mb-3">
-    <label>Rank</label>
+    <label style="color: white;">Rank</label>
     <select name="current_rank" class="form-select">
       {% for rank in available_ranks %}
-        <option value="{{ rank }}" {% if member.current_rank == rank %}selected{% endif %}>{{ rank }}</option>
+      <option value="{{ rank }}" {% if member.current_rank==rank %}selected{% endif %}>{{ rank }}</option>
       {% endfor %}
     </select>
   </div>

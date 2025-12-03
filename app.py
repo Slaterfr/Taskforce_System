@@ -85,12 +85,6 @@ def create_app():
     # Set up background sync task if enabled (and specifically configured for background execution)
     sync_enabled = app.config.get('ROBLOX_SYNC_ENABLED', False)
     background_sync = app.config.get('ROBLOX_BACKGROUND_SYNC_ENABLED', False)
-    
-    print(f"\n{'='*60}")
-    print(f"🔍 Roblox Sync Status: {'✅ ENABLED' if sync_enabled else '❌ DISABLED'}")
-    print(f"🕰️ Background Scheduler: {'✅ ENABLED' if background_sync else '❌ DISABLED'}")
-    print(f"{'='*60}")
-    
     if sync_enabled and background_sync:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.interval import IntervalTrigger
@@ -160,6 +154,10 @@ def create_app():
         initial_msg = "🔄 Initial sync scheduled (will run in 5 seconds)"
         print(initial_msg)
         app.logger.info(initial_msg)
+        print(f"{'='*60}\n")
+    elif sync_enabled and not background_sync:
+        print("⚠️  Roblox Sync is ENABLED but Background Scheduler is DISABLED")
+        print("   To enable background sync, set ROBLOX_BACKGROUND_SYNC_ENABLED=true in your .env file")
         print(f"{'='*60}\n")
     else:
         print("⚠️  Auto-sync is DISABLED")

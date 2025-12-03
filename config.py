@@ -14,4 +14,4 @@ class Config:
     ROBLOX_COOKIE = os.environ.get('ROBLOX_COOKIE') or ''  # .ROBLOSECURITY cookie for write operations
     ROBLOX_SYNC_ENABLED = os.environ.get('ROBLOX_SYNC_ENABLED', 'false').lower() == 'true'
     ROBLOX_SYNC_INTERVAL = int(os.environ.get('ROBLOX_SYNC_INTERVAL', '3600'))  # Default 1 hour (3600 seconds)
-    ROBLOX_BACKGROUND_SYNC_ENABLED = os.environ.get('ROBLOX_BACKGROUND_SYNC_ENABLED', 'false').lower() == 'true'
+    ROBLOX_BACKGROUND_SYNC_ENABLED = os.environ.get('ROBLOX_BACKGROUND_SYNC_ENABLED', str(ROBLOX_SYNC_ENABLED)).lower() == 'true'
