@@ -1,24 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Member — {{ member.discord_username }}{% endblock %}
 {% block content %}
-<h2>{{ member.discord_username }}</h2>
-<p><strong>Rank:</strong> {{ member.current_rank }}</p>
-<p><strong>Roblox:</strong> {{ member.roblox_username or 'N/A' }}</p>
-<a class="btn btn-sm btn-outline-primary" href="{{ url_for('log_activity') }}?member_id={{ member.id }}">Log Activity</a>
-<h4 class="mt-3">Activity Logs</h4>
+<h2 style="color: white;">{{ member.discord_username }}</h2>
+<p style="color: white;"><strong style="color: white;">Rank:</strong> {{ member.current_rank }}</p>
+<p style="color: white;"><strong style="color: white;">Roblox:</strong> {{ member.roblox_username or 'N/A' }}</p>
+<a style="color: white;" class="btn btn-sm btn-outline-primary"
+  href="{{ url_for('log_activity') }}?member_id={{ member.id }}">Log Activity</a>
+<h4 style="color: white;" class="mt-3">Activity Logs</h4>
 <ul>
   {% for a in activities %}
-    <li>{{ a.log_date.strftime('%Y-%m-%d') if a.log_date else '' }} — {{ a.activity_type }} — {{ a.description or '' }}</li>
+  <li>{{ a.log_date.strftime('%Y-%m-%d') if a.log_date else '' }} — {{ a.activity_type }} — {{ a.description or '' }}
+  </li>
   {% else %}
-    <li>No activity logs.</li>
+  <li style="color: white;">No activity logs.</li>
   {% endfor %}
 </ul>
-<h4 class="mt-3">Promotions</h4>
+<h4 style="color: white;" class="mt-3">Promotions</h4>
 <ul>
   {% for p in promotions %}
-    <li>{{ p.promotion_date.strftime('%Y-%m-%d') if p.promotion_date }}: {{ p.from_rank }} → {{ p.to_rank }} ({{ p.promoted_by }})</li>
+  <li style="color: white;">{{ p.promotion_date.strftime('%Y-%m-%d') if p.promotion_date }}: {{ p.from_rank }} → {{
+    p.to_rank }} ({{
+    p.promoted_by }})</li>
   {% else %}
-    <li>No promotions.</li>
+  <li style="color: white;">No promotions.</li>
   {% endfor %}
 </ul>
 {% endblock %}
