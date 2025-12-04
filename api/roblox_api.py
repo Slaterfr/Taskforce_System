@@ -535,6 +535,32 @@ class RobloxAPI:
             pass
         return None
     
+    @staticmethod
+    def validate_cookie(cookie: str) -> Optional[Dict]:
+        """
+        Validate a Roblox cookie and return the user info if valid.
+        Returns None if invalid.
+        """
+        if not cookie:
+            return None
+            
+        url = "https://users.roblox.com/v1/users/authenticated"
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json'
+        }
+        cookies = {'.ROBLOSECURITY': cookie}
+        
+        try:
+            response = requests.get(url, headers=headers, cookies=cookies, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+        except Exception as e:
+            print(f"Error validating cookie: {e}")
+            
+        return None
+
     def test_connection(self) -> bool:
         """Test if we can connect to the Roblox API and fetch group info"""
         print(f"🔍 Testing connection to Roblox group {self.group_id}...")

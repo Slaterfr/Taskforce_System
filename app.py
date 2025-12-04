@@ -216,6 +216,59 @@ def staff_logout():
     flash('Logged out', 'info')
     return redirect(url_for('public_roster'))
 
+@app.route('/staff/update_cookie', methods=['GET', 'POST'])
+@staff_required
+def update_cookie():
+    from api.roblox_api import RobloxAPI
+    
+    if request.method == 'POST':
+        cookie = request.form.get('cookie', '').strip()
+        if not cookie:
+            flash('Cookie cannot be empty', 'error')
+            return redirect(url_for('update_cookie'))
+            
+        # Validate cookie
+        user_info = RobloxAPI.validate_cookie(cookie)
+        if not user_info:
+            flash('Invalid cookie! Please check and try again.', 'error')
+            return redirect(url_for('update_cookie'))
+            
+        # Update .env file
+        try:
+            env_path = op.join(op.dirname(op.abspath(__file__)), '.env')
+            
+            # Read current lines
+            with open(env_path, 'r') as f:
+                lines = f.readlines()
+                
+            # Update or append ROBLOX_COOKIE
+            cookie_found = False
+            new_lines = []
+            for line in lines:
+                if line.startswith('ROBLOX_COOKIE='):
+                    new_lines.append(f'ROBLOX_COOKIE={cookie}\n')
+                    cookie_found = True
+                else:
+                    new_lines.append(line)
+            
+            if not cookie_found:
+                new_lines.append(f'\nROBLOX_COOKIE={cookie}\n')
+                
+            # Write back
+            with open(env_path, 'w') as f:
+                f.writelines(new_lines)
+                
+            # Update current app config
+            current_app.config['ROBLOX_COOKIE'] = cookie
+            
+            flash(f"Cookie updated successfully! Connected as: {user_info.get('name')} (ID: {user_info.get('id')})", 'success')
+            return redirect(url_for('dashboard'))
+            
+        except Exception as e:
+            flash(f'Error updating .env file: {e}', 'error')
+            
+    return render_template('update_cookie.html')
+
 # ========== PUBLIC VIEW ==========
 
 @app.route('/')
