@@ -15,3 +15,11 @@ class Config:
     ROBLOX_SYNC_ENABLED = os.environ.get('ROBLOX_SYNC_ENABLED', 'false').lower() == 'true'
     ROBLOX_SYNC_INTERVAL = int(os.environ.get('ROBLOX_SYNC_INTERVAL', '3600'))  # Default 1 hour (3600 seconds)
     ROBLOX_BACKGROUND_SYNC_ENABLED = os.environ.get('ROBLOX_BACKGROUND_SYNC_ENABLED', str(ROBLOX_SYNC_ENABLED)).lower() == 'true'
+    
+    # Discord Bot API Configuration
+    DISCORD_BOT_API_KEY = os.environ.get('DISCORD_BOT_API_KEY', '')
+    API_RATE_LIMIT = int(os.environ.get('API_RATE_LIMIT', '100'))  # Requests per minute
+    API_ENABLE_LOGGING = os.environ.get('API_ENABLE_LOGGING', 'true').lower() == 'true'
+    
+    # Discord Notifications Configuration
+    DISCORD_NOTIFICATION_WEBHOOK_URL = os.environ.get('DISCORD_NOTIFICATION_WEBHOOK_URL', '')

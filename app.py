@@ -168,6 +168,10 @@ def create_app():
     @app.context_processor
     def inject_globals():
         return dict(is_staff=is_staff())
+    
+    # Register Discord Bot API
+    from api.discord_bot_api import api_bp
+    app.register_blueprint(api_bp, url_prefix='/api/v1')
 
     return app
 
