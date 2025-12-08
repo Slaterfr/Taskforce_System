@@ -393,7 +393,14 @@ def log_ac_activity():
         activity_date = datetime.strptime(data.get('activity_date'), '%Y-%m-%d')
         logged_by = data.get('logged_by') or 'HC Team'
         points = get_activity_points(activity_type)
+        
+        # Get quantity (default to 1, force 1 for cancelled events)
+        quantity = int(data.get('quantity', 1))
+        if activity_type in ['Cancelled Tryout', 'Canceled Training']:
+            quantity = 1
+        quantity = max(1, min(999, quantity))  # Clamp between 1 and 999
 
+        # Limited activity check (only check once, regardless of quantity)
         if is_limited_activity(activity_type):
             existing = ActivityEntry.query.filter_by(
                 member_id=member_id,
@@ -404,23 +411,29 @@ def log_ac_activity():
                 flash('Limited activity already logged for this period', 'error')
                 return redirect(url_for('ac.log_ac_activity'))
 
-        ae = ActivityEntry(
-            member_id=member_id,
-            ac_period_id=current_period.id,
-            activity_type=activity_type,
-            points=points,
-            description=description,
-            activity_date=activity_date,
-            logged_by=logged_by
-        )
-        db.session.add(ae)
+        # Create multiple entries based on quantity
+        created_ids = []
+        for i in range(quantity):
+            ae = ActivityEntry(
+                member_id=member_id,
+                ac_period_id=current_period.id,
+                activity_type=activity_type,
+                points=points,
+                description=description,
+                activity_date=activity_date,
+                logged_by=logged_by
+            )
+            db.session.add(ae)
+            db.session.flush()  # Get the ID before committing
+            created_ids.append(ae.id)
+        
         db.session.commit()
 
         # If AJAX, return JSON success (avoid redirect)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
-            return jsonify({'success': True, 'activity_id': ae.id}), 200
+            return jsonify({'success': True, 'activity_ids': created_ids, 'count': quantity}), 200
 
-        flash('Activity logged successfully', 'success')
+        flash(f'Successfully logged {quantity} {activity_type} activit{"ies" if quantity > 1 else "y"}', 'success')
         return redirect(url_for('ac.ac_dashboard'))
 
     # GET: render form/page
@@ -495,8 +508,8 @@ def quick_log():
 @staff_required
 def quick_log_activity():
     """
-    Accept JSON {member_id, activity_type, activity_date, logged_by}
-    Returns JSON {success, message, points} or error.
+    Accept JSON {member_id, activity_type, activity_date, logged_by, quantity}
+    Returns JSON {success, message, points, count} or error.
     """
     data = request.get_json(force=True, silent=True) or {}
     member_id = data.get('member_id')
@@ -518,26 +531,38 @@ def quick_log_activity():
 
     logged_by = data.get('logged_by', 'HC Team')
     points = get_activity_points(activity_type)
+    
+    # Get quantity (default to 1, force 1 for cancelled events)
+    quantity = int(data.get('quantity', 1))
+    if activity_type in ['Cancelled Tryout', 'Canceled Training']:
+        quantity = 1
+    quantity = max(1, min(999, quantity))  # Clamp between 1 and 999
 
-    # enforce limited-activity rule
+    # enforce limited-activity rule (check once regardless of quantity)
     if is_limited_activity(activity_type):
         existing = ActivityEntry.query.filter_by(member_id=member_id, ac_period_id=current_period.id, activity_type=activity_type).first()
         if existing:
             return jsonify({'success': False, 'message': 'Limited activity already logged for this period'}), 400
 
-    ae = ActivityEntry(
-        member_id=member_id,
-        ac_period_id=current_period.id,
-        activity_type=activity_type,
-        points=points,
-        description=data.get('description'),
-        activity_date=activity_date or datetime.utcnow(),
-        logged_by=logged_by,
-        is_limited_activity=is_limited_activity(activity_type)
-    )
-    db.session.add(ae)
+    # Create multiple entries based on quantity
+    created_ids = []
+    for i in range(quantity):
+        ae = ActivityEntry(
+            member_id=member_id,
+            ac_period_id=current_period.id,
+            activity_type=activity_type,
+            points=points,
+            description=data.get('description'),
+            activity_date=activity_date or datetime.utcnow(),
+            logged_by=logged_by,
+            is_limited_activity=is_limited_activity(activity_type)
+        )
+        db.session.add(ae)
+        db.session.flush()  # Get the ID before committing
+        created_ids.append(ae.id)
+    
     db.session.commit()
-    return jsonify({'success': True, 'points': points})
+    return jsonify({'success': True, 'points': points, 'count': quantity, 'activity_ids': created_ids})
 
 
 @ac_bp.route('/quick_log_ia', methods=['POST'])

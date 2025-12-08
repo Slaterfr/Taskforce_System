@@ -708,6 +708,7 @@ def log_activity():
         activity_type (str): Type of activity (required)
         description (str): Activity description (optional)
         activity_date (str): Date in YYYY-MM-DD format (default: today)
+        quantity (int): Number of activities to log (default: 1, max: 999)
         discord_user_id (str): Discord user ID who logged (optional)
     
     Returns:
@@ -782,38 +783,67 @@ def log_activity():
         # Get points for activity type
         points = get_activity_points(activity_type)
         
+        # Get quantity (default to 1, force 1 for cancelled events)
+        quantity = int(data.get('quantity', 1))
+        if activity_type in ['Cancelled Tryout', 'Canceled Training']:
+            quantity = 1
+        quantity = max(1, min(999, quantity))  # Clamp between 1 and 999
+        
+        # Check limited activity rule (check once regardless of quantity)
+        if is_limited_activity(activity_type):
+            existing = ActivityEntry.query.filter_by(
+                member_id=member_id,
+                ac_period_id=current_period.id,
+                activity_type=activity_type
+            ).first()
+            if existing:
+                log_api_access('/activity', 'POST', discord_user_id, False, 400)
+                return jsonify({
+                    'success': False,
+                    'error': 'limited_activity_exists',
+                    'message': f'Limited activity "{activity_type}" already logged for this period'
+                }), 400
+        
         # Determine who logged this activity
         logged_by = data.get('logged_by', f'Discord Bot')
         if discord_user_id and not data.get('logged_by'):
             logged_by = f'Discord User {discord_user_id}'
         
-        # Create activity entry
-        activity_entry = ActivityEntry(
-            member_id=member_id,
-            ac_period_id=current_period.id,
-            activity_type=activity_type,
-            activity_date=activity_date,
-            points=points,
-            description=description or f"{activity_type} logged via Discord",
-            logged_by=logged_by
-        )
-        db.session.add(activity_entry)
+        # Create multiple activity entries based on quantity
+        created_entries = []
+        for i in range(quantity):
+            activity_entry = ActivityEntry(
+                member_id=member_id,
+                ac_period_id=current_period.id,
+                activity_type=activity_type,
+                activity_date=activity_date,
+                points=points,
+                description=description or f"{activity_type} logged via Discord",
+                logged_by=logged_by,
+                is_limited_activity=is_limited_activity(activity_type)
+            )
+            db.session.add(activity_entry)
+            db.session.flush()  # Get the ID before committing
+            created_entries.append({
+                'id': activity_entry.id,
+                'activity_type': activity_type,
+                'points': float(points)
+            })
+        
         db.session.commit()
         
         log_api_access('/activity', 'POST', discord_user_id, True, 201)
         
         return jsonify({
             'success': True,
-            'message': 'Activity logged successfully',
-            'activity': {
-                'id': activity_entry.id,
-                'member_id': member_id,
-                'member_name': member.discord_username,
-                'activity_type': activity_type,
-                'points': float(points),
-                'activity_date': activity_date.isoformat(),
-                'description': activity_entry.description
-            }
+            'message': f'Successfully logged {quantity} {activity_type} activit{"ies" if quantity > 1 else "y"}',
+            'count': quantity,
+            'total_points': float(points * quantity),
+            'member': {
+                'id': member_id,
+                'discord_username': member.discord_username
+            },
+            'activities': created_entries
         }), 201
         
     except Exception as e:

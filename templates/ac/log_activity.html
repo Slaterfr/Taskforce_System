@@ -14,9 +14,13 @@
   </div>
   <div class="mb-3">
     <label style="color: white;">Activity Type</label>
-    <select name="activity_type" class="form-select">
+    <select name="activity_type" id="activity_type" class="form-select">
       {% for t in activity_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
     </select>
+  </div>
+  <div class="mb-3" id="quantity_container">
+    <label style="color: white;">Quantity <small class="text-muted">(How many to log)</small></label>
+    <input type="number" name="quantity" id="quantity" class="form-control" value="1" min="1" max="999" />
   </div>
   <div class="mb-3"><label style="color: white;">Date</label><input type="date" name="activity_date"
       class="form-control" value="{{ current_period.start_date.strftime('%Y-%m-%d') if current_period }}" /></div>
@@ -24,4 +28,28 @@
   </div>
   <button class="btn btn-primary" type="submit">Log</button>
 </form>
+
+<script>
+  // Hide quantity field for cancelled events
+  const activityTypeSelect = document.getElementById('activity_type');
+  const quantityContainer = document.getElementById('quantity_container');
+  const quantityInput = document.getElementById('quantity');
+
+  const EXCLUDED_TYPES = ['Cancelled Tryout', 'Canceled Training'];
+
+  function updateQuantityVisibility() {
+    const selectedType = activityTypeSelect.value;
+    if (EXCLUDED_TYPES.includes(selectedType)) {
+      quantityContainer.style.display = 'none';
+      quantityInput.value = '1';
+      quantityInput.disabled = true;
+    } else {
+      quantityContainer.style.display = 'block';
+      quantityInput.disabled = false;
+    }
+  }
+
+  activityTypeSelect.addEventListener('change', updateQuantityVisibility);
+  updateQuantityVisibility(); // Run on page load
+</script>
 {% endblock %}
