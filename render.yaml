@@ -3,19 +3,54 @@ services:
     name: taskforce-system
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app --workers 2 --timeout 120
     envVars:
+      # Core Flask Settings
       - key: SECRET_KEY
-        sync: false
+        generateValue: true
       - key: STAFF_PASSWORD
         sync: false
-      - key: DATABASE_URL
-        fromDatabase:
-          name: taskforce-db
-          property: connectionString
-
-databases:
-  - name: taskforce-db
-    plan: free
+      
+      # Roblox Integration
+      - key: ROBLOX_GROUP_ID
+        sync: false
+      - key: ROBLOX_COOKIE
+        sync: false
+      - key: ROBLOX_SYNC_ENABLED
+        value: "true"
+      - key: ROBLOX_SYNC_INTERVAL
+        value: "3600"
+      - key: ROBLOX_BACKGROUND_SYNC_ENABLED
+        value: "true"
+      
+      # Discord Bot API
+      - key: DISCORD_BOT_API_KEY
+        sync: false
+      - key: API_RATE_LIMIT
+        value: "100"
+      - key: API_ENABLE_LOGGING
+        value: "true"
+      
+      # Discord Notifications
+      - key: DISCORD_NOTIFICATION_WEBHOOK_URL
+        sync: false
+      
+      # Discord Bot Settings (if running bot separately)
+      - key: APP_ID
+        sync: false
+      - key: PUBLIC_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: "llama-3.3-70b-versatile"
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: MAX_TOKENS
+        value: "1000"
+      - key: COOLDOWN_SECONDS
+        value: "10"
+      - key: MAX_QUESTION_LENGTH
+        value: "500"
 
 

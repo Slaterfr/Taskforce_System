@@ -283,7 +283,7 @@ class TFSystemCog(commands.Cog):
             embed.add_field(name="Discord", value=member_data['discord_username'], inline=True)
             embed.add_field(name="Roblox", value=member_data.get('roblox_username') or 'Not set', inline=True)
             embed.add_field(name="Current Rank", value=member_data['current_rank'], inline=True)
-            embed.add_field(name="Join Date", 
+            embed.add_field(name="System join Date", 
                           value=member_data.get('join_date', 'Unknown')[:10] if member_data.get('join_date') else 'Unknown',
                           inline=True)
             

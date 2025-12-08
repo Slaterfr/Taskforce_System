@@ -782,6 +782,11 @@ def log_activity():
         # Get points for activity type
         points = get_activity_points(activity_type)
         
+        # Determine who logged this activity
+        logged_by = data.get('logged_by', f'Discord Bot')
+        if discord_user_id and not data.get('logged_by'):
+            logged_by = f'Discord User {discord_user_id}'
+        
         # Create activity entry
         activity_entry = ActivityEntry(
             member_id=member_id,
@@ -789,7 +794,8 @@ def log_activity():
             activity_type=activity_type,
             activity_date=activity_date,
             points=points,
-            description=description or f"{activity_type} logged via Discord Bot"
+            description=description or f"{activity_type} logged via Discord",
+            logged_by=logged_by
         )
         db.session.add(activity_entry)
         db.session.commit()

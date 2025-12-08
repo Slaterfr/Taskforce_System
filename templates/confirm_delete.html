@@ -15,7 +15,7 @@
                 <p>Are you sure you want to remove <strong>{{ member.discord_username }}</strong> from the active members list? This will mark the member as inactive.</p>
                 <form method="POST">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ url_for('member_detail', member_id=member.id) }}" class="btn btn-outline-secondary me-2">Cancel</a>
+                        <a href="{{ url_for('members.member_detail', member_id=member.id) }}" class="btn btn-outline-secondary me-2">Cancel</a>
                         <button type="submit" class="btn btn-danger">Yes, Remove</button>
                     </div>
                 </form>

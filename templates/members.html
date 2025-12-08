@@ -14,7 +14,7 @@
         <p style="color: white;">Manage your taskforce members</p>
     </div>
     <div class="col-md-6 text-end">
-        <a href="{{ url_for('add_member') }}" class="btn btn-primary">
+        <a href="{{ url_for('members.add_member') }}" class="btn btn-primary">
             <i class="fas fa-user-plus me-2"></i>Add Member
         </a>
     </div>
@@ -72,15 +72,15 @@
                         <td>{{ member.join_date.strftime('%m/%d/%Y') }}</td>
                         <td>{{ member.last_updated.strftime('%m/%d/%Y') }}</td>
                         <td>
-                            <a href="{{ url_for('member_detail', member_id=member.id) }}"
+                            <a href="{{ url_for('members.member_detail', member_id=member.id) }}"
                                 class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-eye me-1"></i>View
                             </a>
-                            <a href="{{ url_for('edit_member', member_id=member.id) }}"
+                            <a href="{{ url_for('members.edit_member', member_id=member.id) }}"
                                 class="btn btn-sm btn-secondary">
                                 <i class="fas fa-edit me-1"></i>Edit
                             </a>
-                            <form method="post" action="{{ url_for('delete_member', member_id=member.id) }}"
+                            <form method="post" action="{{ url_for('members.delete_member', member_id=member.id) }}"
                                 style="display:inline">
                                 <button class="btn btn-sm btn-danger" type="submit"
                                     onclick="return confirm('Remove member?')">Remove</button>
@@ -97,12 +97,12 @@
             <h4 class="text-muted">No members found</h4>
             {% if search %}
             <p class="text-muted">No members match your search for "{{ search }}"</p>
-            <a href="{{ url_for('members') }}" class="btn btn-outline-primary">
+            <a href="{{ url_for('members.members') }}" class="btn btn-outline-primary">
                 <i class="fas fa-arrow-left me-2"></i>View All Members
             </a>
             {% else %}
             <p class="text-muted">Get started by adding your first member</p>
-            <a href="{{ url_for('add_member') }}" class="btn btn-primary">
+            <a href="{{ url_for('members.add_member') }}" class="btn btn-primary">
                 <i class="fas fa-user-plus me-2"></i>Add Member
             </a>
             {% endif %}

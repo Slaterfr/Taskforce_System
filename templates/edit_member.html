@@ -18,6 +18,6 @@
     </select>
   </div>
   <button class="btn btn-primary" type="submit">Save</button>
-  <a class="btn btn-secondary" href="{{ url_for('member_detail', member_id=member.id) }}">Cancel</a>
+  <a class="btn btn-secondary" href="{{ url_for('members.member_detail', member_id=member.id) }}">Cancel</a>
 </form>
 {% endblock %}

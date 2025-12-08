@@ -5,7 +5,7 @@
 {% block content %}
 <h3>No active AC period</h3>
 {% if is_staff %}
-  <a href="{{ url_for('create_ac_period') }}" class="btn btn-primary">Create AC Period</a>
+  <a href="{{ url_for('ac.create_ac_period') }}" class="btn btn-primary">Create AC Period</a>
 {% else %}
   <p>Only staff can create AC periods.</p>
 {% endif %}

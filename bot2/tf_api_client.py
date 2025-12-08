@@ -242,7 +242,7 @@ class TFSystemAPI:
     
     async def log_activity(self, member_id: int, activity_type: str,
                           description: str = None, activity_date: str = None,
-                          discord_user_id: str = None) -> Dict:
+                          discord_user_id: str = "Cortex") -> Dict:
         """
         Log an activity for a member
         

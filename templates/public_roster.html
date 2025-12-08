@@ -26,15 +26,15 @@
       <td>{{ m.current_rank }}</td>
       <td>
         {% if is_staff %}
-        <a href="{{ url_for('member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
+        <a href="{{ url_for('members.member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
         {% else %}
-        <a href="{{ url_for('public_member', member_id=m.id) }}">{{ m.discord_username }}</a>
+        <a href="{{ url_for('public.public_member', member_id=m.id) }}">{{ m.discord_username }}</a>
         {% endif %}
       </td>
       <td>{{ m.roblox_username or 'N/A' }}</td>
       <td>
         {% if is_staff %}
-        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('edit_member', member_id=m.id) }}">Edit</a>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('members.edit_member', member_id=m.id) }}">Edit</a>
         {% endif %}
       </td>
     </tr>

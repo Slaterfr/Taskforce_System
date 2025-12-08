@@ -13,7 +13,7 @@
 
 <div class="mb-3">
   {% if is_staff %}
-  <form method="post" action="{{ url_for('clear_member_activities', member_id=member.id) }}" onsubmit="return confirm('Delete all activities for this member in the current period?');" style="display:inline">
+  <form method="post" action="{{ url_for('ac.clear_member_activities', member_id=member.id) }}" onsubmit="return confirm('Delete all activities for this member in the current period?');" style="display:inline">
     <input type="hidden" name="period_id" value="{{ current_period.id if current_period }}">
     <button class="btn btn-sm btn-danger">Clear Activities (current period)</button>
   </form>
@@ -51,7 +51,7 @@
             </div>
             {% if is_staff %}
             <div class="btn-group btn-group-sm">
-              <form method="post" action="{{ url_for('delete_ac_activity', activity_id=a.id) }}" onsubmit="return confirm('Delete this activity?');">
+              <form method="post" action="{{ url_for('ac.delete_ac_activity', activity_id=a.id) }}" onsubmit="return confirm('Delete this activity?');">
                 <button type="submit" class="btn btn-outline-danger">Delete</button>
               </form>
             </div>

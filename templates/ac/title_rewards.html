@@ -12,7 +12,7 @@
         <p style="color: white;">{{ current_period.period_name }}</p>
     </div>
     <div class="col-md-4 text-end">
-        <a href="{{ url_for('ac_dashboard') }}" class="btn btn-outline-secondary">
+        <a href="{{ url_for('ac.ac_dashboard') }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
         </a>
     </div>
@@ -81,7 +81,7 @@
                 <div class="bg-light p-3 rounded mb-3" style="white-space: pre-wrap; font-family: monospace;">{{
                     discord_message }}</div>
 
-                <form method="POST" action="{{ url_for('send_title_webhook') }}">
+                <form method="POST" action="{{ url_for('ac.send_title_webhook') }}">
                     <div class="mb-3">
                         <label for="webhook_url" class="form-label">Discord Webhook URL</label>
                         <input type="url" class="form-control" id="webhook_url" name="webhook_url"
