@@ -167,35 +167,7 @@ def create_app():
         app.logger.info(initial_msg)
         
         # --- Add Member Stats Job (Daily) ---
-        from utils.stats_logger import capture_member_stats
-        
-        def stats_job():
-            with app.app_context():
-                print(f"\n📊 [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Capturing member statistics...")
-                capture_member_stats()
-        
-        scheduler.add_job(
-            func=stats_job,
-            trigger='cron',
-            hour=0,  # Run at midnight
-            minute=0,
-            id='member_stats_job',
-            name='Daily Member Stats',
-            replace_existing=True
-        )
-        print("📈 Daily member stats job scheduled for midnight")
-        # ------------------------------------
-        
-        print(f"{'='*60}\n")
-    elif sync_enabled and not background_sync:
-        print("⚠️  Roblox Sync is ENABLED but Background Scheduler is DISABLED")
-        print("   To enable background sync, set ROBLOX_BACKGROUND_SYNC_ENABLED=true in your .env file")
-        print(f"{'='*60}\n")
-    else:
-        print("⚠️  Auto-sync is DISABLED")
-        print("   To enable, set ROBLOX_SYNC_ENABLED=true in your .env file")
-        print(f"{'='*60}\n")
-
+     
     # inject helpful template globals
     @app.context_processor
     def inject_globals():
