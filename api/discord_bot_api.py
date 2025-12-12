@@ -7,7 +7,8 @@ from flask import Blueprint, request, jsonify, current_app
 from database.models import db, Member, RankMapping, PromotionLog, ActivityLog
 from database.ac_models import (
     ACPeriod, ActivityEntry, InactivityNotice, ACExemption,
-    ACTIVITY_TYPES, get_activity_points, get_member_quota
+    ACTIVITY_TYPES, get_activity_points, get_member_quota,
+    is_limited_activity
 )
 from utils.api_auth import api_key_required, log_api_access
 from utils.roblox_sync import sync_member_to_roblox, add_member_to_roblox, remove_member_from_roblox
