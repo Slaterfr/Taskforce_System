@@ -804,14 +804,14 @@ def log_activity():
                     'error': 'limited_activity_exists',
                     'message': f'Limited activity "{activity_type}" already logged for this period'
                 }), 400
-        
+
         # Determine who logged this activity
         logged_by = data.get('logged_by', f'Discord Bot')
         if discord_user_id and not data.get('logged_by'):
             logged_by = f'Discord User {discord_user_id}'
         
         # Create multiple activity entries based on quantity
-        created_entries = []
+        created_ids = []
         for i in range(quantity):
             activity_entry = ActivityEntry(
                 member_id=member_id,
@@ -825,27 +825,38 @@ def log_activity():
             )
             db.session.add(activity_entry)
             db.session.flush()  # Get the ID before committing
-            created_entries.append({
-                'id': activity_entry.id,
-                'activity_type': activity_type,
-                'points': float(points)
-            })
+            created_ids.append(activity_entry.id)
         
         db.session.commit()
+        
+        # Send Discord notification
+        qty_str = f" (x{quantity})" if quantity > 1 else ""
+        notification_message = (
+            f"**Activity Logged**\n"
+            f"Activity: **{activity_type}**{qty_str}\n"
+            f"Points: {points * quantity}\n"
+            f"Member: **{member.discord_username}**\n"
+            f"Logged by: {logged_by}"
+        )
+        if description:
+            notification_message += f"\nDescription: {description}"
+        notification_message += f"\nDate: {activity_date.strftime('%Y-%m-%d')}"
+            
+        send_discord_notification(notification_message, title="Activity Log")
         
         log_api_access('/activity', 'POST', discord_user_id, True, 201)
         
         return jsonify({
             'success': True,
-            'message': f'Successfully logged {quantity} {activity_type} activit{"ies" if quantity > 1 else "y"}',
-            'count': quantity,
-            'total_points': float(points * quantity),
-            'member': {
-                'id': member_id,
-                'discord_username': member.discord_username
-            },
-            'activities': created_entries
+            'message': f'Logged {quantity} activity entries',
+            'activity': {
+                'id': created_ids[0],
+                'type': activity_type,
+                'points': points * quantity,
+                'date': activity_date.isoformat()
+            }
         }), 201
+
         
     except Exception as e:
         db.session.rollback()
@@ -920,3 +931,4 @@ def get_member_activities(member_id):
             'error': 'server_error',
             'message': f'Error retrieving activities: {str(e)}'
         }), 500
+
