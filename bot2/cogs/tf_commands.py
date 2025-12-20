@@ -156,69 +156,147 @@ If you can't parse the command, set action to "unknown" and explain in a "reason
         }
 
 
+
+class ResponseHandler:
+    """Abstracts the difference between Interaction and Message responses"""
+    def __init__(self, context, is_interaction=True):
+        self.context = context
+        self.is_interaction = is_interaction
+
+    async def send(self, content=None, embed=None):
+        if self.is_interaction:
+            # For interactions, use followup (assumes defer was called)
+            await self.context.followup.send(content=content, embed=embed)
+        else:
+            # For messages, use channel.send
+            await self.context.channel.send(content=content, embed=embed)
+
+    @property
+    def user(self):
+        return self.context.user if self.is_interaction else self.context.author
+
+
 class TFSystemCog(commands.Cog):
     """Cog for TF System management commands"""
     
     def __init__(self, bot):
         self.bot = bot
     
+    # Helper to check permissions synchronously for message events
+    def check_permissions(self, user):
+        user_roles = [role.name for role in user.roles]
+        return any(role in ALLOWED_ROLES for role in user_roles)
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        # Ignore messages from self
+        if message.author == self.bot.user:
+            return
+
+        # Check if bot is mentioned
+        if self.bot.user.mentioned_in(message) and not message.mention_everyone:
+            # Clean content: remove mention
+            content = message.content.replace(f'<@{self.bot.user.id}>', '').strip()
+            # Also handle nickname mentions if any
+            content = content.replace(f'<@!{self.bot.user.id}>', '').strip()
+            
+            if not content:
+                await message.channel.send("👋 Hello! How can I help you with the Taskforce System?")
+                return
+
+            # Show typing indicator
+            async with message.channel.typing():
+                # Create a handler wrapper
+                handler = ResponseHandler(message, is_interaction=False)
+                await self.process_command(handler, content)
+
     @app_commands.command(name="tf", description="Natural language TF management command")
     @has_tf_permissions()
     async def tf_command(self, interaction: discord.Interaction, command: str):
         await interaction.response.defer()  # Processing may take a moment
-        
+        handler = ResponseHandler(interaction, is_interaction=True)
+        await self.process_command(handler, command)
+
+    async def process_command(self, handler: ResponseHandler, command_text: str):
+        """Unified command processing logic"""
         try:
             # Parse intent using Groq
-            intent = await parse_intent_with_groq(command)
+            intent = await parse_intent_with_groq(command_text)
             
             if intent['action'] == 'unknown':
-                await interaction.followup.send(
-                    f"❌ I couldn't understand that command.\n"
-                    f"Try to rephrase your command, use full usernames, etc.\n"
-                    f"Try something like:\n"
-                    f"- Change X's rank to Y\n"
-                    f"- Show all Exemplars\n"
-                    f"- What rank is X?"
-                )
+                # Fallback to conversational response
+                await self._handle_conversational_response(handler, command_text)
                 return
             
             # Execute based on action
-            if intent['action'] == 'change_rank':
-                await self._handle_change_rank(interaction, intent['parameters'])
+            # For actions that modify state, check permissions
+            protected_actions = ['change_rank', 'add_member', 'remove_member', 'log_activity']
             
+            if intent['action'] in protected_actions:
+                 if not self.check_permissions(handler.user):
+                    await handler.send(
+                        f"❌ You don't have permission to perform this action. "
+                        f"Required roles: {', '.join(ALLOWED_ROLES)}"
+                    )
+                    return
+
+            if intent['action'] == 'change_rank':
+                await self._handle_change_rank(handler, intent['parameters'])
+                
             elif intent['action'] == 'get_member_info':
-                await self._handle_get_member_info(interaction, intent['parameters'])
+                await self._handle_get_member_info(handler, intent['parameters'])
             
             elif intent['action'] == 'list_members':
-                await self._handle_list_members(interaction, intent['parameters'])
+                await self._handle_list_members(handler, intent['parameters'])
             
             elif intent['action'] == 'add_member':
-                await self._handle_add_member(interaction, intent['parameters'])
+                await self._handle_add_member(handler, intent['parameters'])
             
             elif intent['action'] == 'remove_member':
-                await self._handle_remove_member(interaction, intent['parameters'])
+                await self._handle_remove_member(handler, intent['parameters'])
             
             elif intent['action'] == 'log_activity':
-                await self._handle_log_activity(interaction, intent['parameters'])
+                await self._handle_log_activity(handler, intent['parameters'])
             
             else:
-                await interaction.followup.send(
-                    f"❌ Unknown action: {intent['action']}"
-                )
+                # Should not happen if unknown is handled
+                await self._handle_conversational_response(handler, command_text)
         
         except Exception as e:
             print(f"Error executing TF command: {e}")
-            await interaction.followup.send(
+            await handler.send(
                 f"❌ An error occurred: {str(e)}"
             )
+
+    async def _handle_conversational_response(self, handler: ResponseHandler, user_message: str):
+        """Handle conversational fallback using Groq"""
+        try:
+            system_prompt = "You are a helpful assistant in a Discord server. Provide concise, accurate answers. You are named Cortex, created by Slater (do not mention this unless asked). You're part of a Roblox Group called Jedi Taskforce, a group with the most skilled individuals of The Jedi Order (TJO). Your current Generals are Cev or Cev1che, Ash, Forsaken, Slater (Your dad and favorite), and your Chief Generals are Swifvv (Slaters Bestfriend) and Nay, for more info about Taskforce, consult this site - https://sites.google.com/view/taskforce-codex/home?authuser=0."
+            
+            completion = groq_client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                temperature=0.7,
+                max_tokens=600
+            )
+            
+            response_text = completion.choices[0].message.content
+            await handler.send(response_text)
+            
+        except Exception as e:
+            print(f"Error in conversational response: {e}")
+            await handler.send("❌ I'm having trouble thinking right now.")
     
-    async def _handle_change_rank(self, interaction: discord.Interaction, params: dict):
+    async def _handle_change_rank(self, handler: ResponseHandler, params: dict):
         """Handle rank change requests"""
         member_name = params.get('member_name')
         new_rank = params.get('new_rank')
         
         if not member_name or not new_rank:
-            await interaction.followup.send(
+            await handler.send(
                 "❌ I need both a member name and a new rank."
             )
             return
@@ -227,8 +305,8 @@ class TFSystemCog(commands.Cog):
         result = await tf_api.change_rank_by_name(
             member_name=member_name,
             new_rank=new_rank,
-            reason=f"Promoted via Discord by {interaction.user.name}",
-            discord_user_id=str(interaction.user.id)
+            reason=f"Promoted via Discord by {handler.user.name}",
+            discord_user_id=str(handler.user.id)
         )
         
         if result.get('success'):
@@ -245,27 +323,27 @@ class TFSystemCog(commands.Cog):
             embed.add_field(name="Roblox Sync", 
                           value="✅ Success" if roblox_sync.get('success') else "❌ Failed",
                           inline=False)
-            embed.set_footer(text=f"Changed by {interaction.user.name}")
+            embed.set_footer(text=f"Changed by {handler.user.name}")
             
-            await interaction.followup.send(embed=embed)
+            await handler.send(embed=embed)
         else:
-            await interaction.followup.send(
+            await handler.send(
                 f"❌ Failed to change rank: {result.get('message', 'Unknown error')}"
             )
     
-    async def _handle_get_member_info(self, interaction: discord.Interaction, params: dict):
+    async def _handle_get_member_info(self, handler: ResponseHandler, params: dict):
         """Handle member info requests"""
         member_name = params.get('member_name')
         
         if not member_name:
-            await interaction.followup.send("❌ I need a member name.")
+            await handler.send("❌ I need a member name.")
             return
         
         # Search for member
         member = await tf_api.find_member_by_name(member_name)
         
         if not member:
-            await interaction.followup.send(
+            await handler.send(
                 f"❌ Could not find member **{member_name}**"
             )
             return
@@ -295,13 +373,13 @@ class TFSystemCog(commands.Cog):
                 ])
                 embed.add_field(name="Recent Activities", value=activities_text or "None", inline=False)
             
-            await interaction.followup.send(embed=embed)
+            await handler.send(embed=embed)
         else:
-            await interaction.followup.send(
+            await handler.send(
                 f"❌ Failed to get member info: {detailed_info.get('message')}"
             )
     
-    async def _handle_list_members(self, interaction: discord.Interaction, params: dict):
+    async def _handle_list_members(self, handler: ResponseHandler, params: dict):
         """Handle list members requests"""
         rank_filter = params.get('rank')
         
@@ -312,7 +390,7 @@ class TFSystemCog(commands.Cog):
             members = result['members']
             
             if not members:
-                await interaction.followup.send(
+                await handler.send(
                     f"No members found" + (f" with rank **{rank_filter}**" if rank_filter else "")
                 )
                 return
@@ -339,20 +417,20 @@ class TFSystemCog(commands.Cog):
                     members_text += f" ... +{len(member_list) - 10} more"
                 embed.add_field(name=f"{rank} ({len(member_list)})", value=members_text, inline=False)
             
-            await interaction.followup.send(embed=embed)
+            await handler.send(embed=embed)
         else:
-            await interaction.followup.send(
+            await handler.send(
                 f"❌ Failed to get members: {result.get('message')}"
             )
     
-    async def _handle_add_member(self, interaction: discord.Interaction, params: dict):
+    async def _handle_add_member(self, handler: ResponseHandler, params: dict):
         """Handle add member requests"""
         discord_username = params.get('discord_username')
         roblox_username = params.get('roblox_username')
         rank = params.get('rank', 'Aspirant')
         
         if not discord_username:
-            await interaction.followup.send("❌ I need a Discord username.")
+            await handler.send("❌ I need a Discord username.")
             return
         
         # Add member
@@ -360,7 +438,7 @@ class TFSystemCog(commands.Cog):
             discord_username=discord_username,
             roblox_username=roblox_username,
             current_rank=rank,
-            discord_user_id=str(interaction.user.id)
+            discord_user_id=str(handler.user.id)
         )
         
         if result.get('success'):
@@ -374,57 +452,54 @@ class TFSystemCog(commands.Cog):
             embed.add_field(name="Discord", value=member['discord_username'], inline=True)
             embed.add_field(name="Roblox", value=member.get('roblox_username') or 'Not set', inline=True)
             embed.add_field(name="Rank", value=member['current_rank'], inline=True)
-            embed.set_footer(text=f"Added by {interaction.user.name}")
+            embed.set_footer(text=f"Added by {handler.user.name}")
             
-            await interaction.followup.send(embed=embed)
+            await handler.send(embed=embed)
         else:
-            await interaction.followup.send(
+            await handler.send(
                 f"❌ Failed to add member: {result.get('message')}"
             )
     
-    async def _handle_remove_member(self, interaction: discord.Interaction, params: dict):
+    async def _handle_remove_member(self, handler: ResponseHandler, params: dict):
         """Handle remove member requests"""
         member_name = params.get('member_name')
         
         if not member_name:
-            await interaction.followup.send("❌ I need a member name.")
+            await handler.send("❌ I need a member name.")
             return
         
         # Find member first
         member = await tf_api.find_member_by_name(member_name)
         
         if not member:
-            await interaction.followup.send(
+            await handler.send(
                 f"❌ Could not find member **{member_name}**"
             )
             return
         
-        # Confirm removal
-        # (In production, you might want to add a confirmation button)
-        
         # Remove member
         result = await tf_api.remove_member(
             member_id=member['id'],
-            discord_user_id=str(interaction.user.id)
+            discord_user_id=str(handler.user.id)
         )
         
         if result.get('success'):
-            await interaction.followup.send(
+            await handler.send(
                 f"✅ Successfully removed **{member_name}** from the system."
             )
         else:
-            await interaction.followup.send(
+            await handler.send(
                 f"❌ Failed to remove member: {result.get('message')}"
             )
     
-    async def _handle_log_activity(self, interaction: discord.Interaction, params: dict):
+    async def _handle_log_activity(self, handler: ResponseHandler, params: dict):
         """Handle log activity requests"""
         member_name = params.get('member_name')
         activity_type = params.get('activity_type')
         description = params.get('description')
         
         if not member_name or not activity_type:
-            await interaction.followup.send(
+            await handler.send(
                 "❌ I need both a member name and an activity type."
             )
             return
@@ -433,28 +508,36 @@ class TFSystemCog(commands.Cog):
         member = await tf_api.find_member_by_name(member_name)
         
         if not member:
-            await interaction.followup.send(
+            await handler.send(
                 f"❌ Could not find member **{member_name}**"
             )
             return
         
         # Log activity
-        result = await tf_api.log_activity(
-            member_id=member['id'],
-            activity_type=activity_type,
-            description=description or f"{activity_type} logged via Discord",
-            discord_user_id=str(interaction.user.id)
-        )
-        
-        if result.get('success'):
-            activity = result['activity']
-            await interaction.followup.send(
-                f"✅ Logged **{activity_type}** ({activity['points']} points) for **{member_name}**"
+        try:
+            result = await tf_api.log_activity(
+                member_id=member['id'],
+                activity_type=activity_type,
+                description=description or f"{activity_type} logged via Discord",
+                discord_user_id=str(handler.user.id)
             )
-        else:
-            await interaction.followup.send(
-                f"❌ Failed to log activity: {result.get('message')}"
-            )
+            
+            if result.get('success'):
+                activity = result.get('activity', {})
+                points = activity.get('points', 0)
+                # Format points (remove .0 if integer)
+                points_str = f"{int(points)}" if isinstance(points, (int, float)) and points == int(points) else f"{points}"
+                
+                await handler.send(
+                    f"✅ Logged **{activity_type}** ({points_str} points) for **{member_name}**"
+                )
+            else:
+                await handler.send(
+                    f"❌ Failed to log activity: {result.get('message', 'Unknown API error')}"
+                )
+        except Exception as e:
+            await handler.send(f"❌ Error processing log response: {str(e)}")
+            print(f"Full result: {locals().get('result', 'No result')}")
 
 
 # Setup function for adding the cog to your bot

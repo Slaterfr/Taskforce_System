@@ -4,7 +4,7 @@ from database.ac_models import (
     ACPeriod, ActivityEntry, InactivityNotice, ACExemption,
     ACTIVITY_TYPES, AC_QUOTAS, get_member_quota, get_activity_points, is_limited_activity
 )
-from utils.auth import staff_required
+from utils.auth import hct_required
 from utils.ac_reports import send_discord_webhook
 from utils.excel_reports import generate_ac_workbook_bytes, merge_into_uploaded_workbook_bytes
 from sqlalchemy import func
@@ -174,7 +174,7 @@ def generate_title_discord_message(titles, period):
 
 # Replace the member_progress building loop in /ac route with this aggregated version
 @ac_bp.route('/')
-@staff_required
+@hct_required
 def ac_dashboard():
     current_period = ACPeriod.query.filter_by(is_active=True).first()
     if not current_period:
@@ -273,7 +273,7 @@ def ac_dashboard():
 
 
 @ac_bp.route('/create_period', methods=['GET', 'POST'])
-@staff_required
+@hct_required
 def create_ac_period():
     if request.method == 'POST':
         period_name = request.form.get('period_name', '').strip()
@@ -290,7 +290,7 @@ def create_ac_period():
 
 
 @ac_bp.route('/edit_period', methods=['GET', 'POST'])
-@staff_required
+@hct_required
 def edit_ac_period():
     current_period = ACPeriod.query.filter_by(is_active=True).first()
     if not current_period:
@@ -311,7 +311,7 @@ def edit_ac_period():
 
 
 @ac_bp.route('/clear_all_activities', methods=['POST'])
-@staff_required
+@hct_required
 def clear_all_activities():
     """Clear all activities for all members in the current period"""
     current_period = ACPeriod.query.filter_by(is_active=True).first()
@@ -328,7 +328,7 @@ def clear_all_activities():
 
 
 @ac_bp.route('/title_rewards')
-@staff_required
+@hct_required
 def title_rewards():
     """Display title rewards for the current AC period"""
     current_period = ACPeriod.query.filter_by(is_active=True).first()
@@ -352,7 +352,7 @@ def title_rewards():
 
 
 @ac_bp.route('/send_title_webhook', methods=['POST'])
-@staff_required
+@hct_required
 def send_title_webhook():
     """Send title rewards message to Discord webhook"""
     webhook_url = request.form.get('webhook_url', '').strip()
@@ -376,7 +376,7 @@ def send_title_webhook():
 
 
 @ac_bp.route('/log_activity', methods=['GET', 'POST'])
-@staff_required
+@hct_required
 def log_ac_activity():
     current_period = ACPeriod.query.filter_by(is_active=True).first()
     if not current_period:
@@ -445,7 +445,7 @@ def log_ac_activity():
 
 
 @ac_bp.route('/quick_log', methods=['GET'])
-@staff_required
+@hct_required
 def quick_log():
     current_period = ACPeriod.query.filter_by(is_active=True).first()
     if not current_period:
@@ -505,7 +505,7 @@ def quick_log():
 
 
 @ac_bp.route('/quick_log_activity', methods=['POST'])
-@staff_required
+@hct_required
 def quick_log_activity():
     """
     Accept JSON {member_id, activity_type, activity_date, logged_by, quantity}
@@ -566,7 +566,7 @@ def quick_log_activity():
 
 
 @ac_bp.route('/quick_log_ia', methods=['POST'])
-@staff_required
+@hct_required
 def quick_log_ia():
     """
     Toggle IA status for a member in the current period.
@@ -613,7 +613,7 @@ def quick_log_ia():
 
 
 @ac_bp.route('/quick_log_exempt', methods=['POST'])
-@staff_required
+@hct_required
 def quick_log_exempt():
     """
     Toggle Exempt status for a member in the current period.
@@ -658,7 +658,7 @@ def quick_log_exempt():
 
 # Export AC to Excel (GET: new workbook; POST: merge uploaded workbook)
 @ac_bp.route('/export_excel', methods=['GET', 'POST'])
-@staff_required
+@hct_required
 def export_ac_excel():
     period_id = request.args.get('period_id', None, type=int)
     if request.method == 'POST' and 'workbook' in request.files:
@@ -674,7 +674,7 @@ def export_ac_excel():
 
 # Replace ac_member_detail route with aggregation + detailed list (keeps delete buttons for staff)
 @ac_bp.route('/member/<int:member_id>')
-@staff_required
+@hct_required
 def ac_member_detail(member_id):
     member = Member.query.get_or_404(member_id)
     current_period = ACPeriod.query.filter_by(is_active=True).first()
@@ -720,7 +720,7 @@ def ac_member_detail(member_id):
 
 # Ensure delete/clear endpoints exist (idempotent if already present)
 @ac_bp.route('/activity/<int:activity_id>/delete', methods=['POST'])
-@staff_required
+@hct_required
 def delete_ac_activity(activity_id):
     ae = ActivityEntry.query.get_or_404(activity_id)
     member_id = ae.member_id
@@ -731,7 +731,7 @@ def delete_ac_activity(activity_id):
 
 
 @ac_bp.route('/member/<int:member_id>/clear_activities', methods=['POST'])
-@staff_required
+@hct_required
 def clear_member_activities(member_id):
     period_id = request.form.get('period_id', type=int)
     if not period_id:

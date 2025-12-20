@@ -23,6 +23,7 @@
           {% if is_staff %}
           <li class="nav-item"><a class="nav-link" href="{{ url_for('members.dashboard') }}">Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('members.members') }}">Manage</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('members.stats') }}">Statistics</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('ac.ac_dashboard') }}">AC</a></li>
           {% endif %}
         </ul>

@@ -1,0 +1,20 @@
+# Database
+*.db
+*.sqlite3
+instance/
+database/taskforce.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

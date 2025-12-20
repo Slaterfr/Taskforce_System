@@ -26,7 +26,9 @@ MAX_QUESTION_LENGTH = int(os.getenv("MAX_QUESTION_LENGTH", "500"))
 client = Groq(api_key=GROQ_API_KEY)
 
 # Discord bot setup
+# Discord bot setup
 intents = discord.Intents.default()
+intents.message_content = True  # Required for on_message and mentions
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Rate limiting tracker
@@ -88,6 +90,7 @@ async def on_ready():
     
     print(f"✓ Bot ready as {bot.user}")
     print(f"✓ Using Groq model: {GROQ_MODEL}")
+    print(f"✓ Message Content Intent: {bot.intents.message_content}")
     print(f"✓ Cooldown: {COOLDOWN_SECONDS}s | Max question length: {MAX_QUESTION_LENGTH} chars")
 
 # Initialize TF System API
@@ -205,8 +208,15 @@ async def help_command(interaction: discord.Interaction):
     
     embed.set_footer(text="Powered by Groq")
     
+    embed.set_footer(text="Powered by Groq")
+    
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
+@bot.event
+async def on_message(message):
+    # Process commands needed if using message commands too
+    await bot.process_commands(message)
 
 @bot.event
 async def on_error(event, *args, **kwargs):

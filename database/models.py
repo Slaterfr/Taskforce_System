@@ -103,3 +103,15 @@ class RankMapping(db.Model):
             'roblox_role_name': self.roblox_role_name,
             'is_active': self.is_active
         }
+
+class MemberStats(db.Model):
+    """Stores historical snapshots of member counts"""
+    __tablename__ = 'member_stats'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    total_members = db.Column(db.Integer, nullable=False)
+    rank_counts = db.Column(db.JSON, nullable=False)  # usage: {"General": 2, "Private": 50}
+    
+    def __repr__(self):
+        return f'<MemberStats {self.timestamp}: {self.total_members}>'

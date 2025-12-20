@@ -209,3 +209,34 @@ def promote_member():
     # GET: show form
     members_list = Member.query.filter_by(is_active=True).order_by(Member.discord_username).all()
     return render_template('promote_member.html', members=members_list, available_ranks=available_ranks)
+
+@members_bp.route('/stats')
+@staff_required
+def stats():
+    """Member Statistics Dashboard"""
+    from utils.stats_logger import get_stats_history
+    import json
+    
+    # Get last 30 days of history
+    data = get_stats_history(days=30)
+    
+    # Calculate some quick summary stats
+    total_members = data['totals'][-1] if data['totals'] else 0
+    
+    # Find rank with most members
+    latest_ranks = data['latest_ranks']
+    most_populated_rank = "N/A"
+    max_count = 0
+    if latest_ranks:
+        most_populated_rank = max(latest_ranks, key=latest_ranks.get)
+        max_count = latest_ranks[most_populated_rank]
+        
+    return render_template('stats.html', 
+                          dates=json.dumps(data['dates']),
+                          totals=json.dumps(data['totals']),
+                          rank_labels=json.dumps(list(latest_ranks.keys())),
+                          rank_values=json.dumps(list(latest_ranks.values())),
+                          total_members=total_members,
+                          most_populated_rank=most_populated_rank,
+                          most_populated_count=max_count)
+

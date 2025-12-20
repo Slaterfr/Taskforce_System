@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}HCT Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card p-3">
+            <h4>HCT Login</h4>
+            <p class="text-muted">High Command Team Access Only</p>
+            <form method="post">
+                <div class="mb-3">
+                    <label class="form-label">HCT Password</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <button class="btn btn-danger" type="submit">Login to HCT Area</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

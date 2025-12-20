@@ -19,23 +19,12 @@ from utils.ac_reports import ACReportGenerator, send_discord_webhook
 from utils.excel_reports import generate_ac_workbook_bytes, merge_into_uploaded_workbook_bytes
 from utils.auth import staff_required, is_staff, check_password
 from utils.roblox_sync import sync_member_to_roblox, add_member_to_roblox, remove_member_from_roblox, sync_from_roblox
-from sqlalchemy import func, event
-from sqlalchemy.engine import Engine
+from sqlalchemy import func
 from datetime import datetime, timedelta
 import os
 import os.path as op
 import secrets
 from io import BytesIO
-
-# Enable Write-Ahead Logging (WAL) for SQLite to handle concurrency better
-@event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    if hasattr(dbapi_connection, "cursor"):  # Ensure it's a DBAPI connection
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA busy_timeout=30000")  # 30 seconds timeout
-        cursor.close()
 
 def create_app():
     app = Flask(__name__)

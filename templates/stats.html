@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Member Statistics{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div
+        class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2" style="color: white;">Member Statistics</h1>
+        <div class="btn-toolbar mb-2 mb-md-0">
+            <div class="btn-group me-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">Export
+                    PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-6 col-xl-4 mb-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Total Members</h5>
+                    <p class="display-4">{{ total_members }}</p>
+                    <small>Active members in system</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-4 mb-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Largest Rank Group</h5>
+                    <p class="display-6">{{ most_populated_rank }}</p>
+                    <p class="card-text">{{ most_populated_count }} members</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- Growth Chart -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Member Growth (Last 30 Days)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="growthChart" width="100%" height="40"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rank Distribution Chart -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Rank Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="rankChart" width="100%" height="60"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Data passed from Flask
+    const dates = JSON.parse('{{ dates | safe }}');
+    const totals = JSON.parse('{{ totals | safe }}');
+
+    // Growth Chart (Line)
+    const ctxGrowth = document.getElementById('growthChart').getContext('2d');
+    new Chart(ctxGrowth, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Total Members',
+                data: totals,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+
+    // Rank Distribution Chart (Bar/Pie)
+    const rankLabels = JSON.parse('{{ rank_labels | safe }}');
+    const rankValues = JSON.parse('{{ rank_values | safe }}');
+
+    // Generate random colors for ranks
+    const backgroundColors = rankLabels.map(() => `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`);
+
+    const ctxRank = document.getElementById('rankChart').getContext('2d');
+    new Chart(ctxRank, {
+        type: 'doughnut',  // Changed to doughnut for variety
+        data: {
+            labels: rankLabels,
+            datasets: [{
+                label: 'Members',
+                data: rankValues,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.7)',
+                    'rgba(54, 162, 235, 0.7)',
+                    'rgba(255, 206, 86, 0.7)',
+                    'rgba(75, 192, 192, 0.7)',
+                    'rgba(153, 102, 255, 0.7)',
+                    'rgba(255, 159, 64, 0.7)',
+                    'rgba(199, 199, 199, 0.7)'
+                ],
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
