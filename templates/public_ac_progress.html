@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Public Activity Progress - Taskforce{% endblock %}
+
+{% block content %}
+{# Safe defaults #}
+{% set member_progress = member_progress|default([]) %}
+{% set current_period = current_period|default(None) %}
+
+<div class="row mb-3">
+    <div class="col-12">
+        <h2 style="color: white;">AC Progress — {{ current_period.period_name if current_period else 'No active period'
+            }}</h2>
+    </div>
+</div>
+
+<!-- Member Progress Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Rank</th>
+                        <th>Member</th>
+                        <th>Quota</th>
+                        <th>Total Points</th>
+                        <th>Progress</th>
+                        <th>Activity Summary</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if member_progress %}
+                    {% for progress in member_progress %}
+                    <tr>
+                        <td>{{ progress.member.current_rank }}</td>
+                        <td>
+                            <a href="{{ url_for('public.public_member', member_id=progress.member.id) }}"
+                                class="text-decoration-none">
+                                {{ progress.member.discord_username }}
+                            </a>
+                        </td>
+                        <td>{{ progress.quota }}</td>
+                        <td>{{ progress.points|round(1) }}</td>
+                        <td style="min-width: 150px;">
+                            <div class="progress" style="height: 25px;">
+                                {% set pct = progress.percentage|round(0) %}
+                                <div class="progress-bar
+                                        {% if progress.is_exempt %}bg-warning
+                                        {% elif progress.is_protected %}bg-info
+                                        {% elif pct >= 100 %}bg-success
+                                        {% elif pct >= 75 %}bg-primary
+                                        {% elif pct >= 50 %}bg-warning
+                                        {% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ pct }}%;"
+                                    aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+                                    {% if progress.is_exempt %}Exempt
+                                    {% elif progress.is_protected %}IA
+                                    {% else %}{{ pct }}%{% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            {% for type in activity_types %}
+                            {% if progress.activity_summary.get(type) %}
+                            <div class="badge bg-secondary me-1 mb-1">
+                                {{ progress.activity_summary[type].count }} {{ type }}
+                                <span class="text-warning">({{ progress.activity_summary[type].points|round(1)
+                                    }})</span>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </td>
+                        <td>
+                            <span class="badge {% if progress.is_exempt %}bg-warning
+                                    {% elif progress.is_protected %}bg-info
+                                    {% elif progress.percentage >= 100 %}bg-success
+                                    {% else %}bg-warning{% endif %}">
+                                {{ progress.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">No member progress data available.</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
