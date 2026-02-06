@@ -844,6 +844,19 @@ def log_activity():
             
         send_discord_notification(notification_message, title="Activity Log")
         
+        # Calculate total points for the member in the current period (for quota progress)
+        total_entries = ActivityEntry.query.filter_by(
+            member_id=member_id,
+            ac_period_id=current_period.id
+        ).all()
+        total_points = sum(entry.points for entry in total_entries)
+        
+        # Get member's quota requirement based on rank
+        member_quota = get_member_quota(member.current_rank)
+        
+        # Calculate percentage complete
+        quota_percentage = (total_points / member_quota * 100) if member_quota > 0 else 0
+        
         log_api_access('/activity', 'POST', discord_user_id, True, 201)
         
         return jsonify({
@@ -854,6 +867,11 @@ def log_activity():
                 'type': activity_type,
                 'points': points * quantity,
                 'date': activity_date.isoformat()
+            },
+            'quota_progress': {
+                'total_points': total_points,
+                'quota': member_quota,
+                'percentage': round(quota_percentage, 2)
             }
         }), 201
 
