@@ -831,18 +831,6 @@ def log_activity():
         
         # Send Discord notification
         qty_str = f" (x{quantity})" if quantity > 1 else ""
-        notification_message = (
-            f"**Activity Logged**\n"
-            f"Activity: **{activity_type}**{qty_str}\n"
-            f"Points: {points * quantity}\n"
-            f"Member: **{member.discord_username}**\n"
-            f"Logged by: {logged_by}"
-        )
-        if description:
-            notification_message += f"\nDescription: {description}"
-        notification_message += f"\nDate: {activity_date.strftime('%Y-%m-%d')}"
-            
-        send_discord_notification(notification_message, title="Activity Log")
         
         # Calculate total points for the member in the current period (for quota progress)
         total_entries = ActivityEntry.query.filter_by(
@@ -856,6 +844,20 @@ def log_activity():
         
         # Calculate percentage complete
         quota_percentage = (total_points / member_quota * 100) if member_quota > 0 else 0
+        
+        notification_message = (
+            f"**Activity Logged**\n"
+            f"Activity: **{activity_type}**{qty_str}\n"
+            f"Points: {points * quantity}\n"
+            f"Member: **{member.discord_username}**\n"
+            f"Logged by: {logged_by}\n"
+            f"New Total: **{total_points}/{member_quota} points** ({round(quota_percentage, 1)}%)"
+        )
+        if description:
+            notification_message += f"\nDescription: {description}"
+        notification_message += f"\nDate: {activity_date.strftime('%Y-%m-%d')}"
+            
+        send_discord_notification(notification_message, title="Activity Log")
         
         log_api_access('/activity', 'POST', discord_user_id, True, 201)
         
@@ -1009,7 +1011,8 @@ def remove_activity(activity_id):
             f"**Activity Removed**\n"
             f"Activity: **{activity_type}** ({points} pts)\n"
             f"Member: **{member.discord_username if member else 'Unknown'}**\n"
-            f"Removed by: {f'Discord User {discord_user_id}' if discord_user_id else 'API'}"
+            f"Removed by: {f'Discord User {discord_user_id}' if discord_user_id else 'API'}\n"
+            f"New Total: **{total_points}/{member_quota} points** ({round((total_points / member_quota * 100) if member_quota > 0 else 0, 1)}%)"
         )
         send_discord_notification(notification_message, title="Activity Removed")
         
@@ -1038,5 +1041,78 @@ def remove_activity(activity_id):
             'success': False,
             'error': 'server_error',
             'message': f'Error removing activity: {str(e)}'
+        }), 500
+
+
+@api_bp.route('/members/<int:member_id>/points', methods=['GET'])
+@api_key_required
+def get_member_points(member_id):
+    """
+    Get a member's current AC points and quota progress
+    
+    Args:
+        member_id: Member ID
+    
+    Returns:
+        200: Member's current AC points and quota
+        404: Member not found
+    """
+    try:
+        member = Member.query.filter_by(id=member_id, is_active=True).first()
+        if not member:
+            log_api_access(f'/members/{member_id}/points', 'GET', success=False, response_code=404)
+            return jsonify({
+                'success': False,
+                'error': 'member_not_found',
+                'message': f'Member with ID {member_id} not found'
+            }), 404
+        
+        # Get active AC period
+        current_period = ACPeriod.query.filter_by(is_active=True).first()
+        if not current_period:
+            log_api_access(f'/members/{member_id}/points', 'GET', success=False, response_code=404)
+            return jsonify({
+                'success': False,
+                'error': 'no_active_period',
+                'message': 'No active AC period'
+            }), 404
+        
+        # Calculate total points for the member in current period
+        total_entries = ActivityEntry.query.filter_by(
+            member_id=member_id,
+            ac_period_id=current_period.id
+        ).all()
+        total_points = sum(entry.points for entry in total_entries)
+        
+        # Get member's quota
+        member_quota = get_member_quota(member.current_rank)
+        
+        # Calculate percentage
+        percentage = (total_points / member_quota * 100) if member_quota > 0 else 0
+        
+        log_api_access(f'/members/{member_id}/points', 'GET', success=True, response_code=200)
+        
+        return jsonify({
+            'success': True,
+            'member': {
+                'id': member.id,
+                'discord_username': member.discord_username,
+                'current_rank': member.current_rank
+            },
+            'points': {
+                'total_points': total_points,
+                'quota': member_quota,
+                'percentage': round(percentage, 2),
+                'period_name': current_period.period_name
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting member points: {e}", exc_info=True)
+        log_api_access(f'/members/{member_id}/points', 'GET', success=False, response_code=500)
+        return jsonify({
+            'success': False,
+            'error': 'server_error',
+            'message': f'Error retrieving points: {str(e)}'
         }), 500
 

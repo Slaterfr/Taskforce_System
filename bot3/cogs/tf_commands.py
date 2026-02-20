@@ -84,6 +84,7 @@ Valid actions:
 - remove_member: Remove a member
 - log_activity: Log an activity for a member
 - remove_activity: Remove/delete an activity entry for a member
+- check_points: Check a member's current AC points and quota progress
 
 Valid ranks: Aspirant, Novice, Adept, Crusader, Paladin, Exemplar, Prospect, Commander, Marshal, General, Chief General
 Valid activity types: Raid, Patrol, Training, Mission, Tryout, Canceled Training, Cancelled Tryout
@@ -115,6 +116,15 @@ Recognize these patterns for removing activities:
 - "delete activity for [member]" -> remove_activity with member name
 - "remove [number] points from [member]" -> May need clarification which activity to remove
 
+IMPORTANT: Check Points Recognition
+Recognize these patterns for checking points:
+- "how many points do I have" -> check_points with no member name (check current user)
+- "what are my points" -> check_points with no member name
+- "check my progress" -> check_points with no member name
+- "how many points does [member] have" -> check_points with member name
+- "what are [member]'s points" -> check_points with member name
+- "check points for [member]" -> check_points with member name
+
 Examples of correct parsing:
 1. "show all generals" -> {"action": "list_members", "parameters": {"rank": "General"}}
 2. "list all commanders" -> {"action": "list_members", "parameters": {"rank": "Commander"}}
@@ -127,6 +137,9 @@ Examples of correct parsing:
 9. "log a cancelled tryout for Steve" -> {"action": "log_activity", "parameters": {"member_name": "Steve", "activity_type": "Cancelled Tryout"}}
 10. "remove training for John" -> {"action": "remove_activity", "parameters": {"member_name": "John", "activity_type": "Training"}}
 11. "undo raid for Sarah" -> {"action": "remove_activity", "parameters": {"member_name": "Sarah", "activity_type": "Raid"}}
+12. "how many points do I have" -> {"action": "check_points", "parameters": {}}
+13. "what are my points" -> {"action": "check_points", "parameters": {}}
+14. "how many points does John have" -> {"action": "check_points", "parameters": {"member_name": "John"}}
 
 Respond ONLY with a JSON object in this format:
 {
@@ -290,6 +303,9 @@ class TFSystemCog(commands.Cog):
             
             elif intent['action'] == 'remove_activity':
                 await self._handle_remove_activity(handler, intent['parameters'])
+            
+            elif intent['action'] == 'check_points':
+                await self._handle_check_points(handler, intent['parameters'])
             
             else:
                 # Should not happen if unknown is handled
@@ -652,6 +668,69 @@ class TFSystemCog(commands.Cog):
         except Exception as e:
             await handler.send(f"❌ Error removing activity: {str(e)}")
             print(f"Full result: {locals().get('result', 'No result')}")
+
+    async def _handle_check_points(self, handler: ResponseHandler, params: dict):
+        """Handle check points requests"""
+        member_name = params.get('member_name')
+        
+        # If no member name specified, we can't check points (would need Discord ID mapping)
+        if not member_name:
+            await handler.send(
+                "❌ I need a member name to check points. (Note: Checking your own points requires staff implementation)"
+            )
+            return
+        
+        # Find member
+        member = await tf_api.find_member_by_name(member_name)
+        
+        if not member:
+            await handler.send(
+                f"❌ Could not find member **{member_name}**"
+            )
+            return
+        
+        # Get member's current points
+        try:
+            result = await tf_api.get_member_points(member['id'])
+            
+            if result.get('success'):
+                points_data = result.get('points', {})
+                total_points = points_data.get('total_points', 0)
+                quota = points_data.get('quota', 0)
+                percentage = points_data.get('percentage', 0)
+                
+                # Format points (remove .0 if integer)
+                total_str = f"{int(total_points)}" if isinstance(total_points, (int, float)) and total_points == int(total_points) else f"{total_points}"
+                quota_str = f"{int(quota)}" if isinstance(quota, (int, float)) and quota == int(quota) else f"{quota}"
+                
+                # Create embed for visual display
+                embed = discord.Embed(
+                    title=f"📊 AC Points: {member_name}",
+                    color=discord.Color.blue()
+                )
+                embed.add_field(name="Current Points", value=total_str, inline=True)
+                embed.add_field(name="Quota Required", value=quota_str, inline=True)
+                embed.add_field(name="Progress", value=f"{percentage}%", inline=True)
+                
+                # Add status bar
+                if quota > 0:
+                    progress_value = min(int(percentage / 10), 10)
+                    bar = "█" * progress_value + "░" * (10 - progress_value)
+                    embed.add_field(name="Status", value=bar, inline=False)
+                    
+                    if percentage >= 100:
+                        embed.add_field(name="", value="✅ Quota complete!", inline=False)
+                    else:
+                        points_needed = quota - total_points
+                        embed.add_field(name="", value=f"⏳ {points_needed} more points needed", inline=False)
+                
+                await handler.send(embed=embed)
+            else:
+                await handler.send(
+                    f"❌ Could not retrieve points: {result.get('message', 'Unknown error')}"
+                )
+        except Exception as e:
+            await handler.send(f"❌ Error checking points: {str(e)}")
 
 # Setup function for adding the cog to your bot
 async def setup(bot):

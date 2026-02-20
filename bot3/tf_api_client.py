@@ -303,6 +303,18 @@ class TFSystemAPI:
         params = {'limit': limit}
         return await self._request('GET', f'/members/{member_id}/activities', params=params)
     
+    async def get_member_points(self, member_id: int) -> Dict:
+        """
+        Get a member's current AC points and quota progress
+        
+        Args:
+            member_id: Member ID
+        
+        Returns:
+            dict: Member's current points and quota information
+        """
+        return await self._request('GET', f'/members/{member_id}/points')
+    
     # ========================================
     # HELPER METHODS
     # ========================================
