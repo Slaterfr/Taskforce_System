@@ -83,6 +83,7 @@ Valid actions:
 - add_member: Add a new member
 - remove_member: Remove a member
 - log_activity: Log an activity for a member
+- remove_activity: Remove/delete an activity entry for a member
 
 Valid ranks: Aspirant, Novice, Adept, Crusader, Paladin, Exemplar, Prospect, Commander, Marshal, General, Chief General
 Valid activity types: Raid, Patrol, Training, Mission, Tryout, Canceled Training, Cancelled Tryout
@@ -103,7 +104,16 @@ Note: Always use SINGULAR form of rank names (General, not Generals; Commander, 
 CRITICAL: Activity Type Spelling
 - "cancelled training" or "canceled training" -> MUST map to "Canceled Training" (one L)
 - "cancelled tryout" or "canceled tryout" -> MUST map to "Cancelled Tryout" (two Ls)
+- You should also consider "cancelled" or "cancelled event" to map to "Canceled Training"
 - This is extremely important for the database to recognize the activity.
+
+IMPORTANT: Activity Removal Recognition
+Recognize these patterns for removing activities:
+- "remove activity from [member]" -> remove_activity with member name (will need to specify which activity if multiple)
+- "remove [activity type] for [member]" -> remove_activity with activity type and member name
+- "undo [activity type] for [member]" -> remove_activity with activity type and member name
+- "delete activity for [member]" -> remove_activity with member name
+- "remove [number] points from [member]" -> May need clarification which activity to remove
 
 Examples of correct parsing:
 1. "show all generals" -> {"action": "list_members", "parameters": {"rank": "General"}}
@@ -115,6 +125,8 @@ Examples of correct parsing:
 7. "log a cancelled training for Clicky" -> {"action": "log_activity", "parameters": {"member_name": "Clicky", "activity_type": "Canceled Training"}}
 8. "log a canceled training for Bob" -> {"action": "log_activity", "parameters": {"member_name": "Bob", "activity_type": "Canceled Training"}}
 9. "log a cancelled tryout for Steve" -> {"action": "log_activity", "parameters": {"member_name": "Steve", "activity_type": "Cancelled Tryout"}}
+10. "remove training for John" -> {"action": "remove_activity", "parameters": {"member_name": "John", "activity_type": "Training"}}
+11. "undo raid for Sarah" -> {"action": "remove_activity", "parameters": {"member_name": "Sarah", "activity_type": "Raid"}}
 
 Respond ONLY with a JSON object in this format:
 {
@@ -248,7 +260,7 @@ class TFSystemCog(commands.Cog):
             
             # Execute based on action
             # For actions that modify state, check permissions
-            protected_actions = ['change_rank', 'add_member', 'remove_member', 'log_activity']
+            protected_actions = ['change_rank', 'add_member', 'remove_member', 'log_activity', 'remove_activity']
             
             if intent['action'] in protected_actions:
                  if not self.check_permissions(handler.user):
@@ -275,6 +287,9 @@ class TFSystemCog(commands.Cog):
             
             elif intent['action'] == 'log_activity':
                 await self._handle_log_activity(handler, intent['parameters'])
+            
+            elif intent['action'] == 'remove_activity':
+                await self._handle_remove_activity(handler, intent['parameters'])
             
             else:
                 # Should not happen if unknown is handled
@@ -546,6 +561,97 @@ class TFSystemCog(commands.Cog):
             await handler.send(f"❌ Error processing log response: {str(e)}")
             print(f"Full result: {locals().get('result', 'No result')}")
 
+    async def _handle_remove_activity(self, handler: ResponseHandler, params: dict):
+        """Handle remove activity requests"""
+        member_name = params.get('member_name')
+        activity_type = params.get('activity_type')
+        
+        if not member_name:
+            await handler.send(
+                "❌ I need a member name to find which activity to remove."
+            )
+            return
+        
+        # Find member
+        member = await tf_api.find_member_by_name(member_name)
+        
+        if not member:
+            await handler.send(
+                f"❌ Could not find member **{member_name}**"
+            )
+            return
+        
+        # Get member's activities to find the one to remove
+        activities_result = await tf_api.get_member_activities(member['id'], limit=50)
+        
+        if not activities_result.get('success'):
+            await handler.send(
+                f"❌ Could not retrieve activities for **{member_name}**"
+            )
+            return
+        
+        activities = activities_result.get('activities', [])
+        
+        if not activities:
+            await handler.send(
+                f"❌ No activities found for **{member_name}**"
+            )
+            return
+        
+        # Find the activity to remove
+        activity_to_remove = None
+        
+        if activity_type:
+            # Find most recent activity of this type
+            for activity in activities:
+                if activity['activity_type'] == activity_type:
+                    activity_to_remove = activity
+                    break
+        else:
+            # If no activity type specified, remove the most recent
+            activity_to_remove = activities[0]
+            activity_type = activity_to_remove['activity_type']
+        
+        if not activity_to_remove:
+            await handler.send(
+                f"❌ Could not find {f'**{activity_type}** activity' if activity_type else 'an activity'} for **{member_name}**"
+            )
+            return
+        
+        # Remove the activity
+        try:
+            result = await tf_api.remove_activity(
+                activity_id=activity_to_remove['id'],
+                discord_user_id=str(handler.user.id)
+            )
+            
+            if result.get('success'):
+                activity = result.get('activity', {})
+                points = activity.get('points', 0)
+                activity_type = activity.get('type', activity_type)
+                
+                # Format points (remove .0 if integer)
+                points_str = f"{int(points)}" if isinstance(points, (int, float)) and points == int(points) else f"{points}"
+                
+                # Get quota progress information
+                quota_progress = result.get('quota_progress', {})
+                total_points = quota_progress.get('total_points', 0)
+                quota = quota_progress.get('quota', 0)
+                
+                # Format total_points and quota (remove .0 if integer)
+                total_str = f"{int(total_points)}" if isinstance(total_points, (int, float)) and total_points == int(total_points) else f"{total_points}"
+                quota_str = f"{int(quota)}" if isinstance(quota, (int, float)) and quota == int(quota) else f"{quota}"
+                
+                await handler.send(
+                    f"✅ Removed {activity_type} ({points_str} pts) from **{member_name}**, they now have {total_str}/{quota_str} points."
+                )
+            else:
+                await handler.send(
+                    f"❌ Failed to remove activity: {result.get('message', 'Unknown API error')}"
+                )
+        except Exception as e:
+            await handler.send(f"❌ Error removing activity: {str(e)}")
+            print(f"Full result: {locals().get('result', 'No result')}")
 
 # Setup function for adding the cog to your bot
 async def setup(bot):
@@ -586,30 +692,4 @@ if __name__ == '__main__':
     import asyncio
     asyncio.run(main())
 """
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

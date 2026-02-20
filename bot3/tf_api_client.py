@@ -272,6 +272,23 @@ class TFSystemAPI:
         
         return await self._request('POST', '/activity', json=data)
     
+    async def remove_activity(self, activity_id: int, discord_user_id: str = None) -> Dict:
+        """
+        Remove an activity entry
+        
+        Args:
+            activity_id: Activity ID to remove
+            discord_user_id: Discord user ID who is removing the activity
+        
+        Returns:
+            dict: Remove activity result with updated quota progress
+        """
+        data = {}
+        if discord_user_id:
+            data['discord_user_id'] = discord_user_id
+        
+        return await self._request('DELETE', f'/activity/{activity_id}', json=data)
+    
     async def get_member_activities(self, member_id: int, limit: int = 20) -> Dict:
         """
         Get activities for a specific member

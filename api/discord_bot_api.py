@@ -950,3 +950,93 @@ def get_member_activities(member_id):
             'message': f'Error retrieving activities: {str(e)}'
         }), 500
 
+
+@api_bp.route('/activity/<int:activity_id>', methods=['DELETE'])
+@api_key_required
+def remove_activity(activity_id):
+    """
+    Remove/delete an activity entry
+    
+    Args:
+        activity_id: Activity ID to remove
+    
+    Request Body:
+        discord_user_id (str): Discord user ID who is removing (optional)
+    
+    Returns:
+        200: Activity removed successfully
+        404: Activity not found
+    """
+    try:
+        data = request.get_json() or {}
+        discord_user_id = data.get('discord_user_id')
+        
+        # Find activity
+        activity = ActivityEntry.query.filter_by(id=activity_id).first()
+        if not activity:
+            log_api_access('/activity/<id>', 'DELETE', discord_user_id, False, 404)
+            return jsonify({
+                'success': False,
+                'error': 'activity_not_found',
+                'message': f'Activity with ID {activity_id} not found'
+            }), 404
+        
+        # Get member info before deleting (for response)
+        member = Member.query.get(activity.member_id)
+        activity_type = activity.activity_type
+        points = activity.points
+        ac_period_id = activity.ac_period_id
+        
+        # Delete the activity
+        db.session.delete(activity)
+        db.session.commit()
+        
+        # Calculate updated quota progress
+        current_period = ACPeriod.query.get(ac_period_id)
+        if current_period and member:
+            total_entries = ActivityEntry.query.filter_by(
+                member_id=member.id,
+                ac_period_id=ac_period_id
+            ).all()
+            total_points = sum(entry.points for entry in total_entries)
+            member_quota = get_member_quota(member.current_rank)
+        else:
+            total_points = 0
+            member_quota = 0
+        
+        # Send Discord notification
+        notification_message = (
+            f"**Activity Removed**\n"
+            f"Activity: **{activity_type}** ({points} pts)\n"
+            f"Member: **{member.discord_username if member else 'Unknown'}**\n"
+            f"Removed by: {f'Discord User {discord_user_id}' if discord_user_id else 'API'}"
+        )
+        send_discord_notification(notification_message, title="Activity Removed")
+        
+        log_api_access('/activity/<id>', 'DELETE', discord_user_id, True, 200)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Activity removed successfully',
+            'activity': {
+                'id': activity_id,
+                'type': activity_type,
+                'points': points
+            },
+            'quota_progress': {
+                'total_points': total_points,
+                'quota': member_quota,
+                'percentage': round((total_points / member_quota * 100) if member_quota > 0 else 0, 2)
+            }
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error removing activity: {e}", exc_info=True)
+        log_api_access('/activity/<id>', 'DELETE', data.get('discord_user_id'), False, 500)
+        return jsonify({
+            'success': False,
+            'error': 'server_error',
+            'message': f'Error removing activity: {str(e)}'
+        }), 500
+
