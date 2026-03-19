@@ -73,8 +73,9 @@ def hct_login():
 
         # Invalid password
         if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
-            return jsonify({'error': 'authentication_failed'}), 401
-        flash('Invalid HCT password', 'error')
+            flash('Invalid HCT password', 'error')
+            return render_template('hct_login.html'), 401
+            
 
     return render_template('hct_login.html')
 

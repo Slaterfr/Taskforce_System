@@ -2,7 +2,10 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from database.models import db, Member
 from database.ac_models import (
     ACPeriod, ActivityEntry, InactivityNotice, ACExemption,
-    ACTIVITY_TYPES, AC_QUOTAS, get_member_quota, get_activity_points, is_limited_activity
+    ACTIVITY_TYPES, AC_QUOTAS, get_member_quota, get_activity_points, is_limited_activity,
+    capture_period_statistics, get_hwtm_winner, get_leggionary_winner, 
+    get_scout_winner, get_taskmaster_winner, is_last_period_of_month, PeriodStatistics,
+    MonthlyActivityEntry, get_monthly_activity_counts
 )
 from utils.auth import hct_required
 from utils.ac_reports import send_discord_webhook
@@ -27,128 +30,218 @@ def _members_with_quota_query():
 def calculate_title_rewards(all_activities, period):
     """
     Calculate title reward winners based on activity counts for the current period.
+    Reads from MonthlyActivityEntry for persistent title tracking.
+    
+    All titles show current stats that accumulate throughout the month.
+    
     Returns dict of title winners.
     """
-    # Count activities by type for each member
-    member_stats = {}
-    
-    for activity in all_activities:
-        member_id = activity.member_id
-        member = activity.member
-        activity_type = activity.activity_type
-        
-        if member_id not in member_stats:
-            member_stats[member_id] = {
-                'name': member.discord_username,
-                'events': 0,  # Training + Raid + Patrol for HWTM
-                'missions': 0,
-                'raids': 0,
-                'patrols': 0,
-                'tryouts': 0
-            }
-        
-        # Track specific activity types
-        if activity_type == 'Raid':
-            member_stats[member_id]['raids'] += 1
-            member_stats[member_id]['events'] += 1  # Events = Training + Raid + Patrol
-        elif activity_type == 'Patrol':
-            member_stats[member_id]['patrols'] += 1
-            member_stats[member_id]['events'] += 1  # Events = Training + Raid + Patrol
-        elif activity_type == 'Training':
-            member_stats[member_id]['events'] += 1  # Events = Training + Raid + Patrol
-        elif activity_type == 'Mission':
-            member_stats[member_id]['missions'] += 1
-        elif activity_type == 'Tryout':
-            member_stats[member_id]['tryouts'] += 1
-    
-    # Calculate winners - always show all titles, even if no one meets minimum
     titles = {}
     
-    # Host with the Most (most events = Training + Raid + Patrol, min 5)
-    if member_stats:
-        event_leaders = [(mid, stats['events'], stats['name']) 
-                        for mid, stats in member_stats.items() 
-                        if stats['events'] > 0]
-        if event_leaders:
-            winner = max(event_leaders, key=lambda x: x[1])
-            meets_minimum = winner[1] >= 5
-            titles['Host with the Most'] = {
-                'winner': winner[2] if meets_minimum else f"{winner[2]} (Not Qualified)",
-                'count': winner[1],
-                'requirement': '5+ events hosted (Training + Raid + Patrol)',
-                'qualified': meets_minimum
-            }
+    # ALWAYS calculate HWTM for this period (from MonthlyActivityEntry only)
+    hwtm_winner_id, hwtm_count = get_hwtm_winner(period)
+    if hwtm_winner_id and hwtm_count >= 5:
+        winner = Member.query.get(hwtm_winner_id)
+        titles['Host with the Most'] = {
+            'winner': winner.discord_username if winner else 'Unknown',
+            'count': hwtm_count,
+            'requirement': '5+ events hosted (Training + Raid + Patrol)',
+            'period_award': True,
+            'qualified': True
+        }
+    else:
+        # Show top contestant with "Not Qualified" if close - from MonthlyActivityEntry
+        activity_counts = get_monthly_activity_counts(period)
+        if activity_counts:
+            max_events = 0
+            top_member_id = None
+            for member_id, counts in activity_counts.items():
+                combined = counts['trainings'] + counts['raids'] + counts['patrols']
+                if combined > max_events:
+                    max_events = combined
+                    top_member_id = member_id
+            
+            if max_events > 0:
+                winner = Member.query.get(top_member_id)
+                titles['Host with the Most'] = {
+                    'winner': f"{winner.discord_username if winner else 'Unknown'} (Not Qualified - {max_events} events)",
+                    'count': max_events,
+                    'requirement': '5+ events hosted (Training + Raid + Patrol)',
+                    'period_award': True,
+                    'qualified': False
+                }
+            else:
+                titles['Host with the Most'] = {
+                    'winner': 'No participants',
+                    'count': 0,
+                    'requirement': '5+ events hosted (Training + Raid + Patrol)',
+                    'period_award': True,
+                    'qualified': False
+                }
         else:
             titles['Host with the Most'] = {
                 'winner': 'No participants',
                 'count': 0,
                 'requirement': '5+ events hosted (Training + Raid + Patrol)',
+                'period_award': True,
                 'qualified': False
             }
     
-    # Taskmaster (most missions, min 5)
-    if member_stats:
-        mission_leaders = [(mid, stats['missions'], stats['name']) 
-                          for mid, stats in member_stats.items() 
-                          if stats['missions'] > 0]
-        if mission_leaders:
-            winner = max(mission_leaders, key=lambda x: x[1])
-            meets_minimum = winner[1] >= 5
-            titles['Taskmaster'] = {
-                'winner': winner[2] if meets_minimum else f"{winner[2]} (Not Qualified)",
-                'count': winner[1],
-                'requirement': '5+ missions posted',
-                'qualified': meets_minimum
-            }
+    # Calculate all other titles - show stats all the time
+    # Leggionary (accumulated Raid + Patrol events from MonthlyActivityEntry)
+    leg_winner_id, leg_count = get_leggionary_winner(period)
+    if leg_winner_id and leg_count >= 5:
+        winner = Member.query.get(leg_winner_id)
+        titles['Legionnaire'] = {
+            'winner': winner.discord_username if winner else 'Unknown',
+            'count': leg_count,
+            'requirement': f'5+ events hosted (Raids + Patrols - monthly)',
+            'period_award': False,
+            'is_monthly': True,
+            'qualified': True
+        }
+    else:
+        # Show top contestant from MonthlyActivityEntry
+        activity_counts = get_monthly_activity_counts(period)
+        if activity_counts:
+            max_events = 0
+            top_member_id = None
+            for member_id, counts in activity_counts.items():
+                raid_patrol_count = counts['raids'] + counts['patrols']
+                if raid_patrol_count > max_events:
+                    max_events = raid_patrol_count
+                    top_member_id = member_id
+            
+            if max_events > 0:
+                winner = Member.query.get(top_member_id)
+                titles['Legionnaire'] = {
+                    'winner': f"{winner.discord_username if winner else 'Unknown'} (Not Qualified - {max_events} events)",
+                    'count': max_events,
+                    'requirement': '5+ events hosted (Raids + Patrols - monthly)',
+                    'period_award': False,
+                    'is_monthly': True,
+                    'qualified': False
+                }
+            else:
+                titles['Legionnaire'] = {
+                    'winner': 'No participants',
+                    'count': 0,
+                    'requirement': '5+ events hosted (Raids + Patrols - monthly)',
+                    'period_award': False,
+                    'is_monthly': True,
+                    'qualified': False
+                }
         else:
-            titles['Taskmaster'] = {
-                'winner': 'No participants',
-                'count': 0,
-                'requirement': '5+ missions posted',
-                'qualified': False
-            }
-    
-    # Legionnaire (most raids, min 5)
-    if member_stats:
-        raid_leaders = [(mid, stats['raids'], stats['name']) 
-                       for mid, stats in member_stats.items() 
-                       if stats['raids'] > 0]
-        if raid_leaders:
-            winner = max(raid_leaders, key=lambda x: x[1])
-            meets_minimum = winner[1] >= 5
             titles['Legionnaire'] = {
-                'winner': winner[2] if meets_minimum else f"{winner[2]} (Not Qualified)",
-                'count': winner[1],
-                'requirement': '5+ raids hosted',
-                'qualified': meets_minimum
-            }
-        else:
-            titles['Legionnaire'] = {
                 'winner': 'No participants',
                 'count': 0,
-                'requirement': '5+ raids hosted',
+                'requirement': '5+ events hosted (Raids + Patrols - monthly)',
+                'period_award': False,
+                'is_monthly': True,
                 'qualified': False
             }
     
-    # Scout (most tryouts, min 5)
-    if member_stats:
-        tryout_leaders = [(mid, stats['tryouts'], stats['name']) 
-                         for mid, stats in member_stats.items() 
-                         if stats['tryouts'] > 0]
-        if tryout_leaders:
-            winner = max(tryout_leaders, key=lambda x: x[1])
-            meets_minimum = winner[1] >= 5
-            titles['Scout'] = {
-                'winner': winner[2] if meets_minimum else f"{winner[2]} (Not Qualified)",
-                'count': winner[1],
-                'requirement': '5+ tryouts hosted',
-                'qualified': meets_minimum
-            }
+    # Scout (most tryouts from MonthlyActivityEntry)
+    scout_winner_id, scout_count = get_scout_winner(period)
+    if scout_winner_id and scout_count >= 5:
+        winner = Member.query.get(scout_winner_id)
+        titles['Scout'] = {
+            'winner': winner.discord_username if winner else 'Unknown',
+            'count': scout_count,
+            'requirement': '5+ tryouts - monthly',
+            'period_award': False,
+            'is_monthly': True,
+            'qualified': True
+        }
+    else:
+        # Show top contestant from MonthlyActivityEntry
+        activity_counts = get_monthly_activity_counts(period)
+        if activity_counts:
+            max_tryouts = 0
+            top_member_id = None
+            for member_id, counts in activity_counts.items():
+                if counts['tryouts'] > max_tryouts:
+                    max_tryouts = counts['tryouts']
+                    top_member_id = member_id
+            
+            if max_tryouts > 0:
+                winner = Member.query.get(top_member_id)
+                titles['Scout'] = {
+                    'winner': f"{winner.discord_username if winner else 'Unknown'} (Not Qualified - {max_tryouts} tryouts)",
+                    'count': max_tryouts,
+                    'requirement': '5+ tryouts - monthly',
+                    'period_award': False,
+                    'is_monthly': True,
+                    'qualified': False
+                }
+            else:
+                titles['Scout'] = {
+                    'winner': 'No participants',
+                    'count': 0,
+                    'requirement': '5+ tryouts - monthly',
+                    'period_award': False,
+                    'is_monthly': True,
+                    'qualified': False
+                }
         else:
             titles['Scout'] = {
                 'winner': 'No participants',
                 'count': 0,
-                'requirement': '5+ tryouts hosted',
+                'requirement': '5+ tryouts - monthly',
+                'period_award': False,
+                'is_monthly': True,
+                'qualified': False
+            }
+    
+    # Taskmaster (most missions from MonthlyActivityEntry)
+    taskmaster_winner_id, taskmaster_count = get_taskmaster_winner(period)
+    if taskmaster_winner_id and taskmaster_count >= 5:
+        winner = Member.query.get(taskmaster_winner_id)
+        titles['Taskmaster'] = {
+            'winner': winner.discord_username if winner else 'Unknown',
+            'count': taskmaster_count,
+            'requirement': '5+ missions - monthly',
+            'period_award': False,
+            'is_monthly': True,
+            'qualified': True
+        }
+    else:
+        # Show top contestant from MonthlyActivityEntry
+        activity_counts = get_monthly_activity_counts(period)
+        if activity_counts:
+            max_missions = 0
+            top_member_id = None
+            for member_id, counts in activity_counts.items():
+                if counts['missions'] > max_missions:
+                    max_missions = counts['missions']
+                    top_member_id = member_id
+            
+            if max_missions > 0:
+                winner = Member.query.get(top_member_id)
+                titles['Taskmaster'] = {
+                    'winner': f"{winner.discord_username if winner else 'Unknown'} (Not Qualified - {max_missions} missions)",
+                    'count': max_missions,
+                    'requirement': '5+ missions - monthly',
+                    'period_award': False,
+                    'is_monthly': True,
+                    'qualified': False
+                }
+            else:
+                titles['Taskmaster'] = {
+                    'winner': 'No participants',
+                    'count': 0,
+                    'requirement': '5+ missions - monthly',
+                    'period_award': False,
+                    'is_monthly': True,
+                    'qualified': False
+                }
+        else:
+            titles['Taskmaster'] = {
+                'winner': 'No participants',
+                'count': 0,
+                'requirement': '5+ missions - monthly',
+                'period_award': False,
+                'is_monthly': True,
                 'qualified': False
             }
     
@@ -156,20 +249,27 @@ def calculate_title_rewards(all_activities, period):
 
 
 def generate_title_discord_message(titles, period):
-    """Generate Discord message for title winners (only qualified)"""
+    """Generate Discord message for title winners"""
     qualified_titles = {k: v for k, v in titles.items() if v.get('qualified', False)}
-    
-    if not qualified_titles:
-        return "No title winners this cycle (minimum requirements not met)."
     
     message = f"🏆 **Title Rewards - {period.period_name}** 🏆\n\n"
     
-    for title, info in qualified_titles.items():
-        message += f"**@{title}**\n"
-        message += f"👑 Winner: **{info['winner']}**\n"
-        message += f"📊 Achievement: {info['count']} ({info['requirement']})\n\n"
-    
-    return message
+    if qualified_titles:
+        for title, info in qualified_titles.items():
+            message += f"**@{title}**\n"
+            message += f"👑 Winner: **{info['winner']}**\n"
+            message += f"📊 Achievement: {info['count']} ({info['requirement']})\n"
+            
+            if info.get('is_monthly'):
+                message += f"📅 *Monthly Accumulated Award*\n"
+            else:
+                message += f"⏱️ *Period Award*\n"
+            
+            message += "\n"
+        
+        return message
+    else:
+        return "No title winners this cycle (minimum requirements not met)."
 
 
 # Replace the member_progress building loop in /ac route with this aggregated version
@@ -310,20 +410,52 @@ def edit_ac_period():
     return render_template('ac/edit_period.html', period=current_period)
 
 
+@ac_bp.route('/finalize_period', methods=['POST'])
+@hct_required
+def finalize_period():
+    """
+    Finalize the current AC period:
+    1. Capture all member statistics for the period
+    2. Mark period as finalized
+    3. Redirect to title rewards page
+    """
+    current_period = ACPeriod.query.filter_by(is_active=True).first()
+    if not current_period:
+        flash('No active AC period to finalize', 'error')
+        return redirect(url_for('ac.ac_dashboard'))
+
+
 @ac_bp.route('/clear_all_activities', methods=['POST'])
 @hct_required
 def clear_all_activities():
-    """Clear all activities for all members in the current period"""
+    """Clear all activities for all members in the current period (MonthlyActivityEntry preserved)"""
     current_period = ACPeriod.query.filter_by(is_active=True).first()
     if not current_period:
         flash('No active AC period', 'error')
         return redirect(url_for('ac.ac_dashboard'))
     
-    # Delete all activity entries for the current period
+    # Delete all activity entries for the current period (only ActivityEntry, preserve MonthlyActivityEntry)
     deleted_count = ActivityEntry.query.filter_by(ac_period_id=current_period.id).delete()
     db.session.commit()
     
-    flash(f'Cleared {deleted_count} activity entries for all members', 'success')
+    flash(f'Cleared {deleted_count} activity entries for all members. Title tracking data preserved.', 'success')
+    return redirect(url_for('ac.ac_dashboard'))
+
+
+@ac_bp.route('/clear_titles', methods=['POST'])
+@hct_required
+def clear_titles():
+    """Clear all title tracking data - manual action to reset title history"""
+    current_period = ACPeriod.query.filter_by(is_active=True).first()
+    if not current_period:
+        flash('No active AC period', 'error')
+        return redirect(url_for('ac.ac_dashboard'))
+    
+    # Delete all monthly activity entries for the current period
+    deleted_count = MonthlyActivityEntry.query.filter_by(ac_period_id=current_period.id).delete()
+    db.session.commit()
+    
+    flash(f'Cleared {deleted_count} title tracking entries. Monthly activity history reset.', 'success')
     return redirect(url_for('ac.ac_dashboard'))
 
 
@@ -426,6 +558,18 @@ def log_ac_activity():
             db.session.add(ae)
             db.session.flush()  # Get the ID before committing
             created_ids.append(ae.id)
+            
+            # Also add to MonthlyActivityEntry for title tracking
+            mae = MonthlyActivityEntry(
+                member_id=member_id,
+                ac_period_id=current_period.id,
+                activity_type=activity_type,
+                points=points,
+                description=description,
+                activity_date=activity_date,
+                logged_by=logged_by
+            )
+            db.session.add(mae)
         
         db.session.commit()
 
@@ -560,6 +704,18 @@ def quick_log_activity():
         db.session.add(ae)
         db.session.flush()  # Get the ID before committing
         created_ids.append(ae.id)
+        
+        # Also add to MonthlyActivityEntry for title tracking
+        mae = MonthlyActivityEntry(
+            member_id=member_id,
+            ac_period_id=current_period.id,
+            activity_type=activity_type,
+            points=points,
+            description=data.get('description'),
+            activity_date=activity_date or datetime.utcnow(),
+            logged_by=logged_by
+        )
+        db.session.add(mae)
     
     db.session.commit()
     return jsonify({'success': True, 'points': points, 'count': quantity, 'activity_ids': created_ids})

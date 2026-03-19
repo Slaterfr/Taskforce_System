@@ -137,101 +137,71 @@ class ACReportGenerator:
         """
         Calculate title reward winners based on activity counts
         
+        Title Award Schedule:
+        - Host with the Most (HWTM): Awarded EVERY period based on that period's stats only
+        - Other Titles: Awarded at END OF MONTH only, using accumulated stats from all periods in month
+        
         Title Requirements:
-        - Host with the Most: Most events (Raid + Patrol) per quota cycle (min 5)
-        - Taskmaster: Most missions posted per quota cycle (min 5)
-        - Legionnaire: Most raids hosted per quota cycle (min 5)
-        - Scout: Most tryouts hosted per quota cycle (min 5)
-        - Executor: Excluded (requires mission completion tracking)
+        - Host with the Most: Most events (Training + Raid + Patrol) in single period (min 5)
+        - Taskmaster: Most missions posted across month (min 5)
+        - Legionnaire: Most raid + patrol events across month (min 5)
+        - Scout: Most tryouts hosted across month (min 5)
         """
+        from database.ac_models import (
+            get_hwtm_winner, get_leggionary_winner, 
+            get_scout_winner, get_taskmaster_winner, 
+            is_last_period_of_month
+        )
+        from database.models import Member
         
-        # Count activities by type for each member
-        member_stats = {}
-        
-        for activity in all_activities:
-            member_id = activity.member_id
-            member_name = activity.member.discord_username
-            activity_type = activity.activity_type
-            
-            if member_id not in member_stats:
-                member_stats[member_id] = {
-                    'name': member_name,
-                    'events': 0,  # Training + Raid + Patrol for HWTM
-                    'missions': 0,
-                    'raids': 0,
-                    'patrols': 0,
-                    'tryouts': 0,
-                    'total': 0
-                }
-            
-            member_stats[member_id]['total'] += 1
-            
-            # Track specific activity types
-            if activity_type == 'Raid':
-                member_stats[member_id]['raids'] += 1
-                member_stats[member_id]['events'] += 1  # Events = Training + Raid + Patrol
-            elif activity_type == 'Patrol':
-                member_stats[member_id]['patrols'] += 1
-                member_stats[member_id]['events'] += 1  # Events = Training + Raid + Patrol
-            elif activity_type == 'Training':
-                member_stats[member_id]['events'] += 1  # Events = Training + Raid + Patrol
-            elif activity_type == 'Mission':
-                member_stats[member_id]['missions'] += 1
-            elif activity_type == 'Tryout':
-                member_stats[member_id]['tryouts'] += 1
-        
-        # Calculate winners
         titles = {}
         
-        # Host with the Most (most events = Training + Raid + Patrol, min 5)
-        event_leaders = [(mid, stats['events'], stats['name']) 
-                        for mid, stats in member_stats.items() 
-                        if stats['events'] >= 5]
-        if event_leaders:
-            winner = max(event_leaders, key=lambda x: x[1])
+        # ALWAYS calculate HWTM for this period
+        hwtm_winner_id, hwtm_count = get_hwtm_winner(self.ac_period)
+        if hwtm_winner_id and hwtm_count >= 5:
+            winner = Member.query.get(hwtm_winner_id)
             titles['Host with the Most'] = {
-                'winner': winner[2],
-                'count': winner[1],
-                'requirement': '5+ events hosted (Training + Raid + Patrol)'
+                'winner': winner.discord_username if winner else 'Unknown',
+                'count': hwtm_count,
+                'requirement': '5+ events hosted (Training + Raid + Patrol)',
+                'awarded_at_period': self.ac_period.period_name,
+                'is_monthly': False
             }
         
-        # Taskmaster (most missions, min 5)
-        mission_leaders = [(mid, stats['missions'], stats['name']) 
-                          for mid, stats in member_stats.items() 
-                          if stats['missions'] >= 5]
-        if mission_leaders:
-            winner = max(mission_leaders, key=lambda x: x[1])
-            titles['Taskmaster'] = {
-                'winner': winner[2],
-                'count': winner[1],
-                'requirement': '5+ missions posted'
-            }
-        
-        # Legionnaire (most raids, min 5)
-        raid_leaders = [(mid, stats['raids'], stats['name']) 
-                       for mid, stats in member_stats.items() 
-                       if stats['raids'] >= 5]
-        if raid_leaders:
-            winner = max(raid_leaders, key=lambda x: x[1])
-            titles['Legionnaire'] = {
-                'winner': winner[2],
-                'count': winner[1],
-                'requirement': '5+ raids hosted'
-            }
-        
-        # Scout (most tryouts, min 5)
-        tryout_leaders = [(mid, stats['tryouts'], stats['name']) 
-                         for mid, stats in member_stats.items() 
-                         if stats['tryouts'] >= 5]
-        if tryout_leaders:
-            winner = max(tryout_leaders, key=lambda x: x[1])
-            titles['Scout'] = {
-                'winner': winner[2],
-                'count': winner[1],
-                'requirement': '5+ tryouts hosted'
-            }
-        
-        # Executor is excluded (requires mission completion tracking)
+        # Only calculate other titles if this is the last period of the month
+        if is_last_period_of_month(self.ac_period):
+            # Leggionary (most raid + patrol events accumulated, min 5)
+            leg_winner_id, leg_count = get_leggionary_winner(self.ac_period)
+            if leg_winner_id and leg_count >= 5:
+                winner = Member.query.get(leg_winner_id)
+                titles['Legionnaire'] = {
+                    'winner': winner.discord_username if winner else 'Unknown',
+                    'count': leg_count,
+                    'requirement': '5+ events hosted (Raids + Patrols across month)',
+                    'is_monthly': True
+                }
+            
+            # Scout (most tryouts accumulated, min 5)
+            scout_winner_id, scout_count = get_scout_winner(self.ac_period)
+            if scout_winner_id and scout_count >= 5:
+                winner = Member.query.get(scout_winner_id)
+                titles['Scout'] = {
+                    'winner': winner.discord_username if winner else 'Unknown',
+                    'count': scout_count,
+                    'requirement': '5+ tryouts hosted (accumulated across month)',
+                    'is_monthly': True
+                }
+            
+            # Taskmaster (most missions accumulated, min 5)
+            tm_winner_id, tm_count = get_taskmaster_winner(self.ac_period)
+            if tm_winner_id and tm_count >= 5:
+                winner = Member.query.get(tm_winner_id)
+                titles['Taskmaster'] = {
+                    'winner': winner.discord_username if winner else 'Unknown',
+                    'count': tm_count,
+                    'requirement': '5+ missions posted (accumulated across month)',
+                    'is_monthly': True
+                }
         
         self.title_winners = titles
         return titles
@@ -246,10 +216,18 @@ class ACReportGenerator:
         for title, info in self.title_winners.items():
             message += f"**@{title}**\n"
             message += f"👑 Winner: **{info['winner']}**\n"
-            message += f"📊 Achievement: {info['count']} ({info['requirement']})\n\n"
+            message += f"📊 Achievement: {info['count']} ({info['requirement']})\n"
+            
+            if info.get('is_monthly'):
+                message += f"📅 *Monthly Award - Accumulated Stats*\n"
+            else:
+                message += f"⏱️ *Period Award*\n"
+            
+            message += "\n"
         
         if len(self.title_winners) < 6:
-            message += "\n*Note: Some titles had no qualifiers (minimum requirements not met)*"
+            monthly_msg = " or end of month has not been reached" if any(info.get('is_monthly') for info in self.title_winners.values()) else ""
+            message += f"\n*Note: Some titles had no qualifiers (minimum requirements not met{monthly_msg})*"
         
         return message
     

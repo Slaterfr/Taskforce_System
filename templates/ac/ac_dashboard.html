@@ -30,8 +30,14 @@
         </a>
         <form action="{{ url_for('ac.clear_all_activities') }}" method="post" class="d-inline-block me-2"
             onsubmit="return confirm('Are you sure you want to clear ALL activities for ALL members in this period? This cannot be undone!');">
-            <button class="btn btn-outline-danger" type="submit" title="Clear all activities">
-                <i class="fas fa-trash-alt me-1"></i>Clear All
+            <button class="btn btn-outline-danger" type="submit" title="Clear all AC activities">
+                <i class="fas fa-trash-alt me-1"></i>Clear ACs
+            </button>
+        </form>
+        <form action="{{ url_for('ac.clear_titles') }}" method="post" class="d-inline-block me-2"
+            onsubmit="return confirm('Are you sure you want to clear all title tracking data? This will reset monthly activity history for titles!');">
+            <button class="btn btn-outline-warning" type="submit" title="Clear title tracking data">
+                <i class="fas fa-crown me-1"></i>Clear Titles
             </button>
         </form>
         {% endif %}
