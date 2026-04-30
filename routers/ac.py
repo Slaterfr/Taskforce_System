@@ -878,12 +878,23 @@ def ac_member_detail(member_id):
 @ac_bp.route('/activity/<int:activity_id>/delete', methods=['POST'])
 @hct_required
 def delete_ac_activity(activity_id):
-    ae = ActivityEntry.query.get_or_404(activity_id)
-    member_id = ae.member_id
-    db.session.delete(ae)
-    db.session.commit()
-    flash('Activity entry deleted.', 'success')
-    return redirect(url_for('ac.ac_member_detail', member_id=member_id))
+    try:
+        ae = ActivityEntry.query.get_or_404(activity_id)
+        db.session.delete(ae)
+        db.session.commit()
+        
+        # Return JSON for AJAX requests, else redirect
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True, 'message': 'Activity deleted'}), 200
+        
+        flash('Activity entry deleted.', 'success')
+        return redirect(url_for('ac.ac_member_detail', member_id=ae.member_id))
+    except Exception as e:
+        db.session.rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': str(e)}), 500
+        flash(f'Error deleting activity: {e}', 'error')
+        return redirect(url_for('ac.quick_log'))
 
 
 @ac_bp.route('/member/<int:member_id>/clear_activities', methods=['POST'])

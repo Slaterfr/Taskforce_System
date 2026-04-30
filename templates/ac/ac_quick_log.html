@@ -38,12 +38,9 @@
         <div class="d-flex justify-content-between align-items-center mb-1">
           <span>{{ activity.activity_date.strftime('%Y-%m-%d') }} — {{ activity.activity_type }} ({{ activity.points
             }})</span>
-          <form method="post" action="{{ url_for('ac.delete_ac_activity', activity_id=activity.id) }}" class="d-inline"
-            onsubmit="return confirm('Delete this activity?');">
-            <button type="submit" class="btn btn-sm btn-outline-danger">
-              <i class="fas fa-times"></i>
-            </button>
-          </form>
+          <button type="button" class="btn btn-sm btn-outline-danger delete-activity-btn" data-activity-id="{{ activity.id }}">
+            <i class="fas fa-times"></i>
+          </button>
         </div>
         {% endfor %}
         {% else %}
@@ -100,6 +97,29 @@
           console.error(err);
           alert('Network error');
         } finally { this.disabled = false; }
+      });
+    });
+
+    // Delete activity buttons - no confirmation, stay on page
+    document.querySelectorAll('.delete-activity-btn').forEach(btn => {
+      btn.addEventListener('click', async function () {
+        const activityId = Number(this.dataset.activityId);
+        try {
+          const res = await fetch("{{ url_for('ac.delete_ac_activity', activity_id=0) }}".replace('/0', '/' + activityId), {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            // Remove the activity row smoothly
+            this.closest('.d-flex').remove();
+          } else {
+            alert(data.message || 'Error deleting activity');
+          }
+        } catch (err) {
+          console.error(err);
+          alert('Network error');
+        }
       });
     });
 
