@@ -248,20 +248,15 @@ ACTIVITY_TYPES = {
         'limited': False,
         'description': 'Posted or led a mission'
     },
-    'Evaluation': {
-        'points': 0.5,
-        'limited': True,
-        'description': 'Conducted member evaluation'
-    },
     'Supervision': {
         'points': 1.0,
         'limited': False,
         'description': 'Supervised activities or members'
     },
-    'Tryout': {
-        'points': 1.5,
+    'Training': {
+        'points': 1.0,
         'limited': False,
-        'description': 'Conducted recruitment tryout'
+        'description': 'Hosted training session'
     },
     'Raid': {
         'points': 1.5,
@@ -273,20 +268,35 @@ ACTIVITY_TYPES = {
         'limited': False,
         'description': 'Led patrol activity'
     },
-    'Training': {
+    'Tryout': {
+        'points': 1.5,
+        'limited': False,
+        'description': 'Conducted recruitment tryout'
+    },
+    'Tryout Certification': {
         'points': 1.0,
         'limited': False,
-        'description': 'Hosted training session'
+        'description': 'Certified tryout host (host only)'
     },
-    'Canceled Training': {
+    'Cancelled Training': {
         'points': 0.5,
         'limited': True,
-        'description': 'Training session that was canceled'
+        'description': 'Training session that was canceled (1 per cycle)'
     },
     'Cancelled Tryout': {
         'points': 0.5,
         'limited': True,
-        'description': 'Tryout that was cancelled'
+        'description': 'Tryout that was cancelled (1 per cycle)'
+    },
+    'Tryout Grading': {
+        'points': 0.5,
+        'limited': True,
+        'description': 'Graded tryout results (1 per cycle)'
+    },
+    'Dueling Supervision/Evaluation': {
+        'points': 0.5,
+        'limited': True,
+        'description': 'Supervised or evaluated dueling (1 per cycle)'
     }
 }
 
@@ -305,27 +315,11 @@ def get_member_quota(rank):
 
 def get_activity_points(activity_type):
     """Get point value for an activity type"""
-    pts_map = {
-        "Mission": 0.5,
-        "Evaluation": 0.5,
-        "Supervision": 1.0,
-        "Tryout": 1.5,
-        "Raid": 1.5,
-        "Patrol": 1.5,
-        "Training": 1.0,
-        "Canceled Training": 0.5,
-        "Cancelled Tryout": 0.5,
-    }
-    return pts_map.get(activity_type, 0.0)
+    return ACTIVITY_TYPES.get(activity_type, {}).get('points', 0.0)
 
 def is_limited_activity(activity_type):
     """Check if activity type is limited to 1 per cycle"""
-    limited = {
-        "Evaluation",
-        "Canceled Training",
-        "Cancelled Tryout",
-    }
-    return activity_type in limited
+    return ACTIVITY_TYPES.get(activity_type, {}).get('limited', False)
 
 
 # Statistical Functions for Title Tracking
