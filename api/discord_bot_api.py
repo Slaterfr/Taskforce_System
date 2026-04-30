@@ -6,7 +6,7 @@ Provides REST API endpoints for Discord bot integration with TF_System
 from flask import Blueprint, request, jsonify, current_app
 from database.models import db, Member, RankMapping, PromotionLog, ActivityLog
 from database.ac_models import (
-    ACPeriod, ActivityEntry, InactivityNotice, ACExemption,
+    ACPeriod, ActivityEntry, MonthlyActivityEntry, InactivityNotice, ACExemption,
     ACTIVITY_TYPES, get_activity_points, get_member_quota,
     is_limited_activity
 )
@@ -826,6 +826,18 @@ def log_activity():
             db.session.add(activity_entry)
             db.session.flush()  # Get the ID before committing
             created_ids.append(activity_entry.id)
+            
+            # Also add to MonthlyActivityEntry for title tracking (preserved across AC resets)
+            monthly_entry = MonthlyActivityEntry(
+                member_id=member_id,
+                ac_period_id=current_period.id,
+                activity_type=activity_type,
+                activity_date=activity_date,
+                points=points,
+                description=description or f"{activity_type} logged via Discord",
+                logged_by=logged_by
+            )
+            db.session.add(monthly_entry)
         
         db.session.commit()
         
