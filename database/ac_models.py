@@ -281,7 +281,7 @@ ACTIVITY_TYPES = {
     'Cancelled Training': {
         'points': 0.5,
         'limited': True,
-        'description': 'Training session that was canceled (1 per cycle)'
+        'description': 'Training session that was cancelled (1 per cycle)'
     },
     'Cancelled Tryout': {
         'points': 0.5,

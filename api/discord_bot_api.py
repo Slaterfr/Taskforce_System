@@ -784,9 +784,9 @@ def log_activity():
         # Get points for activity type
         points = get_activity_points(activity_type)
         
-        # Get quantity (default to 1, force 1 for cancelled events)
+        # Get quantity (default to 1, force 1 for limited activities)
         quantity = int(data.get('quantity', 1))
-        if activity_type in ['Cancelled Tryout', 'Canceled Training']:
+        if is_limited_activity(activity_type):
             quantity = 1
         quantity = max(1, min(999, quantity))  # Clamp between 1 and 999
         
