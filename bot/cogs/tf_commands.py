@@ -86,8 +86,20 @@ Valid actions:
 - remove_activity: Remove/delete an activity entry for a member
 - check_points: Check a member's current AC points and quota progress
 
+Activity Types and Points:
+- Mission: 0.5 points
+- Supervision: 1 point
+- Training: 1 point
+- Raid or Patrol: 1.5 points
+- Tryout: 1.5 points
+- Tryout Certification: 1 point (host only)
+- Cancelled Training: 0.5 points (only 1 per cycle)
+- Cancelled Tryout: 0.5 points (only 1 per cycle)
+- Tryout Grading: 0.5 points (only 1 per cycle)
+- Dueling Supervision/Evaluation: 0.5 points (only 1 per cycle)
+
 Valid ranks: Aspirant, Novice, Adept, Crusader, Paladin, Exemplar, Prospect, Commander, Marshal, General, Chief General
-Valid activity types: Raid, Patrol, Training, Mission, Tryout, Canceled Training, Cancelled Tryout
+Valid activity types: Raid, Patrol, Training, Mission, Supervision, Tryout, Tryout Certification, Cancelled Training, Cancelled Tryout, Tryout Grading, Dueling Supervision/Evaluation
 
 IMPORTANT: Recognize these variations for listing members:
 - "show all members" -> list_members with no rank filter
@@ -103,9 +115,12 @@ IMPORTANT: Recognize these variations for listing members:
 Note: Always use SINGULAR form of rank names (General, not Generals; Commander, not Commanders)
 
 CRITICAL: Activity Type Spelling
-- "cancelled training" or "canceled training" -> MUST map to "Canceled Training" (one L)
-- "cancelled tryout" or "canceled tryout" -> MUST map to "Cancelled Tryout" (two Ls)
-- You should also consider "cancelled" or "cancelled event" to map to "Canceled Training"
+- "cancelled training" or "canceled training" -> MUST map to "Cancelled Training"
+- "cancelled tryout" or "canceled tryout" -> MUST map to "Cancelled Tryout"
+- "tryout grading" -> MUST map to "Tryout Grading"
+- "dueling supervision" or "evaluation" or "dueling evaluation" -> MUST map to "Dueling Supervision/Evaluation"
+- "tryout certification" or "tryout cert" -> MUST map to "Tryout Certification"
+- "supervision" -> MUST map to "Supervision"
 - This is extremely important for the database to recognize the activity.
 
 IMPORTANT: Activity Removal Recognition
@@ -132,14 +147,16 @@ Examples of correct parsing:
 4. "list everyone" -> {"action": "list_members", "parameters": {}}
 5. "change John to Commander" -> {"action": "change_rank", "parameters": {"member_name": "John", "new_rank": "Commander"}}
 6. "what rank is Sarah?" -> {"action": "get_member_info", "parameters": {"member_name": "Sarah"}}
-7. "log a cancelled training for Clicky" -> {"action": "log_activity", "parameters": {"member_name": "Clicky", "activity_type": "Canceled Training"}}
-8. "log a canceled training for Bob" -> {"action": "log_activity", "parameters": {"member_name": "Bob", "activity_type": "Canceled Training"}}
+7. "log a cancelled training for Clicky" -> {"action": "log_activity", "parameters": {"member_name": "Clicky", "activity_type": "Cancelled Training"}}
+8. "log a canceled training for Bob" -> {"action": "log_activity", "parameters": {"member_name": "Bob", "activity_type": "Cancelled Training"}}
 9. "log a cancelled tryout for Steve" -> {"action": "log_activity", "parameters": {"member_name": "Steve", "activity_type": "Cancelled Tryout"}}
-10. "remove training for John" -> {"action": "remove_activity", "parameters": {"member_name": "John", "activity_type": "Training"}}
-11. "undo raid for Sarah" -> {"action": "remove_activity", "parameters": {"member_name": "Sarah", "activity_type": "Raid"}}
-12. "how many points do I have" -> {"action": "check_points", "parameters": {}}
-13. "what are my points" -> {"action": "check_points", "parameters": {}}
-14. "how many points does John have" -> {"action": "check_points", "parameters": {"member_name": "John"}}
+10. "log supervision for John" -> {"action": "log_activity", "parameters": {"member_name": "John", "activity_type": "Supervision"}}
+11. "log tryout grading for Alice" -> {"action": "log_activity", "parameters": {"member_name": "Alice", "activity_type": "Tryout Grading"}}
+12. "remove training for John" -> {"action": "remove_activity", "parameters": {"member_name": "John", "activity_type": "Training"}}
+13. "undo raid for Sarah" -> {"action": "remove_activity", "parameters": {"member_name": "Sarah", "activity_type": "Raid"}}
+14. "how many points do I have" -> {"action": "check_points", "parameters": {}}
+15. "what are my points" -> {"action": "check_points", "parameters": {}}
+16. "how many points does John have" -> {"action": "check_points", "parameters": {"member_name": "John"}}
 
 Respond ONLY with a JSON object in this format:
 {
@@ -771,4 +788,3 @@ if __name__ == '__main__':
     import asyncio
     asyncio.run(main())
 """
-

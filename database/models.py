@@ -115,3 +115,107 @@ class MemberStats(db.Model):
     
     def __repr__(self):
         return f'<MemberStats {self.timestamp}: {self.total_members}>'
+
+
+# ========== MISSION TRACKING MODELS ==========
+
+class Mission(db.Model):
+    """Represents a mission posted in Discord"""
+    __tablename__ = 'missions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    discord_message_id = db.Column(db.String(50), nullable=False, unique=True)
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    stars = db.Column(db.Integer, nullable=False, default=1)  # Difficulty level
+    difficulty = db.Column(db.String(50), nullable=True)  # e.g., "⭐⭐⭐"
+    expiration_date = db.Column(db.Date, nullable=True)
+    planet_coordinates = db.Column(db.String(500), nullable=True)  # URL or coords
+    created_by_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=True)
+    cycle_month = db.Column(db.Date, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    completions = db.relationship('MissionCompletion', backref='mission', lazy=True, cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<Mission {self.title}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'discord_message_id': self.discord_message_id,
+            'title': self.title,
+            'description': self.description,
+            'stars': self.stars,
+            'difficulty': self.difficulty,
+            'expiration_date': self.expiration_date.strftime('%Y-%m-%d') if self.expiration_date else None,
+            'planet_coordinates': self.planet_coordinates,
+            'created_by_id': self.created_by_id,
+            'cycle_month': self.cycle_month.strftime('%Y-%m'),
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'completions_count': len(self.completions)
+        }
+
+
+class MissionCompletion(db.Model):
+    """Records which members completed which missions"""
+    __tablename__ = 'mission_completions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    mission_id = db.Column(db.Integer, db.ForeignKey('missions.id'), nullable=False)
+    member_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=False)
+    logged_by_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=True)
+    logged_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Unique constraint: one member can only complete each mission once
+    __table_args__ = (db.UniqueConstraint('mission_id', 'member_id', name='unique_mission_completion'),)
+    
+    # Relationships
+    member = db.relationship('Member', foreign_keys=[member_id], backref='mission_completions')
+    logged_by = db.relationship('Member', foreign_keys=[logged_by_id])
+    
+    def __repr__(self):
+        return f'<MissionCompletion mission_id={self.mission_id} member_id={self.member_id}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'mission_id': self.mission_id,
+            'member_id': self.member_id,
+            'member_username': self.member.discord_username if self.member else None,
+            'logged_at': self.logged_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+
+
+class MonthlyStat(db.Model):
+    """Tracks monthly mission statistics per member"""
+    __tablename__ = 'monthly_stats'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    member_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=False)
+    cycle_month = db.Column(db.Date, nullable=False)  # First day of the month
+    total_stars = db.Column(db.Integer, nullable=False, default=0)
+    missions_completed = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Unique constraint: one record per member per month
+    __table_args__ = (db.UniqueConstraint('member_id', 'cycle_month', name='unique_member_month'),)
+    
+    # Relationships
+    member = db.relationship('Member', backref='monthly_stats')
+    
+    def __repr__(self):
+        return f'<MonthlyStat member_id={self.member_id} {self.cycle_month.strftime("%Y-%m")}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'member_id': self.member_id,
+            'member_username': self.member.discord_username if self.member else None,
+            'cycle_month': self.cycle_month.strftime('%Y-%m'),
+            'total_stars': self.total_stars,
+            'missions_completed': self.missions_completed,
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+        }

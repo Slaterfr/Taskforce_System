@@ -248,7 +248,7 @@ class TFSystemAPI:
         
         Args:
             member_id: Member ID
-            activity_type: Type of activity (Raid, Patrol, Training, Mission, Tryout)
+            activity_type: Type of activity (Raid, Patrol, Training, Mission, Supervision, Tryout, Tryout Certification, Cancelled Training, Cancelled Tryout, Tryout Grading, Dueling Supervision/Evaluation)
             description: Activity description
             activity_date: Date in YYYY-MM-DD format (default: today)
             discord_user_id: Discord user ID who logged the activity

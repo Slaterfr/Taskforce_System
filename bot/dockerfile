@@ -1,0 +1,16 @@
+# Usamos una imagen ligera de Python
+FROM python:3.9-slim
+
+# Creamos un usuario para no correr como root (seguridad)
+RUN useradd -m -u 1000 user
+USER user
+ENV PATH="/home/user/.local/bin:${PATH}"
+
+WORKDIR /app
+
+# Copiamos e instalamos dependencias
+COPY --chown=user . .
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
+
+# Comando para arrancar el bot
+CMD ["python", "bot.py"]

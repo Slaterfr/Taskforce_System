@@ -43,6 +43,17 @@ async def on_ready():
         print("✓ Loaded TF commands cog")
     except Exception as e:
         print(f"✗ Error loading TF commands: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    # Load Mission Tracker cog
+    try:
+        await bot.load_extension('cogs.mission_tracker')
+        print("✓ Loaded Mission Tracker cog")
+    except Exception as e:
+        print(f"✗ Error loading Mission Tracker cog: {e}")
+        import traceback
+        traceback.print_exc()
     
     try:
         synced = await bot.tree.sync()
@@ -81,12 +92,3 @@ if __name__ == "__main__":
     
     print("🚀 Starting bot...")
     bot.run(DISCORD_TOKEN)
-
-
-
-
-
-
-
-
-

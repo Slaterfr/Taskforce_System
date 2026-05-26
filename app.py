@@ -41,40 +41,16 @@ def create_app():
         PERMANENT_SESSION_LIFETIME=timedelta(hours=12)
     )
 
-    # Normalize sqlite path: prefer instance/taskforce.db
-    uri = app.config.get('SQLALCHEMY_DATABASE_URI', '') or ''
-    base_dir = op.dirname(op.abspath(__file__))
-    instance_dir = op.join(base_dir, 'instance')
-    os.makedirs(instance_dir, exist_ok=True)
-
-    db_file = None
-    if uri.startswith('sqlite:///'):
-        # if configured, use it but ensure directory exists
-        db_path = uri.replace('sqlite:///', '')
-        if not op.isabs(db_path):
-            db_path = op.join(app.root_path, db_path)
-        db_dir = op.dirname(db_path)
-        if db_dir and not op.exists(db_dir):
-            os.makedirs(db_dir, exist_ok=True)
-        db_file = db_path
-    else:
-        # default to instance/taskforce.db
-        db_file = op.join(instance_dir, 'taskforce.db')
-
-    # ensure file exists (touch) and normalize for SQLAlchemy
-    try:
-        open(db_file, 'a').close()
-    except Exception:
-        pass
-    norm = db_file.replace('\\', '/')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{norm}"
-
-    # Initialize DB
+    # Initialize DB with configured database URI (supports any SQLAlchemy backend)
     db.init_app(app)
 
-    # Create tables if missing
-    with app.app_context():
-        db.create_all()
+    # Log database backend info
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+    db_type = db_uri.split('://')[0] if '://' in db_uri else 'unknown'
+    print(f"\n{'='*60}")
+    print(f"📊 Database Configuration")
+    print(f"   Backend: {db_type.upper()}")
+    print(f"{'='*60}")
 
     # Set up background sync task if enabled
     sync_enabled = app.config.get('ROBLOX_SYNC_ENABLED', False)
@@ -193,6 +169,10 @@ def create_app():
     # Register Discord Bot API
     from api.discord_bot_api import api_bp
     app.register_blueprint(api_bp, url_prefix='/api/v1')
+    
+    # Register Mission Tracking API
+    from routers.missions import missions_bp
+    app.register_blueprint(missions_bp, url_prefix='/api/v1/missions')
 
     return app
 
@@ -207,6 +187,7 @@ from routers.public import public_bp
 from routers.members import members_bp
 from routers.ac import ac_bp
 from routers.sync import sync_bp
+from routers.missions import missions_bp
 
 # Register blueprints
 app.register_blueprint(auth_bp)

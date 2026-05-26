@@ -17,7 +17,7 @@ class Config:
     ROBLOX_BACKGROUND_SYNC_ENABLED = os.environ.get('ROBLOX_BACKGROUND_SYNC_ENABLED', str(ROBLOX_SYNC_ENABLED)).lower() == 'true'
     
     # Discord Bot API Configuration
-    DISCORD_BOT_API_KEY = os.environ.get('DISCORD_BOT_API_KEY', '')
+    DISCORD_BOT_API_KEY = os.environ.get('TF_SYSTEM_API_KEY') or os.environ.get('DISCORD_BOT_API_KEY', '')
     API_RATE_LIMIT = int(os.environ.get('API_RATE_LIMIT', '100'))  # Requests per minute
     API_ENABLE_LOGGING = os.environ.get('API_ENABLE_LOGGING', 'true').lower() == 'true'
     

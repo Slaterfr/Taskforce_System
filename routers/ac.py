@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, session, current_app, send_file
-from database.models import db, Member
+from database.models import db, Member, MonthlyStat
 from database.ac_models import (
     ACPeriod, ActivityEntry, InactivityNotice, ACExemption,
     ACTIVITY_TYPES, AC_QUOTAS, get_member_quota, get_activity_points, is_limited_activity,
@@ -245,6 +245,59 @@ def calculate_title_rewards(all_activities, period):
                 'qualified': False
             }
     
+    # Executor (most mission stars) - from MonthlyStat
+    from datetime import date
+    month_start = date.today().replace(day=1)  # Current month
+    monthly_stats = MonthlyStat.query.filter_by(cycle_month=month_start).all()
+    
+    if monthly_stats:
+        max_stars = 0
+        executor_member_id = None
+        
+        for stat in monthly_stats:
+            if stat.total_stars > max_stars:
+                max_stars = stat.total_stars
+                executor_member_id = stat.member_id
+        
+        if executor_member_id and max_stars >= 5:
+            executor_member = Member.query.get(executor_member_id)
+            titles['Executor'] = {
+                'winner': executor_member.discord_username if executor_member else 'Unknown',
+                'count': max_stars,
+                'requirement': '5+ mission stars (⭐⭐⭐+)',
+                'period_award': False,
+                'is_monthly': True,
+                'qualified': True
+            }
+        elif max_stars > 0:
+            executor_member = Member.query.get(executor_member_id)
+            titles['Executor'] = {
+                'winner': f"{executor_member.discord_username if executor_member else 'Unknown'} (Not Qualified - {max_stars} stars)",
+                'count': max_stars,
+                'requirement': '5+ mission stars (⭐⭐⭐+)',
+                'period_award': False,
+                'is_monthly': True,
+                'qualified': False
+            }
+        else:
+            titles['Executor'] = {
+                'winner': 'No participants',
+                'count': 0,
+                'requirement': '5+ mission stars (⭐⭐⭐+)',
+                'period_award': False,
+                'is_monthly': True,
+                'qualified': False
+            }
+    else:
+        titles['Executor'] = {
+            'winner': 'No participants',
+            'count': 0,
+            'requirement': '5+ mission stars (⭐⭐⭐+)',
+            'period_award': False,
+            'is_monthly': True,
+            'qualified': False
+        }
+    
     return titles
 
 
@@ -471,7 +524,7 @@ def title_rewards():
     # Get all activities for the current period
     all_activities = ActivityEntry.query.filter_by(ac_period_id=current_period.id).all()
     
-    # Calculate title rewards
+    # Calculate title rewards (includes Executor title with mission stats)
     titles = calculate_title_rewards(all_activities, current_period)
     
     # Generate Discord message
