@@ -1,8 +1,7 @@
 from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
-from database.models import db, RankMapping
+from services import member_service
 from utils.auth import staff_required
 from utils.roblox_sync import sync_from_roblox
-from datetime import datetime
 
 sync_bp = Blueprint('sync', __name__)
 
@@ -23,48 +22,28 @@ def manage_rank_mappings():
                 flash('System rank and Roblox role ID are required', 'error')
                 return redirect(url_for('sync.manage_rank_mappings'))
             
-            # Check if mapping already exists
-            existing = RankMapping.query.filter_by(system_rank=system_rank).first()
-            if existing:
-                existing.roblox_role_id = roblox_role_id
-                existing.roblox_role_name = roblox_role_name
-                existing.is_active = True
-                existing.last_updated = datetime.utcnow()
-                flash(f'Updated mapping for {system_rank}', 'success')
+            result = member_service.add_or_update_rank_mapping(system_rank, roblox_role_id, roblox_role_name)
+            if result['success']:
+                flash(result['message'], 'success')
             else:
-                mapping = RankMapping(
-                    system_rank=system_rank,
-                    roblox_role_id=roblox_role_id,
-                    roblox_role_name=roblox_role_name
-                )
-                db.session.add(mapping)
-                flash(f'Added mapping for {system_rank}', 'success')
-            
-            db.session.commit()
+                flash(result['message'], 'error')
         
         elif action == 'delete':
             mapping_id = request.form.get('mapping_id', type=int)
             if mapping_id:
-                mapping = RankMapping.query.get(mapping_id)
-                if mapping:
-                    db.session.delete(mapping)
-                    db.session.commit()
+                if member_service.delete_rank_mapping(mapping_id):
                     flash('Mapping deleted', 'success')
         
         elif action == 'toggle':
             mapping_id = request.form.get('mapping_id', type=int)
             if mapping_id:
-                mapping = RankMapping.query.get(mapping_id)
-                if mapping:
-                    mapping.is_active = not mapping.is_active
-                    mapping.last_updated = datetime.utcnow()
-                    db.session.commit()
+                if member_service.toggle_rank_mapping(mapping_id):
                     flash('Mapping updated', 'success')
         
         return redirect(url_for('sync.manage_rank_mappings'))
     
     # GET: show all mappings
-    mappings = RankMapping.query.order_by(RankMapping.system_rank).all()
+    mappings = member_service.get_all_rank_mappings()
     
     # Get available roles from Roblox if configured
     roblox_roles = []

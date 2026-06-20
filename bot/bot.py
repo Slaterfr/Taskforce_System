@@ -48,7 +48,7 @@ async def on_ready():
     
     # Load Mission Tracker cog
     try:
-        await bot.load_extension('cogs.mission_tracker')
+        await bot.load_extension('cogs.mission_tracking')
         print("✓ Loaded Mission Tracker cog")
     except Exception as e:
         print(f"✗ Error loading Mission Tracker cog: {e}")

@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, session, current_app
+from flask import Blueprint, render_template, request, flash, redirect, url_for, jsonify, session
 from utils.auth import staff_required, check_password, check_hct_password
-import os.path as op
+from services import config_service
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -91,52 +91,14 @@ def staff_logout():
 @auth_bp.route('/staff/update_cookie', methods=['GET', 'POST'])
 @staff_required
 def update_cookie():
-    from api.roblox_api import RobloxAPI
-    
     if request.method == 'POST':
         cookie = request.form.get('cookie', '').strip()
-        if not cookie:
-            flash('Cookie cannot be empty', 'error')
-            return redirect(url_for('auth.update_cookie'))
-            
-        # Validate cookie
-        user_info = RobloxAPI.validate_cookie(cookie)
-        if not user_info:
-            flash('Invalid cookie! Please check and try again.', 'error')
-            return redirect(url_for('auth.update_cookie'))
-            
-        # Update .env file
-        try:
-            env_path = op.join(op.dirname(op.dirname(op.abspath(__file__))), '.env')
-            
-            # Read current lines
-            with open(env_path, 'r') as f:
-                lines = f.readlines()
-                
-            # Update or append ROBLOX_COOKIE
-            cookie_found = False
-            new_lines = []
-            for line in lines:
-                if line.startswith('ROBLOX_COOKIE='):
-                    new_lines.append(f'ROBLOX_COOKIE={cookie}\n')
-                    cookie_found = True
-                else:
-                    new_lines.append(line)
-            
-            if not cookie_found:
-                new_lines.append(f'\nROBLOX_COOKIE={cookie}\n')
-                
-            # Write back
-            with open(env_path, 'w') as f:
-                f.writelines(new_lines)
-                
-            # Update current app config
-            current_app.config['ROBLOX_COOKIE'] = cookie
-            
-            flash(f"Cookie updated successfully! Connected as: {user_info.get('name')} (ID: {user_info.get('id')})", 'success')
+        result = config_service.update_roblox_cookie(cookie)
+        if result['success']:
+            flash(result['message'], 'success')
             return redirect(url_for('members.dashboard'))
-            
-        except Exception as e:
-            flash(f'Error updating .env file: {e}', 'error')
+        else:
+            flash(result['message'], 'error')
+            return redirect(url_for('auth.update_cookie'))
             
     return render_template('update_cookie.html')

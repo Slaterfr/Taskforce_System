@@ -4,15 +4,9 @@ Provides REST API endpoints for Discord bot integration with TF_System
 """
 
 from flask import Blueprint, request, jsonify, current_app
-from database.models import db, Member, RankMapping, PromotionLog, ActivityLog
-from database.ac_models import (
-    ACPeriod, ActivityEntry, MonthlyActivityEntry, InactivityNotice, ACExemption,
-    ACTIVITY_TYPES, get_activity_points, get_member_quota,
-    is_limited_activity
-)
+from database.models import db
+from services import ac_service, member_service
 from utils.api_auth import api_key_required, log_api_access
-from utils.roblox_sync import sync_member_to_roblox, add_member_to_roblox, remove_member_from_roblox
-from sqlalchemy import or_, func
 from datetime import datetime
 import requests
 
@@ -68,7 +62,8 @@ def get_status():
     """
     try:
         # Check database connection
-        member_count = Member.query.filter_by(is_active=True).count()
+        dashboard = member_service.get_dashboard_data()
+        member_count = dashboard.get('member_count')
         db_status = "connected"
     except Exception as e:
         current_app.logger.error(f"Database check failed: {e}")
@@ -136,28 +131,13 @@ def get_members():
     """
     try:
         search = request.args.get('search', '').strip()
-        rank_filter = request.args.get('rank', '').strip()
+        rank_filter = request.args.get('rank', '').strip() or None
         limit = min(int(request.args.get('limit', 100)), 500)  # Max 500
-        
-        query = Member.query.filter_by(is_active=True)
-        
-        # Apply search filter
-        if search:
-            search_pattern = f"%{search}%"
-            query = query.filter(
-                or_(
-                    Member.discord_username.ilike(search_pattern),
-                    Member.roblox_username.ilike(search_pattern),
-                    Member.current_rank.ilike(search_pattern)
-                )
-            )
-        
-        # Apply rank filter
-        if rank_filter:
-            query = query.filter(func.lower(Member.current_rank) == rank_filter.lower())
-        
-        members = query.order_by(Member.current_rank, Member.discord_username).limit(limit).all()
-        
+
+        members = member_service.search_members(
+            search, rank_filter=rank_filter, limit=limit
+        )
+
         members_data = [
             {
                 'id': m.id,
@@ -203,8 +183,8 @@ def get_member(member_id):
         404: Member not found
     """
     try:
-        member = Member.query.filter_by(id=member_id, is_active=True).first()
-        
+        member = member_service.get_member(member_id, active_only=True)
+
         if not member:
             log_api_access(f'/members/{member_id}', 'GET', success=False, response_code=404)
             return jsonify({
@@ -212,15 +192,11 @@ def get_member(member_id):
                 'error': 'member_not_found',
                 'message': f'Member with ID {member_id} not found'
             }), 404
-        
-        # Get recent activities
-        recent_activities = ActivityEntry.query.filter_by(member_id=member_id) \
-            .order_by(ActivityEntry.activity_date.desc()).limit(10).all()
-        
-        # Get rank history
-        rank_history = PromotionLog.query.filter_by(member_id=member_id) \
-            .order_by(PromotionLog.promotion_date.desc()).limit(5).all()
-        
+
+        profile = member_service.get_member_profile_details(member_id)
+        recent_activities = ac_service.get_member_activities(member_id, limit=10)
+        rank_history = profile['promotions'][:5] if profile else []
+
         member_data = {
             'id': member.id,
             'discord_username': member.discord_username,
@@ -291,23 +267,9 @@ def search_members():
                 'message': 'Search query (q) is required'
             }), 400
         
-        search_pattern = f"%{query_str}%"
-        query = Member.query.filter_by(is_active=True)
-        
-        if field == 'discord_username':
-            query = query.filter(Member.discord_username.ilike(search_pattern))
-        elif field == 'roblox_username':
-            query = query.filter(Member.roblox_username.ilike(search_pattern))
-        else:  # both
-            query = query.filter(
-                or_(
-                    Member.discord_username.ilike(search_pattern),
-                    Member.roblox_username.ilike(search_pattern)
-                )
-            )
-        
-        members = query.limit(20).all()
-        
+        # search_members covers discord_username, roblox_username, and rank
+        members = member_service.search_members(query_str, limit=20)
+
         matches = [
             {
                 'id': m.id,
@@ -370,36 +332,34 @@ def update_member_rank(member_id):
                 'error': 'missing_rank',
                 'message': 'Rank is required'
             }), 400
-        
-        # Get member
-        member = Member.query.filter_by(id=member_id, is_active=True).first()
-        
-        if not member:
-            log_api_access(f'/members/{member_id}/rank', 'PATCH', discord_user_id, False, 404)
-            return jsonify({
-                'success': False,
-                'error': 'member_not_found',
-                'message': f'Member with ID {member_id} not found'
-            }), 404
-        
-        # Validate rank
-        valid_ranks = [m.system_rank for m in RankMapping.query.filter_by(is_active=True).all()]
-        if not valid_ranks:
-            valid_ranks = ['Aspirant', 'Novice', 'Adept', 'Crusader', 'Paladin', 
-                          'Exemplar', 'Prospect', 'Commander', 'Marshal', 'General', 'Chief General']
-        
-        if new_rank not in valid_ranks:
-            return jsonify({
-                'success': False,
-                'error': 'invalid_rank',
-                'message': f'Rank "{new_rank}" is not valid',
-                'valid_ranks': valid_ranks
-            }), 400
-        
-        old_rank = member.current_rank
-        
-        # Check if rank actually changed
-        if old_rank == new_rank:
+
+        result = member_service.promote_member(
+            member_id,
+            new_rank,
+            reason=reason,
+            promoted_by=promoted_by,
+        )
+
+        if not result['success']:
+            if result.get('error') == 'member_not_found':
+                log_api_access(f'/members/{member_id}/rank', 'PATCH', discord_user_id, False, 404)
+                return jsonify({
+                    'success': False,
+                    'error': 'member_not_found',
+                    'message': f'Member with ID {member_id} not found'
+                }), 404
+            if result.get('error') == 'invalid_rank':
+                return jsonify({
+                    'success': False,
+                    'error': 'invalid_rank',
+                    'message': result['message'],
+                    'valid_ranks': result.get('valid_ranks', []),
+                }), 400
+
+        member = result['member']
+        old_rank = result['old_rank']
+
+        if result.get('unchanged'):
             return jsonify({
                 'success': True,
                 'message': 'Rank unchanged (already at specified rank)',
@@ -409,26 +369,8 @@ def update_member_rank(member_id):
                     'current_rank': member.current_rank
                 }
             }), 200
-        
-        # Update rank
-        member.current_rank = new_rank
-        member.last_updated = datetime.utcnow()
-        
-        # Log promotion
-        promotion = PromotionLog(
-            member_id=member.id,
-            from_rank=old_rank,
-            to_rank=new_rank,
-            reason=reason,
-            promoted_by=promoted_by
-        )
-        db.session.add(promotion)
-        db.session.commit()
-        
-        # Sync to Roblox if enabled
-        roblox_sync_result = {'success': False, 'message': 'Roblox sync disabled'}
-        if current_app.config.get('ROBLOX_SYNC_ENABLED') and member.roblox_id:
-            roblox_sync_result = sync_member_to_roblox(member)
+
+        roblox_sync_result = result.get('roblox_sync', {'success': False, 'message': 'Roblox sync disabled'})
         
         # Send Discord notification
         notification_sent = send_discord_notification(
@@ -500,33 +442,30 @@ def add_member():
                 'error': 'missing_discord_username',
                 'message': 'Discord username is required'
             }), 400
-        
-        # Check if member already exists
-        existing = Member.query.filter_by(discord_username=discord_username).first()
-        if existing:
-            log_api_access('/members', 'POST', discord_user_id, False, 409)
-            return jsonify({
-                'success': False,
-                'error': 'member_exists',
-                'message': f'Member with Discord username "{discord_username}" already exists',
-                'existing_member_id': existing.id
-            }), 409
-        
-        # Create new member
-        new_member = Member(
-            discord_username=discord_username,
+
+        result = member_service.create_member(
+            discord_username,
             roblox_username=roblox_username,
             current_rank=current_rank,
-            join_date=datetime.utcnow(),
-            last_updated=datetime.utcnow()
         )
-        db.session.add(new_member)
-        db.session.commit()
-        
-        # Try to add to Roblox if username provided
-        roblox_sync_result = {'success': False, 'message': 'No RobloxUsername provided'}
-        if current_app.config.get('ROBLOX_SYNC_ENABLED') and roblox_username:
-            roblox_sync_result = add_member_to_roblox(new_member)
+
+        if not result['success']:
+            if result.get('error') == 'member_exists':
+                log_api_access('/members', 'POST', discord_user_id, False, 409)
+                return jsonify({
+                    'success': False,
+                    'error': 'member_exists',
+                    'message': result['message'],
+                    'existing_member_id': result.get('existing_member_id'),
+                }), 409
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'validation_error'),
+                'message': result.get('message', 'Failed to add member'),
+            }), 400
+
+        new_member = result['member']
+        roblox_sync_result = result.get('roblox_sync', {'success': False, 'message': 'No RobloxUsername provided'})
         
         # Send notification
         notification_sent = send_discord_notification(
@@ -583,28 +522,20 @@ def remove_member(member_id):
     try:
         data = request.get_json() or {}
         discord_user_id = data.get('discord_user_id')
-        
-        member = Member.query.filter_by(id=member_id, is_active=True).first()
-        
-        if not member:
+
+        result = member_service.deactivate_member(member_id)
+
+        if not result['success']:
             log_api_access(f'/members/{member_id}', 'DELETE', discord_user_id, False, 404)
             return jsonify({
                 'success': False,
                 'error': 'member_not_found',
-                'message': f'Member with ID {member_id} not found'
+                'message': result.get('message'),
             }), 404
-        
-        # Mark as inactive
-        member_name = member.discord_username
-        member.is_active = False
-        member.last_updated = datetime.utcnow()
-        
-        # Try to remove from Roblox
-        roblox_sync_result = {'success': False, 'message': 'Roblox sync disabled'}
-        if current_app.config.get('ROBLOX_SYNC_ENABLED') and member.roblox_id:
-            roblox_sync_result = remove_member_from_roblox(member)
-        
-        db.session.commit()
+
+        member_name = result.get('member_name', f'Member {member_id}')
+
+        roblox_sync_result = result.get('roblox_sync', {'success': False, 'message': 'Roblox sync disabled'})
         
         # Send notification
         notification_sent = send_discord_notification(
@@ -649,13 +580,12 @@ def get_ranks():
         200: List of ranks
     """
     try:
-        rank_mappings = RankMapping.query.filter_by(is_active=True) \
-            .order_by(RankMapping.system_rank).all()
-        
+        rank_mappings = member_service.get_available_ranks()
+
         if not rank_mappings:
             # Return default ranks if no mappings exist
             default_ranks = ['Aspirant', 'Novice', 'Adept', 'Crusader', 'Paladin',
-                           'Exemplar', 'Prospect', 'Commander', 'Marshal', 'General', 'Chief General']
+                             'Exemplar', 'Prospect', 'Commander', 'Marshal', 'General', 'Chief General']
             ranks_data = [
                 {
                     'system_rank': rank,
@@ -724,51 +654,22 @@ def log_activity():
         description = data.get('description', '').strip()
         activity_date_str = data.get('activity_date')
         discord_user_id = data.get('discord_user_id')
-        
-        # Validation
+
         if not member_id:
             return jsonify({
                 'success': False,
                 'error': 'missing_member_id',
                 'message': 'member_id is required'
             }), 400
-        
+
         if not activity_type:
             return jsonify({
                 'success': False,
                 'error': 'missing_activity_type',
                 'message': 'activity_type is required'
             }), 400
-        
-        if activity_type not in ACTIVITY_TYPES:
-            return jsonify({
-                'success': False,
-                'error': 'invalid_activity_type',
-                'message': f'Invalid activity type "{activity_type}"',
-                'valid_types': list(ACTIVITY_TYPES.keys())
-            }), 400
-        
-        # Get member
-        member = Member.query.filter_by(id=member_id, is_active=True).first()
-        if not member:
-            log_api_access('/activity', 'POST', discord_user_id, False, 404)
-            return jsonify({
-                'success': False,
-                'error': 'member_not_found',
-                'message': f'Member with ID {member_id} not found'
-            }), 404
-        
-        # Get active AC period
-        current_period = ACPeriod.query.filter_by(is_active=True).first()
-        if not current_period:
-            log_api_access('/activity', 'POST', discord_user_id, False, 404)
-            return jsonify({
-                'success': False,
-                'error': 'no_active_period',
-                'message': 'No active AC period. Please create one first.'
-            }), 404
-        
-        # Parse activity date
+
+        activity_date = None
         if activity_date_str:
             try:
                 activity_date = datetime.strptime(activity_date_str, '%Y-%m-%d')
@@ -778,101 +679,77 @@ def log_activity():
                     'error': 'invalid_date_format',
                     'message': 'activity_date must be in YYYY-MM-DD format'
                 }), 400
-        else:
-            activity_date = datetime.utcnow()
-        
-        # Get points for activity type
-        points = get_activity_points(activity_type)
-        
-        # Get quantity (default to 1, force 1 for limited activities)
-        quantity = int(data.get('quantity', 1))
-        if is_limited_activity(activity_type):
-            quantity = 1
-        quantity = max(1, min(999, quantity))  # Clamp between 1 and 999
-        
-        # Check limited activity rule (check once regardless of quantity)
-        if is_limited_activity(activity_type):
-            existing = ActivityEntry.query.filter_by(
-                member_id=member_id,
-                ac_period_id=current_period.id,
-                activity_type=activity_type
-            ).first()
-            if existing:
+
+        logged_by = data.get('logged_by', 'Discord Bot')
+        if discord_user_id and not data.get('logged_by'):
+            logged_by = f'Discord User {discord_user_id}'
+
+        result = ac_service.log_activity(
+            member_id,
+            activity_type,
+            activity_date=activity_date,
+            description=description or f"{activity_type} logged via Discord",
+            logged_by=logged_by,
+            quantity=data.get('quantity', 1),
+            mark_limited=True,
+        )
+
+        if not result['success']:
+            error = result.get('error')
+            if error == 'member_not_found':
+                log_api_access('/activity', 'POST', discord_user_id, False, 404)
+                return jsonify({
+                    'success': False,
+                    'error': 'member_not_found',
+                    'message': result['message'],
+                }), 404
+            if error == 'no_active_period':
+                log_api_access('/activity', 'POST', discord_user_id, False, 404)
+                return jsonify({
+                    'success': False,
+                    'error': 'no_active_period',
+                    'message': result['message'],
+                }), 404
+            if error == 'invalid_activity_type':
+                return jsonify({
+                    'success': False,
+                    'error': 'invalid_activity_type',
+                    'message': result['message'],
+                    'valid_types': result.get('valid_types', []),
+                }), 400
+            if error == 'limited_activity_exists':
                 log_api_access('/activity', 'POST', discord_user_id, False, 400)
                 return jsonify({
                     'success': False,
                     'error': 'limited_activity_exists',
-                    'message': f'Limited activity "{activity_type}" already logged for this period'
+                    'message': f'Limited activity "{activity_type}" already logged for this period',
                 }), 400
 
-        # Determine who logged this activity
-        logged_by = data.get('logged_by', f'Discord Bot')
-        if discord_user_id and not data.get('logged_by'):
-            logged_by = f'Discord User {discord_user_id}'
-        
-        # Create multiple activity entries based on quantity
-        created_ids = []
-        for i in range(quantity):
-            activity_entry = ActivityEntry(
-                member_id=member_id,
-                ac_period_id=current_period.id,
-                activity_type=activity_type,
-                activity_date=activity_date,
-                points=points,
-                description=description or f"{activity_type} logged via Discord",
-                logged_by=logged_by,
-                is_limited_activity=is_limited_activity(activity_type)
-            )
-            db.session.add(activity_entry)
-            db.session.flush()  # Get the ID before committing
-            created_ids.append(activity_entry.id)
-            
-            # Also add to MonthlyActivityEntry for title tracking (preserved across AC resets)
-            monthly_entry = MonthlyActivityEntry(
-                member_id=member_id,
-                ac_period_id=current_period.id,
-                activity_type=activity_type,
-                activity_date=activity_date,
-                points=points,
-                description=description or f"{activity_type} logged via Discord",
-                logged_by=logged_by
-            )
-            db.session.add(monthly_entry)
-        
-        db.session.commit()
-        
-        # Send Discord notification
+        member = result['member']
+        quantity = result['count']
+        points = result['points']
+        activity_date = result['activity_date']
+        quota_progress = result['quota_progress']
+        created_ids = result['activity_ids']
+
         qty_str = f" (x{quantity})" if quantity > 1 else ""
-        
-        # Calculate total points for the member in the current period (for quota progress)
-        total_entries = ActivityEntry.query.filter_by(
-            member_id=member_id,
-            ac_period_id=current_period.id
-        ).all()
-        total_points = sum(entry.points for entry in total_entries)
-        
-        # Get member's quota requirement based on rank
-        member_quota = get_member_quota(member.current_rank)
-        
-        # Calculate percentage complete
-        quota_percentage = (total_points / member_quota * 100) if member_quota > 0 else 0
-        
         notification_message = (
             f"**Activity Logged**\n"
             f"Activity: **{activity_type}**{qty_str}\n"
             f"Points: {points * quantity}\n"
             f"Member: **{member.discord_username}**\n"
             f"Logged by: {logged_by}\n"
-            f"New Total: **{total_points}/{member_quota} points** ({round(quota_percentage, 1)}%)"
+            f"New Total: **{quota_progress['total_points']}/{quota_progress['quota']} points** "
+            f"({round(quota_progress['percentage'], 1)}%)"
         )
         if description:
             notification_message += f"\nDescription: {description}"
         notification_message += f"\nDate: {activity_date.strftime('%Y-%m-%d')}"
-            
+
         send_discord_notification(notification_message, title="Activity Log")
-        
+
         log_api_access('/activity', 'POST', discord_user_id, True, 201)
-        
+
         return jsonify({
             'success': True,
             'message': f'Logged {quantity} activity entries',
@@ -882,14 +759,9 @@ def log_activity():
                 'points': points * quantity,
                 'date': activity_date.isoformat()
             },
-            'quota_progress': {
-                'total_points': total_points,
-                'quota': member_quota,
-                'percentage': round(quota_percentage, 2)
-            }
+            'quota_progress': quota_progress,
         }), 201
 
-        
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error logging activity: {e}", exc_info=True)
@@ -919,8 +791,8 @@ def get_member_activities(member_id):
     """
     try:
         limit = min(int(request.args.get('limit', 20)), 100)
-        
-        member = Member.query.filter_by(id=member_id, is_active=True).first()
+
+        member = member_service.get_member(member_id, active_only=True)
         if not member:
             log_api_access(f'/members/{member_id}/activities', 'GET', success=False, response_code=404)
             return jsonify({
@@ -928,10 +800,9 @@ def get_member_activities(member_id):
                 'error': 'member_not_found',
                 'message': f'Member with ID {member_id} not found'
             }), 404
-        
-        activities = ActivityEntry.query.filter_by(member_id=member_id) \
-            .order_by(ActivityEntry.activity_date.desc()).limit(limit).all()
-        
+
+        activities = ac_service.get_member_activities(member_id, limit=limit)
+
         activities_data = [
             {
                 'id': a.id,
@@ -984,67 +855,45 @@ def remove_activity(activity_id):
     try:
         data = request.get_json() or {}
         discord_user_id = data.get('discord_user_id')
-        
-        # Find activity
-        activity = ActivityEntry.query.filter_by(id=activity_id).first()
-        if not activity:
+
+        result = ac_service.delete_activity_entry(activity_id)
+
+        if not result['success']:
             log_api_access('/activity/<id>', 'DELETE', discord_user_id, False, 404)
             return jsonify({
                 'success': False,
                 'error': 'activity_not_found',
-                'message': f'Activity with ID {activity_id} not found'
+                'message': result['message'],
             }), 404
-        
-        # Get member info before deleting (for response)
-        member = Member.query.get(activity.member_id)
-        activity_type = activity.activity_type
-        points = activity.points
-        ac_period_id = activity.ac_period_id
-        
-        # Delete the activity
-        db.session.delete(activity)
-        db.session.commit()
-        
-        # Calculate updated quota progress
-        current_period = ACPeriod.query.get(ac_period_id)
-        if current_period and member:
-            total_entries = ActivityEntry.query.filter_by(
-                member_id=member.id,
-                ac_period_id=ac_period_id
-            ).all()
-            total_points = sum(entry.points for entry in total_entries)
-            member_quota = get_member_quota(member.current_rank)
-        else:
-            total_points = 0
-            member_quota = 0
-        
-        # Send Discord notification
+
+        member = result['member']
+        activity_type = result['activity_type']
+        points = result['points']
+        quota_progress = result['quota_progress']
+
         notification_message = (
             f"**Activity Removed**\n"
             f"Activity: **{activity_type}** ({points} pts)\n"
             f"Member: **{member.discord_username if member else 'Unknown'}**\n"
             f"Removed by: {f'Discord User {discord_user_id}' if discord_user_id else 'API'}\n"
-            f"New Total: **{total_points}/{member_quota} points** ({round((total_points / member_quota * 100) if member_quota > 0 else 0, 1)}%)"
+            f"New Total: **{quota_progress['total_points']}/{quota_progress['quota']} points** "
+            f"({round(quota_progress['percentage'], 1)}%)"
         )
         send_discord_notification(notification_message, title="Activity Removed")
-        
+
         log_api_access('/activity/<id>', 'DELETE', discord_user_id, True, 200)
-        
+
         return jsonify({
             'success': True,
-            'message': f'Activity removed successfully',
+            'message': 'Activity removed successfully',
             'activity': {
                 'id': activity_id,
                 'type': activity_type,
-                'points': points
+                'points': points,
             },
-            'quota_progress': {
-                'total_points': total_points,
-                'quota': member_quota,
-                'percentage': round((total_points / member_quota * 100) if member_quota > 0 else 0, 2)
-            }
+            'quota_progress': quota_progress,
         }), 200
-        
+
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error removing activity: {e}", exc_info=True)
@@ -1070,7 +919,7 @@ def get_member_points(member_id):
         404: Member not found
     """
     try:
-        member = Member.query.filter_by(id=member_id, is_active=True).first()
+        member = member_service.get_member(member_id, active_only=True)
         if not member:
             log_api_access(f'/members/{member_id}/points', 'GET', success=False, response_code=404)
             return jsonify({
@@ -1078,9 +927,8 @@ def get_member_points(member_id):
                 'error': 'member_not_found',
                 'message': f'Member with ID {member_id} not found'
             }), 404
-        
-        # Get active AC period
-        current_period = ACPeriod.query.filter_by(is_active=True).first()
+
+        current_period = ac_service.get_active_period()
         if not current_period:
             log_api_access(f'/members/{member_id}/points', 'GET', success=False, response_code=404)
             return jsonify({
@@ -1088,22 +936,11 @@ def get_member_points(member_id):
                 'error': 'no_active_period',
                 'message': 'No active AC period'
             }), 404
-        
-        # Calculate total points for the member in current period
-        total_entries = ActivityEntry.query.filter_by(
-            member_id=member_id,
-            ac_period_id=current_period.id
-        ).all()
-        total_points = sum(entry.points for entry in total_entries)
-        
-        # Get member's quota
-        member_quota = get_member_quota(member.current_rank)
-        
-        # Calculate percentage
-        percentage = (total_points / member_quota * 100) if member_quota > 0 else 0
+
+        quota_progress = ac_service.get_quota_progress(member, current_period)
         
         log_api_access(f'/members/{member_id}/points', 'GET', success=True, response_code=200)
-        
+
         return jsonify({
             'success': True,
             'member': {
@@ -1112,9 +949,9 @@ def get_member_points(member_id):
                 'current_rank': member.current_rank
             },
             'points': {
-                'total_points': total_points,
-                'quota': member_quota,
-                'percentage': round(percentage, 2),
+                'total_points': quota_progress['total_points'],
+                'quota': quota_progress['quota'],
+                'percentage': quota_progress['percentage'],
                 'period_name': current_period.period_name
             }
         }), 200
