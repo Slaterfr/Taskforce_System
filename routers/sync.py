@@ -39,7 +39,44 @@ def manage_rank_mappings():
             if mapping_id:
                 if member_service.toggle_rank_mapping(mapping_id):
                     flash('Mapping updated', 'success')
-        
+
+        elif action == 'auto_import':
+            # Fetch all roles from Roblox and upsert them into rank_mapping
+            try:
+                from utils.roblox_sync import get_roblox_api
+                roblox_api = get_roblox_api()
+                if not roblox_api:
+                    flash('Roblox API not configured — check ROBLOX_GROUP_ID and ROBLOX_COOKIE.', 'error')
+                else:
+                    roles = roblox_api.get_group_roles()
+                    if not roles:
+                        flash('No roles returned from Roblox. Is the group ID correct?', 'error')
+                    else:
+                        imported, skipped = 0, 0
+                        for role in roles:
+                            role_name = role.get('name', '').strip()
+                            role_id = role.get('id')
+                            if not role_name or not role_id:
+                                skipped += 1
+                                continue
+                            result = member_service.add_or_update_rank_mapping(
+                                system_rank=role_name,
+                                roblox_role_id=role_id,
+                                roblox_role_name=role_name,
+                            )
+                            if result['success']:
+                                imported += 1
+                            else:
+                                skipped += 1
+                        flash(
+                            f'Auto-import complete: {imported} role(s) imported/updated'
+                            + (f', {skipped} skipped.' if skipped else '.'),
+                            'success',
+                        )
+            except Exception as e:
+                current_app.logger.error(f'Auto-import error: {e}')
+                flash(f'Auto-import failed: {e}', 'error')
+
         return redirect(url_for('sync.manage_rank_mappings'))
     
     # GET: show all mappings

@@ -21,8 +21,15 @@
     <!-- Available Roblox Roles -->
     {% if roblox_roles %}
     <div class="card mb-4">
-        <div class="card-header bg-primary text-white">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">📋 Available Roblox Roles (from your group)</h5>
+            <form method="POST" action="{{ url_for('sync.manage_rank_mappings') }}"
+                  onsubmit="return confirm('This will auto-create a rank mapping for every Roblox role listed here. Continue?');">
+                <input type="hidden" name="action" value="auto_import">
+                <button type="submit" class="btn btn-light btn-sm">
+                    ⚡ Auto-Import All Roles
+                </button>
+            </form>
         </div>
         <div class="card-body">
             <p class="text-muted">Use these Role IDs when creating mappings below:</p>

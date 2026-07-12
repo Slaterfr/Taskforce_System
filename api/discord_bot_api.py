@@ -355,9 +355,17 @@ def update_member_rank(member_id):
                     'message': result['message'],
                     'valid_ranks': result.get('valid_ranks', []),
                 }), 400
+            # Catch-all for any other failure (e.g. missing_rank, etc.)
+            log_api_access(f'/members/{member_id}/rank', 'PATCH', discord_user_id, False, 400)
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'unknown_error'),
+                'message': result.get('message', 'An unknown error occurred'),
+            }), 400
 
         member = result['member']
         old_rank = result['old_rank']
+
 
         if result.get('unchanged'):
             return jsonify({

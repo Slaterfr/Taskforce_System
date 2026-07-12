@@ -86,7 +86,7 @@ class RankMapping(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     system_rank = db.Column(db.String(100), nullable=False, unique=True)
-    roblox_role_id = db.Column(db.Integer, nullable=False)
+    roblox_role_id = db.Column(db.BigInteger, nullable=False)
     roblox_role_name = db.Column(db.String(100), nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
