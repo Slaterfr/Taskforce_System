@@ -31,7 +31,7 @@ def get_active_period():
 
 def members_with_quota_query():
     """Return a query for active members that have an AC quota (excludes top ranks)."""
-    excluded = {'general', 'chief general'}
+    excluded = {''}
     allowed = [
         r.lower()
         for r, q in AC_QUOTAS.items()
