@@ -24,6 +24,21 @@ from database.ac_models import (
 )
 
 
+# Hardcoded rank order for AC tables: lower number = displayed first (top of table)
+RANK_ORDER = {
+    'prospect':      1,
+    'commander':     2,
+    'marshal':       3,
+    'general':       4,
+    'chief general': 5,
+}
+
+
+def _rank_sort_key(rank_str):
+    """Return a numeric sort key for a rank string (case-insensitive). Unknown ranks go last."""
+    return RANK_ORDER.get((rank_str or '').lower(), 99)
+
+
 def get_active_period():
     """Return the current active AC period, or None."""
     return ACPeriod.query.filter_by(is_active=True).first()
@@ -40,7 +55,7 @@ def members_with_quota_query():
     return Member.query.filter(
         Member.is_active == True,
         func.lower(Member.current_rank).in_(allowed),
-    ).order_by(func.lower(Member.current_rank), Member.discord_username)
+    ).order_by(Member.discord_username)
 
 
 def get_members_with_quota():
@@ -129,7 +144,8 @@ def build_member_progress(period):
 
     member_progress.sort(
         key=lambda x: (
-            100 if x['is_exempt'] else (99 if x['is_protected'] else x['percentage'])
+            _rank_sort_key(x['member'].current_rank),
+            x['member'].discord_username.lower(),
         )
     )
     return member_progress
@@ -605,7 +621,10 @@ def get_period_activities(period_id):
 
 def get_quick_log_data(period_id):
     """Get activities, counts, and statuses for quick logging."""
-    members_with_quota = get_members_with_quota()
+    members_with_quota = sorted(
+        get_members_with_quota(),
+        key=lambda m: (_rank_sort_key(m.current_rank), m.discord_username.lower()),
+    )
     member_activities = {}
     member_activity_counts = {}
     member_ia_status = {}
