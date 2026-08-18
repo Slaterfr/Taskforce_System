@@ -798,7 +798,7 @@ def get_member_activities(member_id):
         404: Member not found
     """
     try:
-        limit = min(int(request.args.get('limit', 20)), 100)
+        limit = min(int(request.args.get('limit', 50)), 1000)
 
         member = member_service.get_member(member_id, active_only=True)
         if not member:
@@ -973,3 +973,178 @@ def get_member_points(member_id):
             'message': f'Error retrieving points: {str(e)}'
         }), 500
 
+
+# ============================================================================
+# BULK ACTIVITY REMOVAL BY TYPE
+# ============================================================================
+
+@api_bp.route('/members/<int:member_id>/activities/by-type', methods=['DELETE'])
+@api_key_required
+def remove_activities_by_type(member_id):
+    """
+    Remove the N most-recent activity entries of a given type for a member.
+
+    Request Body:
+        activity_type (str): Activity type to remove (required)
+        quantity     (int): How many to remove — default 1, max 999
+        discord_user_id (str): Who is removing (optional, for logging)
+
+    Returns:
+        200: Activities removed with updated quota progress
+        400: Missing / invalid parameters
+        404: Member or activities not found
+    """
+    try:
+        data = request.get_json() or {}
+        activity_type = data.get('activity_type', '').strip()
+        quantity = max(1, min(int(data.get('quantity', 1)), 999))
+        discord_user_id = data.get('discord_user_id')
+
+        if not activity_type:
+            return jsonify({
+                'success': False,
+                'error': 'missing_activity_type',
+                'message': 'activity_type is required',
+            }), 400
+
+        result = ac_service.delete_activities_by_type(
+            member_id, activity_type, quantity=quantity
+        )
+
+        if not result['success']:
+            error = result.get('error')
+            status = 404 if error in ('member_not_found', 'no_activities_found') else 400
+            log_api_access(
+                f'/members/{member_id}/activities/by-type', 'DELETE',
+                discord_user_id, False, status
+            )
+            return jsonify({
+                'success': False,
+                'error': error,
+                'message': result['message'],
+            }), status
+
+        member = result['member']
+        deleted = result['deleted']
+        quota_progress = result['quota_progress']
+
+        notification_message = (
+            f"**{deleted} Activity{'s' if deleted > 1 else ''} Removed**\n"
+            f"Activity: **{activity_type}**\n"
+            f"Member: **{member.discord_username}**\n"
+            f"Removed by: {f'Discord User {discord_user_id}' if discord_user_id else 'API'}\n"
+            f"New Total: **{quota_progress['total_points']}/{quota_progress['quota']} points** "
+            f"({round(quota_progress['percentage'], 1)}%)"
+        )
+        send_discord_notification(notification_message, title="Activities Removed")
+
+        log_api_access(
+            f'/members/{member_id}/activities/by-type', 'DELETE',
+            discord_user_id, True, 200
+        )
+        return jsonify({
+            'success': True,
+            'message': f'Removed {deleted} "{activity_type}" activity entries',
+            'deleted': deleted,
+            'activity_type': activity_type,
+            'quota_progress': quota_progress,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(
+            f'Error bulk-removing activities for member {member_id}: {e}', exc_info=True
+        )
+        log_api_access(
+            f'/members/{member_id}/activities/by-type', 'DELETE',
+            data.get('discord_user_id'), False, 500
+        )
+        return jsonify({
+            'success': False,
+            'error': 'server_error',
+            'message': f'Error removing activities: {str(e)}',
+        }), 500
+
+
+# ============================================================================
+# ACTIVITY COUNT BY TYPE
+# ============================================================================
+
+@api_bp.route('/members/<int:member_id>/activities/count', methods=['GET'])
+@api_key_required
+def count_member_activities(member_id):
+    """
+    Count activity entries for a member, optionally filtered by type and/or
+    the current AC period.
+
+    Query Parameters:
+        type        (str):  Filter to a specific activity type (optional)
+        period_only (bool): If "true", restrict count to the active AC period
+
+    Returns:
+        200: {count: int, breakdown: {type: count, ...}}
+        404: Member not found
+    """
+    try:
+        member = member_service.get_member(member_id, active_only=True)
+        if not member:
+            log_api_access(
+                f'/members/{member_id}/activities/count', 'GET',
+                success=False, response_code=404
+            )
+            return jsonify({
+                'success': False,
+                'error': 'member_not_found',
+                'message': f'Member with ID {member_id} not found',
+            }), 404
+
+        activity_type = request.args.get('type', '').strip() or None
+        period_only = request.args.get('period_only', 'false').lower() == 'true'
+
+        period_id = None
+        if period_only:
+            active_period = ac_service.get_active_period()
+            period_id = active_period.id if active_period else None
+
+        result = ac_service.count_activities_by_type(
+            member_id, activity_type=activity_type, period_id=period_id
+        )
+
+        if activity_type:
+            count = result  # scalar int
+            breakdown = {activity_type: count}
+        else:
+            breakdown = result
+            count = sum(breakdown.values())
+
+        log_api_access(
+            f'/members/{member_id}/activities/count', 'GET',
+            success=True, response_code=200
+        )
+        return jsonify({
+            'success': True,
+            'member': {
+                'id': member.id,
+                'discord_username': member.discord_username,
+            },
+            'filters': {
+                'activity_type': activity_type,
+                'period_only': period_only,
+            },
+            'count': count,
+            'breakdown': breakdown,
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(
+            f'Error counting activities for member {member_id}: {e}', exc_info=True
+        )
+        log_api_access(
+            f'/members/{member_id}/activities/count', 'GET',
+            success=False, response_code=500
+        )
+        return jsonify({
+            'success': False,
+            'error': 'server_error',
+            'message': f'Error counting activities: {str(e)}',
+        }), 500

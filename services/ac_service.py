@@ -438,26 +438,30 @@ def log_activity(
                 'message': 'Limited activity already logged for this period',
             }
 
-    created_ids = []
-    for _ in range(quantity):
-        entry_kwargs = {
-            'member_id': member_id,
-            'ac_period_id': current_period.id,
-            'activity_type': activity_type,
-            'points': points,
-            'description': description,
-            'activity_date': activity_date,
-            'logged_by': logged_by,
-        }
-        if mark_limited:
-            entry_kwargs['is_limited_activity'] = is_limited_activity(activity_type)
+    is_limited = is_limited_activity(activity_type)
 
-        activity_entry = ActivityEntry(**entry_kwargs)
-        db.session.add(activity_entry)
-        db.session.flush()
-        created_ids.append(activity_entry.id)
+    # Build all ActivityEntry objects at once, then bulk-insert for efficiency.
+    activity_entries = [
+        ActivityEntry(
+            member_id=member_id,
+            ac_period_id=current_period.id,
+            activity_type=activity_type,
+            points=points,
+            description=description,
+            activity_date=activity_date,
+            logged_by=logged_by,
+            is_limited_activity=is_limited if mark_limited else False,
+        )
+        for _ in range(quantity)
+    ]
+    db.session.bulk_save_objects(activity_entries, return_defaults=True)
 
-        monthly_entry = MonthlyActivityEntry(
+    # Collect the generated IDs (bulk_save_objects populates them when return_defaults=True).
+    created_ids = [e.id for e in activity_entries]
+
+    # Bulk-insert the corresponding MonthlyActivityEntry rows.
+    monthly_entries = [
+        MonthlyActivityEntry(
             member_id=member_id,
             ac_period_id=current_period.id,
             activity_type=activity_type,
@@ -466,7 +470,9 @@ def log_activity(
             activity_date=activity_date,
             logged_by=logged_by,
         )
-        db.session.add(monthly_entry)
+        for _ in range(quantity)
+    ]
+    db.session.bulk_save_objects(monthly_entries)
 
     db.session.commit()
 
@@ -723,8 +729,13 @@ def clear_member_activities(member_id, period_id=None):
     return deleted_count
 
 
-def get_member_activities(member_id, limit=20):
-    """Return recent ActivityEntry records for a member, newest first."""
+def get_member_activities(member_id, limit=500):
+    """Return recent ActivityEntry records for a member, newest first.
+
+    The default limit is intentionally large (500) so that the Discord bot can
+    search across a member's full recent history when looking up activities to
+    remove.  Callers that only need a short preview should pass a smaller limit.
+    """
     return (
         ActivityEntry.query
         .filter_by(member_id=member_id)
@@ -734,3 +745,100 @@ def get_member_activities(member_id, limit=20):
     )
 
 
+def count_activities_by_type(member_id, activity_type=None, period_id=None):
+    """Return the count of activity entries for a member.
+
+    Args:
+        member_id:      The member to query.
+        activity_type:  If given, restrict to this activity type.
+        period_id:      If given, restrict to a specific AC period.
+
+    Returns:
+        int if activity_type is specified, else dict mapping type → count.
+    """
+    query = (
+        db.session.query(
+            ActivityEntry.activity_type,
+            func.count(ActivityEntry.id).label('cnt'),
+        )
+        .filter(ActivityEntry.member_id == member_id)
+    )
+    if period_id is not None:
+        query = query.filter(ActivityEntry.ac_period_id == period_id)
+    if activity_type is not None:
+        query = query.filter(ActivityEntry.activity_type == activity_type)
+    query = query.group_by(ActivityEntry.activity_type)
+
+    rows = query.all()
+    if activity_type is not None:
+        return rows[0].cnt if rows else 0
+    return {row.activity_type: row.cnt for row in rows}
+
+
+def delete_activities_by_type(member_id, activity_type, quantity=1, period_id=None):
+    """Delete the ``quantity`` most-recent ActivityEntry rows of ``activity_type``
+    for ``member_id``.
+
+    Args:
+        member_id:      The member whose activities should be removed.
+        activity_type:  The activity type to delete.
+        quantity:       How many entries to delete (newest first). Use 0 or a
+                        very large number to delete all of that type.
+        period_id:      If given, restrict deletion to a specific AC period.
+
+    Returns:
+        dict with ``success``, ``deleted`` count, ``member``, and
+        ``quota_progress`` (if a current period exists).
+    """
+    member = Member.query.filter_by(id=member_id, is_active=True).first()
+    if not member:
+        return {
+            'success': False,
+            'error': 'member_not_found',
+            'message': f'Member with ID {member_id} not found',
+        }
+
+    # Fetch the target rows ordered newest-first so we delete the most recent.
+    target_query = (
+        ActivityEntry.query
+        .filter(
+            ActivityEntry.member_id == member_id,
+            ActivityEntry.activity_type == activity_type,
+        )
+    )
+    if period_id is not None:
+        target_query = target_query.filter(ActivityEntry.ac_period_id == period_id)
+
+    target_query = target_query.order_by(ActivityEntry.activity_date.desc())
+
+    if quantity and quantity > 0:
+        target_query = target_query.limit(quantity)
+
+    entries_to_delete = target_query.all()
+    deleted_count = len(entries_to_delete)
+
+    if deleted_count == 0:
+        return {
+            'success': False,
+            'error': 'no_activities_found',
+            'message': f'No "{activity_type}" activities found for member {member_id}',
+        }
+
+    for entry in entries_to_delete:
+        db.session.delete(entry)
+    db.session.commit()
+
+    # Compute updated quota progress.
+    current_period = get_active_period()
+    if current_period:
+        quota_progress = get_quota_progress(member, current_period)
+    else:
+        quota_progress = {'total_points': 0, 'quota': 0, 'percentage': 0}
+
+    return {
+        'success': True,
+        'deleted': deleted_count,
+        'activity_type': activity_type,
+        'member': member,
+        'quota_progress': quota_progress,
+    }

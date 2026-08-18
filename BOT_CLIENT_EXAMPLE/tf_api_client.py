@@ -339,6 +339,94 @@ class TFSystemAPI:
             discord_user_id=discord_user_id
         )
 
+    async def remove_activities_by_type(
+        self,
+        member_id: int,
+        activity_type: str,
+        quantity: int = 1,
+        discord_user_id: str = None,
+    ) -> Dict:
+        """
+        Remove the N most-recent activity entries of a given type for a member.
+
+        Args:
+            member_id:      Member ID
+            activity_type:  Activity type string (e.g. "Training", "Raid")
+            quantity:       How many entries to delete (newest first, default 1)
+            discord_user_id: Discord user ID for audit logging
+
+        Returns:
+            dict: Result including deleted count and updated quota_progress
+        """
+        data: Dict = {'activity_type': activity_type, 'quantity': quantity}
+        if discord_user_id:
+            data['discord_user_id'] = discord_user_id
+        return await self._request(
+            'DELETE', f'/members/{member_id}/activities/by-type', json=data
+        )
+
+    async def count_activities_by_type(
+        self,
+        member_id: int,
+        activity_type: str = None,
+        period_only: bool = False,
+    ) -> Dict:
+        """
+        Count activity entries for a member, optionally filtered by type
+        and/or restricted to the active AC period.
+
+        Args:
+            member_id:      Member ID
+            activity_type:  If given, restrict to this type
+            period_only:    If True, count only entries in the active period
+
+        Returns:
+            dict: {count, breakdown: {type: count}}
+        """
+        params: Dict = {}
+        if activity_type:
+            params['type'] = activity_type
+        if period_only:
+            params['period_only'] = 'true'
+        return await self._request(
+            'GET', f'/members/{member_id}/activities/count', params=params
+        )
+
+    async def remove_activity_by_name(
+        self,
+        member_name: str,
+        activity_type: str,
+        quantity: int = 1,
+        discord_user_id: str = None,
+    ) -> Dict:
+        """
+        Remove N most-recent activities of a type for a member looked up by name.
+        Convenience wrapper around remove_activities_by_type.
+
+        Args:
+            member_name:    Discord or Roblox username
+            activity_type:  Activity type to remove
+            quantity:       How many to remove (default 1)
+            discord_user_id: Discord user ID for audit logging
+
+        Returns:
+            dict: Result or member_not_found error
+        """
+        member = await self.find_member_by_name(member_name)
+        if not member:
+            return {
+                'success': False,
+                'error': 'member_not_found',
+                'message': f'Could not find member with name "{member_name}"',
+            }
+        return await self.remove_activities_by_type(
+            member_id=member['id'],
+            activity_type=activity_type,
+            quantity=quantity,
+            discord_user_id=discord_user_id,
+        )
+
+
 
 # Example usage in a Discord bot
 if __name__ == '__main__':
