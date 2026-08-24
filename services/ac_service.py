@@ -811,18 +811,34 @@ def delete_activities_by_type(member_id, activity_type, quantity=1, period_id=No
 
     target_query = target_query.order_by(ActivityEntry.activity_date.desc())
 
-    if quantity and quantity > 0:
-        target_query = target_query.limit(quantity)
+    # Count how many entries actually exist (before applying the limit).
+    total_available = target_query.count()
 
-    entries_to_delete = target_query.all()
-    deleted_count = len(entries_to_delete)
-
-    if deleted_count == 0:
+    if total_available == 0:
         return {
             'success': False,
             'error': 'no_activities_found',
             'message': f'No "{activity_type}" activities found for member {member_id}',
         }
+
+    # Guard: don't allow removing more entries than the member actually has.
+    if quantity and quantity > 0 and quantity > total_available:
+        return {
+            'success': False,
+            'error': 'not_enough_activities',
+            'message': (
+                f'You can\'t subtract more activity entries than the ones you have for this activity! '
+                f'**{member.discord_username}** only has **{total_available}** '
+                f'"{activity_type}" entr{"y" if total_available == 1 else "ies"}.'
+            ),
+            'available': total_available,
+        }
+
+    if quantity and quantity > 0:
+        target_query = target_query.limit(quantity)
+
+    entries_to_delete = target_query.all()
+    deleted_count = len(entries_to_delete)
 
     for entry in entries_to_delete:
         db.session.delete(entry)
