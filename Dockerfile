@@ -29,6 +29,6 @@ USER appuser
 EXPOSE 5000
 
 # Use start script to run both services
-CMD ["./start.sh"]
+CMD ["uvicorn app:app --host 0.0.0.0 --port 5000 "]
 
 
