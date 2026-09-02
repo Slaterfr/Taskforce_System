@@ -1,19 +1,14 @@
-from database.ac_constants import get_member_quota
-from database.engine import db_session
 """Activity Check (AC) business logic."""
 
 from datetime import date, datetime
-
 from sqlalchemy import func
-
 from sqlmodel import select
+
+from database.engine import db_session
 from database.models import Member, MonthlyStat
 from database.ac_constants import (
     ACTIVITY_TYPES,
     AC_QUOTAS,
-    get_activity_points,
-    
-    is_limited_activity,
 )
 from database.ac_models import (
     ACPeriod,
@@ -21,12 +16,79 @@ from database.ac_models import (
     ActivityEntry,
     InactivityNotice,
     MonthlyActivityEntry,
+    ActivityType,
+    RankQuota,
     get_hwtm_winner,
     get_leggionary_winner,
     get_monthly_activity_counts,
     get_scout_winner,
     get_taskmaster_winner,
 )
+
+
+def get_activity_types_map(tenant_id: int = 1) -> dict:
+    """Return dict of {name: {'points': float, 'limited': bool, 'description': str}} from DB with constants fallback."""
+    try:
+        session = db_session()
+        db_types = session.exec(
+            select(ActivityType).where(
+                ActivityType.tenant_id == tenant_id,
+                ActivityType.is_active == True,
+            )
+        ).all()
+        if db_types:
+            return {
+                a.name: {
+                    'points': a.points,
+                    'limited': a.is_limited,
+                    'description': a.description or '',
+                }
+                for a in db_types
+            }
+    except Exception:
+        pass
+    return ACTIVITY_TYPES
+
+
+def get_rank_quotas_map(tenant_id: int = 1) -> dict:
+    """Return dict of {rank_name: required_points} from DB with constants fallback."""
+    try:
+        session = db_session()
+        db_quotas = session.exec(
+            select(RankQuota).where(RankQuota.tenant_id == tenant_id)
+        ).all()
+        if db_quotas:
+            return {q.rank_name: q.required_points for q in db_quotas}
+    except Exception:
+        pass
+    return AC_QUOTAS
+
+
+def get_member_quota(rank: str, tenant_id: int = 1) -> float:
+    """Get AC quota for a member's rank."""
+    quotas = get_rank_quotas_map(tenant_id)
+    for r_name, pts in quotas.items():
+        if r_name.lower() == (rank or '').lower():
+            return pts
+    return 0.0
+
+
+def get_activity_points(activity_type: str, tenant_id: int = 1) -> float:
+    """Get point value for an activity type."""
+    types_map = get_activity_types_map(tenant_id)
+    for name, data in types_map.items():
+        if name.lower() == (activity_type or '').lower():
+            return data.get('points', 0.0)
+    return 0.0
+
+
+def is_limited_activity(activity_type: str, tenant_id: int = 1) -> bool:
+    """Check if activity type is limited to 1 per cycle."""
+    types_map = get_activity_types_map(tenant_id)
+    for name, data in types_map.items():
+        if name.lower() == (activity_type or '').lower():
+            return data.get('limited', False)
+    return False
 
 
 # Hardcoded rank order for AC tables: lower number = displayed first (top of table)
@@ -49,13 +111,13 @@ def get_active_period():
     return db_session().exec(select(ACPeriod).filter_by(is_active=True)).first()
 
 
-def members_with_quota_query():
+def members_with_quota_query(tenant_id: int = 1):
     """Return a query for active members that have an AC quota (excludes top ranks)."""
-    excluded = {''}
+    quotas = get_rank_quotas_map(tenant_id)
     allowed = [
         r.lower()
-        for r, q in AC_QUOTAS.items()
-        if q and q > 0 and r.lower() not in excluded
+        for r, q in quotas.items()
+        if q and q > 0
     ]
     return db_session().query(Member).filter(
         Member.is_active == True,
@@ -394,12 +456,13 @@ def log_activity(
 
     Returns a dict with ``success``, optional ``error``, and result fields on success.
     """
-    if validate_activity_type and activity_type not in ACTIVITY_TYPES:
+    valid_types = get_activity_types_map()
+    if validate_activity_type and activity_type not in valid_types:
         return {
             'success': False,
             'error': 'invalid_activity_type',
             'message': f'Invalid activity type "{activity_type}"',
-            'valid_types': list(ACTIVITY_TYPES.keys()),
+            'valid_types': list(valid_types.keys()),
         }
 
     member = db_session().exec(select(Member).filter_by(id=member_id, is_active=True)).first()

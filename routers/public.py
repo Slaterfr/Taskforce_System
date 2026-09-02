@@ -30,15 +30,16 @@ async def public_member(request: Request, member_id):
 @router.get('/ac_progress')
 async def public_ac_progress(request: Request):
     current_period = ac_service.get_active_period()
+    act_types = ac_service.get_activity_types_map()
     if not current_period:
         return templates.TemplateResponse('public_ac_progress.html', {"request": request,
                              "current_period":None,
                              "member_progress":[],
-                             "activity_types":ACTIVITY_TYPES})
+                             "activity_types":act_types})
 
     member_progress = ac_service.build_member_progress(current_period)
 
     return templates.TemplateResponse('public_ac_progress.html', {"request": request,
                          "current_period":current_period,
                          "member_progress":member_progress,
-                         "activity_types":ACTIVITY_TYPES})
+                         "activity_types":act_types})

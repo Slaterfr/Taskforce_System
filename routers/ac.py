@@ -35,7 +35,7 @@ async def ac_dashboard(request: Request):
     return templates.TemplateResponse('ac/ac_dashboard.html', {"request": request,
                          "current_period":current_period,
                          "member_progress":member_progress,
-                         "activity_types":ACTIVITY_TYPES,
+                         "activity_types":ac_service.get_activity_types_map(),
                          "activity_stats":activity_stats,
                          "title_winners":title_winners})
 
@@ -214,7 +214,7 @@ async def log_ac_activity(request: Request):
     members_with_quota = ac_service.get_members_with_quota()
     return templates.TemplateResponse('ac/log_activity.html', {"request": request,
                            "members":members_with_quota,
-                           "activity_types":ACTIVITY_TYPES,
+                           "activity_types":ac_service.get_activity_types_map(),
                            "current_period":current_period})
 
 
@@ -230,7 +230,7 @@ async def quick_log(request: Request):
 
     return templates.TemplateResponse('ac/ac_quick_log.html', {"request": request,
                          "members":log_data['members'],
-                         "activity_types":ACTIVITY_TYPES,
+                         "activity_types":ac_service.get_activity_types_map(),
                          "current_period":current_period,
                          "today":datetime.utcnow().strftime('%Y-%m-%d'),
                          "member_activities":log_data['member_activities'],
