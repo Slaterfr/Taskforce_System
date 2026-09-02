@@ -1,10 +1,15 @@
+from database.engine import db_session
 """Member management business logic."""
 
 from datetime import datetime
 
-from flask import current_app
+from config import settings
+import logging
 
-from database.models import db, Member, PromotionLog, RankMapping, ActivityLog
+logger = logging.getLogger(__name__)
+
+from sqlmodel import select
+from database.models import Member, PromotionLog, RankMapping, ActivityLog
 from utils.roblox_sync import add_member_to_roblox, remove_member_from_roblox, sync_member_to_roblox
 
 DEFAULT_RANKS = [
@@ -15,7 +20,7 @@ DEFAULT_RANKS = [
 
 def get_available_ranks():
     """Return active rank names from mappings, or the default rank list."""
-    rank_mappings = RankMapping.query.filter_by(is_active=True).order_by(
+    rank_mappings = db_session().query(RankMapping).filter_by(is_active=True).order_by(
         RankMapping.system_rank
     ).all()
     if rank_mappings:
@@ -25,7 +30,7 @@ def get_available_ranks():
 
 def get_member(member_id, *, active_only=True):
     """Fetch a member by ID."""
-    query = Member.query.filter_by(id=member_id)
+    query = db_session().query(Member).filter_by(id=member_id)
     if active_only:
         query = query.filter_by(is_active=True)
     return query.first()
@@ -33,12 +38,12 @@ def get_member(member_id, *, active_only=True):
 
 def find_by_discord_username(discord_username):
     """Find a member by Discord username (any active state)."""
-    return Member.query.filter_by(discord_username=discord_username).first()
+    return db_session().exec(select(Member).filter_by(discord_username=discord_username)).first()
 
 
 def search_members(search='', *, active_only=True, limit=None, rank_filter=None):
     """Search members by username or rank, with optional rank and limit filters."""
-    query = Member.query.filter_by(is_active=True) if active_only else Member.query
+    query = db_session().query(Member).filter_by(is_active=True) if active_only else db_session().query(Member)
     if search:
         pattern = f'%{search}%'
         query = query.filter(
@@ -57,7 +62,7 @@ def search_members(search='', *, active_only=True, limit=None, rank_filter=None)
 
 
 def _roblox_sync_enabled():
-    return current_app.config.get('ROBLOX_SYNC_ENABLED', False)
+    return getattr(settings, 'ROBLOX_SYNC_ENABLED', False)
 
 
 def create_member(discord_username, roblox_username=None, current_rank='Aspirant'):
@@ -93,8 +98,8 @@ def create_member(discord_username, roblox_username=None, current_rank='Aspirant
         join_date=datetime.utcnow(),
         last_updated=datetime.utcnow(),
     )
-    db.session.add(member)
-    db.session.commit()
+    db_session().add(member)
+    db_session().commit()
 
     roblox_sync_result = {'success': False, 'message': 'No Roblox username provided'}
     if _roblox_sync_enabled() and roblox_username:
@@ -131,13 +136,13 @@ def update_member_profile(member_id, *, discord_username=None, roblox_username=N
         member.current_rank = current_rank.strip()
 
     member.last_updated = datetime.utcnow()
-    db.session.commit()
+    db_session().commit()
 
     rank_changed = old_rank != member.current_rank
     roblox_sync_result = {'success': False, 'message': 'Roblox sync disabled'}
 
     if _roblox_sync_enabled() and rank_changed and member.roblox_id:
-        current_app.logger.info(
+        logger.info(
             f"Syncing {member.discord_username} rank change: {old_rank} -> {member.current_rank}"
         )
         roblox_sync_result = sync_member_to_roblox(member)
@@ -174,7 +179,7 @@ def deactivate_member(member_id):
     if _roblox_sync_enabled() and member.roblox_id:
         roblox_sync_result = remove_member_from_roblox(member)
 
-    db.session.commit()
+    db_session().commit()
 
     return {
         'success': True,
@@ -234,12 +239,12 @@ def promote_member(member_id, new_rank, *, reason='', promoted_by='Staff'):
         promoted_by=promoted_by,
         promotion_date=datetime.utcnow(),
     )
-    db.session.add(promotion)
-    db.session.commit()
+    db_session().add(promotion)
+    db_session().commit()
 
     roblox_sync_result = {'success': False, 'message': 'Roblox sync disabled'}
     if _roblox_sync_enabled() and member.roblox_id:
-        current_app.logger.info(
+        logger.info(
             f"Syncing {member.discord_username} promotion: {old_rank} -> {new_rank}"
         )
         roblox_sync_result = sync_member_to_roblox(member)
@@ -260,8 +265,8 @@ def promote_member(member_id, new_rank, *, reason='', promoted_by='Staff'):
 
 def get_dashboard_data():
     """Return dashboard statistics and recent activity logs."""
-    member_count = Member.query.filter_by(is_active=True).count()
-    recent_activities = ActivityLog.query.order_by(ActivityLog.log_date.desc()).limit(5).all()
+    member_count = len(db_session().exec(select(Member).filter_by(is_active=True)).all())
+    recent_activities = db_session().query(ActivityLog).order_by(ActivityLog.log_date.desc()).limit(5).all()
     return {
         'member_count': member_count,
         'recent_activities': recent_activities
@@ -273,8 +278,8 @@ def get_member_profile_details(member_id):
     member = get_member(member_id, active_only=False)
     if not member:
         return None
-    activities = ActivityLog.query.filter_by(member_id=member_id).order_by(ActivityLog.log_date.desc()).all()
-    promotions = PromotionLog.query.filter_by(member_id=member_id).order_by(PromotionLog.promotion_date.desc()).all()
+    activities = db_session().exec(select(ActivityLog).filter_by(member_id=member_id).order_by(ActivityLog.log_date.desc())).all()
+    promotions = db_session().exec(select(PromotionLog).filter_by(member_id=member_id).order_by(PromotionLog.promotion_date.desc())).all()
     return {
         'member': member,
         'activities': activities,
@@ -284,7 +289,7 @@ def get_member_profile_details(member_id):
 
 def get_all_active_members():
     """Return all active members ordered by Discord username."""
-    return Member.query.filter_by(is_active=True).order_by(Member.discord_username).all()
+    return db_session().exec(select(Member).filter_by(is_active=True).order_by(Member.discord_username)).all()
 
 
 def get_public_member_data(member_id):
@@ -293,7 +298,7 @@ def get_public_member_data(member_id):
     if not member:
         return None
     from database.ac_models import ActivityEntry
-    recent_activities = ActivityEntry.query.filter_by(member_id=member_id).order_by(
+    recent_activities = db_session().query(ActivityEntry).filter_by(member_id=member_id).order_by(
         ActivityEntry.activity_date.desc()
     ).limit(5).all()
     return {
@@ -304,7 +309,7 @@ def get_public_member_data(member_id):
 
 def get_all_rank_mappings():
     """Return all rank mappings ordered by system rank."""
-    return RankMapping.query.order_by(RankMapping.system_rank).all()
+    return db_session().query(RankMapping).order_by(RankMapping.system_rank).all()
 
 
 def add_or_update_rank_mapping(system_rank, roblox_role_id, roblox_role_name=None):
@@ -313,7 +318,7 @@ def add_or_update_rank_mapping(system_rank, roblox_role_id, roblox_role_name=Non
     if not system_rank or not roblox_role_id:
         return {'success': False, 'message': 'System rank and Roblox role ID are required'}
 
-    existing = RankMapping.query.filter_by(system_rank=system_rank).first()
+    existing = db_session().exec(select(RankMapping).filter_by(system_rank=system_rank)).first()
     if existing:
         existing.roblox_role_id = roblox_role_id
         existing.roblox_role_name = roblox_role_name
@@ -327,30 +332,30 @@ def add_or_update_rank_mapping(system_rank, roblox_role_id, roblox_role_name=Non
             roblox_role_name=roblox_role_name,
             last_updated=datetime.utcnow()
         )
-        db.session.add(mapping)
+        db_session().add(mapping)
         message = f'Added mapping for {system_rank}'
 
-    db.session.commit()
+    db_session().commit()
     return {'success': True, 'message': message}
 
 
 def delete_rank_mapping(mapping_id):
     """Delete a rank mapping by ID."""
-    mapping = RankMapping.query.get(mapping_id)
+    mapping = db_session().get(RankMapping, mapping_id)
     if mapping:
-        db.session.delete(mapping)
-        db.session.commit()
+        db_session().delete(mapping)
+        db_session().commit()
         return True
     return False
 
 
 def toggle_rank_mapping(mapping_id):
     """Toggle is_active on a rank mapping."""
-    mapping = RankMapping.query.get(mapping_id)
+    mapping = db_session().get(RankMapping, mapping_id)
     if mapping:
         mapping.is_active = not mapping.is_active
         mapping.last_updated = datetime.utcnow()
-        db.session.commit()
+        db_session().commit()
         return True
     return False
 

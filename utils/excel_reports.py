@@ -4,8 +4,11 @@ from datetime import datetime
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from database.engine import db_session
+from sqlmodel import select
 from database.models import Member
-from database.ac_models import ACPeriod, ActivityEntry, InactivityNotice, ACExemption, get_member_quota
+from database.ac_models import ACPeriod, ActivityEntry, InactivityNotice, ACExemption
+from database.ac_constants import get_member_quota
 from sqlalchemy import func
 
 def _gather_ac_rows(period: ACPeriod) -> List[List]:
@@ -28,7 +31,7 @@ def _gather_ac_rows(period: ACPeriod) -> List[List]:
         return rows
 
     # Query members with quota
-    members = Member.query.filter(Member.is_active == True).order_by(Member.current_rank, Member.discord_username).all()
+    members = db_session().exec(select(Member).filter(Member.is_active == True).order_by(Member.current_rank, Member.discord_username)).all()
     for m in members:
         quota = get_member_quota(m.current_rank) or 0
         if quota == 0:
@@ -36,7 +39,7 @@ def _gather_ac_rows(period: ACPeriod) -> List[List]:
             continue
 
         total_points = (
-            ActivityEntry.query.with_entities(
+            db_session().query(ActivityEntry).with_entities(
                 ActivityEntry.points
             )
             .filter(ActivityEntry.member_id == m.id, ActivityEntry.ac_period_id == period.id)
@@ -44,9 +47,9 @@ def _gather_ac_rows(period: ACPeriod) -> List[List]:
         )
         total_points = sum(p[0] for p in total_points) if total_points else 0.0
 
-        ia = InactivityNotice.query.filter_by(member_id=m.id, ac_period_id=period.id, protects_ac=True).first()
-        exemption = ACExemption.query.filter_by(member_id=m.id, ac_period_id=period.id).first()
-        recent_acts = ActivityEntry.query.filter_by(member_id=m.id, ac_period_id=period.id).order_by(ActivityEntry.activity_date.desc()).limit(5).all()
+        ia = db_session().exec(select(InactivityNotice).filter_by(member_id=m.id, ac_period_id=period.id, protects_ac=True)).first()
+        exemption = db_session().exec(select(ACExemption).filter_by(member_id=m.id, ac_period_id=period.id)).first()
+        recent_acts = db_session().exec(select(ActivityEntry).filter_by(member_id=m.id, ac_period_id=period.id).order_by(ActivityEntry.activity_date.desc()).limit(5)).all()
         recent_str = "; ".join(f"{a.activity_date.strftime('%Y-%m-%d')}:{a.activity_type}({a.points})" for a in recent_acts)
 
         pct = round(min(100.0, (total_points / quota) * 100.0), 2) if quota else 0.0
@@ -85,7 +88,7 @@ def _gather_ac_data_by_rank(period: ACPeriod) -> Dict[str, List]:
     
     # Query members with quota, grouped by rank (exclude Chief General only)
     excluded_ranks = {'chief general'}
-    members = Member.query.filter(
+    members = db_session().query(Member).filter(
         Member.is_active == True,
         func.lower(Member.current_rank).notin_([r.lower() for r in excluded_ranks])
     ).order_by(Member.current_rank, Member.discord_username).all()
@@ -100,17 +103,17 @@ def _gather_ac_data_by_rank(period: ACPeriod) -> Dict[str, List]:
             data_by_rank[rank] = []
         
         total_points = (
-            ActivityEntry.query.with_entities(ActivityEntry.points)
+            db_session().query(ActivityEntry).with_entities(ActivityEntry.points)
             .filter(ActivityEntry.member_id == m.id, ActivityEntry.ac_period_id == period.id)
             .all()
         )
         total_points = sum(p[0] for p in total_points) if total_points else 0.0
         
-        ia = InactivityNotice.query.filter_by(member_id=m.id, ac_period_id=period.id, protects_ac=True).first()
-        exemption = ACExemption.query.filter_by(member_id=m.id, ac_period_id=period.id).first()
+        ia = db_session().exec(select(InactivityNotice).filter_by(member_id=m.id, ac_period_id=period.id, protects_ac=True)).first()
+        exemption = db_session().exec(select(ACExemption).filter_by(member_id=m.id, ac_period_id=period.id)).first()
         
         # Get activity breakdown
-        activities = ActivityEntry.query.filter_by(member_id=m.id, ac_period_id=period.id).all()
+        activities = db_session().exec(select(ActivityEntry).filter_by(member_id=m.id, ac_period_id=period.id)).all()
         activity_counts = {}
         for a in activities:
             activity_counts[a.activity_type] = activity_counts.get(a.activity_type, 0) + 1
@@ -355,9 +358,9 @@ def generate_ac_workbook_bytes(period_id: int = None) -> (BytesIO, str):
     Returns (BytesIO, filename).
     """
     if period_id:
-        period = ACPeriod.query.get(period_id)
+        period = db_session().get(ACPeriod, period_id)
     else:
-        period = ACPeriod.query.filter_by(is_active=True).first()
+        period = db_session().exec(select(ACPeriod).filter_by(is_active=True)).first()
 
     period_name = period.period_name if period else f"AC_{datetime.utcnow().strftime('%Y%m%d')}"
     rows = _gather_ac_rows(period)
@@ -388,9 +391,9 @@ def merge_into_uploaded_workbook_bytes(uploaded_file_stream, period_id: int = No
         wb.remove(wb.active)
 
     if period_id:
-        period = ACPeriod.query.get(period_id)
+        period = db_session().get(ACPeriod, period_id)
     else:
-        period = ACPeriod.query.filter_by(is_active=True).first()
+        period = db_session().exec(select(ACPeriod).filter_by(is_active=True)).first()
 
     period_name = period.period_name if period else f"AC_{datetime.utcnow().strftime('%Y%m%d')}"
     rows = _gather_ac_rows(period)

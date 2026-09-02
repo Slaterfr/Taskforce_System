@@ -2,7 +2,10 @@
 
 import os
 import os.path as op
-from flask import current_app
+from config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 from api.roblox_api import RobloxAPI
 
 def update_roblox_cookie(cookie):
@@ -49,7 +52,7 @@ def update_roblox_cookie(cookie):
             f.writelines(new_lines)
 
         # Update active app config
-        current_app.config['ROBLOX_COOKIE'] = cookie
+        setattr(settings, 'ROBLOX_COOKIE', cookie)
 
         return {
             'success': True,

@@ -1,22 +1,26 @@
+from database.engine import db_session
 """
 API Routes for Mission Tracking System
 Missions posted in Discord with star difficulty.
 """
 
-from flask import Blueprint, jsonify, request
+from fastapi import APIRouter, Request, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from utils.templates import templates, url_for
+from utils.flash import flash
 from database.models import Mission
 from services import mission_service
 from utils.api_auth import api_key_required
 
-missions_bp = Blueprint('missions', __name__)
+router = APIRouter()
 
 
-@missions_bp.route('', methods=['POST'])
+@router.api_route('', methods=['POST'])
 @api_key_required
-def create_mission():
+async def create_mission(request: Request):
     """Create a new mission from Discord message."""
     try:
-        data = request.get_json()
+        data = (await request.json())
         result = mission_service.create_mission(data)
 
         if not result['success']:
@@ -24,47 +28,47 @@ def create_mission():
             payload = {'error': result['error']}
             if 'mission_id' in result:
                 payload['mission_id'] = result['mission_id']
-            return jsonify(payload), status_code
+            return JSONResponse(payload), status_code
 
-        return jsonify({
+        return JSONResponse(content={
             'success': True,
             'mission': result['mission'].to_dict(),
-        }), 201
+        }, status_code=201)
 
     except Exception as e:
         from database.models import db
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        db_session().rollback()
+        return JSONResponse({'error': str(e)}, status_code=500)
 
 
-@missions_bp.route('/by-message/<discord_message_id>', methods=['GET'])
+@router.api_route('/by-message/<discord_message_id>', methods=['GET'])
 @api_key_required
-def get_mission_by_message_id(discord_message_id):
+async def get_mission_by_message_id(request: Request, discord_message_id):
     """Get a mission by its Discord message ID"""
     try:
         mission = mission_service.get_mission_by_message_id(discord_message_id)
 
         if not mission:
-            return jsonify({'error': 'Mission not found'}), 404
+            return JSONResponse({'error': 'Mission not found'}, status_code=404)
 
-        return jsonify({
+        return JSONResponse(content={
             'success': True,
             'id': mission.id,
             'title': mission.title,
             'stars': mission.stars,
             'completions': [c.to_dict() for c in mission.completions],
-        }), 200
+        }, status_code=200)
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse({'error': str(e)}, status_code=500)
 
 
-@missions_bp.route('/completions', methods=['POST'])
+@router.api_route('/completions', methods=['POST'])
 @api_key_required
-def log_mission_completions():
+async def log_mission_completions(request: Request):
     """Log mission completions or removals."""
     try:
-        data = request.get_json()
+        data = (await request.json())
         result = mission_service.log_mission_completions(
             data.get('mission_id'),
             verified_by_username=data.get('verified_by_username'),
@@ -73,37 +77,37 @@ def log_mission_completions():
         )
 
         if not result['success']:
-            return jsonify({'error': result['error']}), 404
+            return JSONResponse({'error': result['error']}, status_code=404)
 
-        return jsonify({
+        return JSONResponse(content={
             'success': True,
             'stats': result['stats'],
-        }), 200
+        }, status_code=200)
 
     except Exception as e:
         from database.models import db
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        db_session().rollback()
+        return JSONResponse({'error': str(e)}, status_code=500)
 
 
-@missions_bp.route('/monthly-stats/leaderboard', methods=['GET'])
+@router.api_route('/monthly-stats/leaderboard', methods=['GET'])
 @api_key_required
-def get_monthly_leaderboard():
+async def get_monthly_leaderboard(request: Request):
     """Get current month's mission leaderboard sorted by stars"""
     try:
         cycle_month, stats = mission_service.get_monthly_leaderboard()
 
-        return jsonify({
+        return JSONResponse(content={
             'success': True,
             'cycle_month': cycle_month.strftime('%Y-%m'),
             'leaderboard': [s.to_dict() for s in stats],
-        }), 200
+        }, status_code=200)
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse({'error': str(e)}, status_code=500)
 
 
-@missions_bp.route('/health', methods=['GET'])
-def health_check():
+@router.api_route('/health', methods=['GET'])
+async def health_check(request: Request):
     """Simple health check endpoint"""
-    return jsonify({'status': 'ok', 'service': 'missions'}), 200
+    return JSONResponse({'status': 'ok', 'service': 'missions'}, status_code=200)

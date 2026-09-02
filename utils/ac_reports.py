@@ -6,6 +6,7 @@ Generates Excel reports and calculates title rewards automatically
 from datetime import datetime
 from typing import Dict, List, Optional
 import io
+from database.engine import db_session
 
 class ACReportGenerator:
     """Generates AC reports and calculates title rewards"""
@@ -159,7 +160,7 @@ class ACReportGenerator:
         # ALWAYS calculate HWTM for this period
         hwtm_winner_id, hwtm_count = get_hwtm_winner(self.ac_period)
         if hwtm_winner_id and hwtm_count >= 5:
-            winner = Member.query.get(hwtm_winner_id)
+            winner = db_session().get(Member, hwtm_winner_id)
             titles['Host with the Most'] = {
                 'winner': winner.discord_username if winner else 'Unknown',
                 'count': hwtm_count,
@@ -173,7 +174,7 @@ class ACReportGenerator:
             # Leggionary (most raid + patrol events accumulated, min 5)
             leg_winner_id, leg_count = get_leggionary_winner(self.ac_period)
             if leg_winner_id and leg_count >= 5:
-                winner = Member.query.get(leg_winner_id)
+                winner = db_session().get(Member, leg_winner_id)
                 titles['Legionnaire'] = {
                     'winner': winner.discord_username if winner else 'Unknown',
                     'count': leg_count,
@@ -184,7 +185,7 @@ class ACReportGenerator:
             # Scout (most tryouts accumulated, min 5)
             scout_winner_id, scout_count = get_scout_winner(self.ac_period)
             if scout_winner_id and scout_count >= 5:
-                winner = Member.query.get(scout_winner_id)
+                winner = db_session().get(Member, scout_winner_id)
                 titles['Scout'] = {
                     'winner': winner.discord_username if winner else 'Unknown',
                     'count': scout_count,
@@ -195,7 +196,7 @@ class ACReportGenerator:
             # Taskmaster (most missions accumulated, min 5)
             tm_winner_id, tm_count = get_taskmaster_winner(self.ac_period)
             if tm_winner_id and tm_count >= 5:
-                winner = Member.query.get(tm_winner_id)
+                winner = db_session().get(Member, tm_winner_id)
                 titles['Taskmaster'] = {
                     'winner': winner.discord_username if winner else 'Unknown',
                     'count': tm_count,

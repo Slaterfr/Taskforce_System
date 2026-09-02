@@ -18,3 +18,17 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs
+*.log
+
+# Zip files
+*.zip
+
+*.sh

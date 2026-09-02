@@ -6,8 +6,13 @@ Handles synchronization between the system and Roblox group
 import os
 from typing import Optional, Dict
 from datetime import datetime
-from flask import current_app
-from database.models import db, Member, RankMapping, PromotionLog
+from config import settings
+import logging
+
+logger = logging.getLogger(__name__)
+from database.engine import db_session
+from sqlmodel import select
+from database.models import Member, RankMapping, PromotionLog
 from api.roblox_api import RobloxAPI
 
 # Global flag to prevent sync loops
@@ -24,23 +29,23 @@ def set_syncing_flag(value: bool):
 
 def get_roblox_api() -> Optional[RobloxAPI]:
     """Get configured RobloxAPI instance"""
-    group_id = current_app.config.get('ROBLOX_GROUP_ID')
-    cookie = current_app.config.get('ROBLOX_COOKIE')
+    group_id = getattr(settings, 'ROBLOX_GROUP_ID', None)
+    cookie = getattr(settings, 'ROBLOX_COOKIE', None)
     
     # Debug logging
     if not group_id:
-        current_app.logger.warning("Roblox API not configured: ROBLOX_GROUP_ID is missing or empty")
+        logger.warning("Roblox API not configured: ROBLOX_GROUP_ID is missing or empty")
         return None
     
     # Check if group_id is just whitespace
     if isinstance(group_id, str) and not group_id.strip():
-        current_app.logger.warning("Roblox API not configured: ROBLOX_GROUP_ID is empty string")
+        logger.warning("Roblox API not configured: ROBLOX_GROUP_ID is empty string")
         return None
     
     try:
         group_id_int = int(group_id)
     except (ValueError, TypeError) as e:
-        current_app.logger.error(f"Roblox API not configured: ROBLOX_GROUP_ID '{group_id}' is not a valid integer: {e}")
+        logger.error(f"Roblox API not configured: ROBLOX_GROUP_ID '{group_id}' is not a valid integer: {e}")
         return None
     
     return RobloxAPI(group_id_int, cookie=cookie)
@@ -50,19 +55,19 @@ def get_role_id_for_rank(system_rank: str) -> Optional[int]:
     # Ensure system_rank is a string
     if not isinstance(system_rank, str):
         if isinstance(system_rank, dict):
-            current_app.logger.warning(f"get_role_id_for_rank received dict instead of string: {system_rank}")
+            logger.warning(f"get_role_id_for_rank received dict instead of string: {system_rank}")
             return None
         system_rank = str(system_rank) if system_rank else 'Aspirant'
     
     try:
-        mapping = RankMapping.query.filter_by(
+        mapping = db_session().query(RankMapping).filter_by(
             system_rank=system_rank,
             is_active=True
         ).first()
         
         return mapping.roblox_role_id if mapping else None
     except Exception as e:
-        current_app.logger.error(f"Error in get_role_id_for_rank with rank '{system_rank}': {e}")
+        logger.error(f"Error in get_role_id_for_rank with rank '{system_rank}': {e}")
         return None
 
 def sync_member_to_roblox(member: Member, skip_if_syncing: bool = True) -> Dict:
@@ -71,48 +76,48 @@ def sync_member_to_roblox(member: Member, skip_if_syncing: bool = True) -> Dict:
     Returns: {'success': bool, 'message': str}
     """
     if skip_if_syncing and _syncing_from_roblox:
-        current_app.logger.info(f"Skipping sync for {member.discord_username} - currently syncing from Roblox")
+        logger.info(f"Skipping sync for {member.discord_username} - currently syncing from Roblox")
         return {'success': True, 'message': 'Skipped - syncing from Roblox'}
     
-    current_app.logger.info(f"Attempting to sync {member.discord_username} (rank: {member.current_rank}) to Roblox")
+    logger.info(f"Attempting to sync {member.discord_username} (rank: {member.current_rank}) to Roblox")
     
     roblox_api = get_roblox_api()
     if not roblox_api:
         error_msg = 'Roblox API not configured'
-        current_app.logger.error(error_msg)
+        logger.error(error_msg)
         return {'success': False, 'message': error_msg}
     
     if not member.roblox_id:
         error_msg = f'Member {member.discord_username} has no Roblox ID'
-        current_app.logger.warning(error_msg)
+        logger.warning(error_msg)
         return {'success': False, 'message': error_msg}
     
     role_id = get_role_id_for_rank(member.current_rank)
     if not role_id:
         error_msg = f'No role mapping found for rank: {member.current_rank}'
-        current_app.logger.warning(error_msg)
+        logger.warning(error_msg)
         return {'success': False, 'message': error_msg}
     
     try:
         user_id = int(member.roblox_id)
-        current_app.logger.info(f"Updating Roblox user {user_id} to role {role_id} (rank: {member.current_rank})")
+        logger.info(f"Updating Roblox user {user_id} to role {role_id} (rank: {member.current_rank})")
         success, error_msg = roblox_api.update_member_role(user_id, role_id)
         
         if success:
             success_msg = f'Updated {member.discord_username} to {member.current_rank} in Roblox'
-            current_app.logger.info(success_msg)
+            logger.info(success_msg)
             return {'success': True, 'message': success_msg}
         else:
             error_msg_full = f'Failed to update role in Roblox: {error_msg}'
-            current_app.logger.error(f"Roblox sync failed for {member.discord_username}: {error_msg_full}")
+            logger.error(f"Roblox sync failed for {member.discord_username}: {error_msg_full}")
             return {'success': False, 'message': error_msg_full}
     except (ValueError, TypeError) as e:
         error_msg = f'Invalid Roblox ID: {member.roblox_id} ({str(e)})'
-        current_app.logger.error(error_msg)
+        logger.error(error_msg)
         return {'success': False, 'message': error_msg}
     except Exception as e:
         error_msg = f'Error updating role: {str(e)}'
-        current_app.logger.error(f"Unexpected error syncing {member.discord_username} to Roblox: {error_msg}", exc_info=True)
+        logger.error(f"Unexpected error syncing {member.discord_username} to Roblox: {error_msg}", exc_info=True)
         return {'success': False, 'message': error_msg}
 
 def add_member_to_roblox(member: Member, skip_if_syncing: bool = True) -> Dict:
@@ -125,8 +130,8 @@ def add_member_to_roblox(member: Member, skip_if_syncing: bool = True) -> Dict:
     
     roblox_api = get_roblox_api()
     if not roblox_api:
-        group_id = current_app.config.get('ROBLOX_GROUP_ID', 'Not set')
-        cookie_set = bool(current_app.config.get('ROBLOX_COOKIE'))
+        group_id = getattr(settings, 'ROBLOX_GROUP_ID', 'Not set')
+        cookie_set = bool(getattr(settings, 'ROBLOX_COOKIE', None))
         return {
             'success': False, 
             'message': f'Roblox API not configured. Group ID: {group_id}, Cookie set: {cookie_set}'
@@ -143,7 +148,7 @@ def add_member_to_roblox(member: Member, skip_if_syncing: bool = True) -> Dict:
     # Update member's roblox_id if missing
     if not member.roblox_id:
         member.roblox_id = str(user_id)
-        db.session.commit()
+        db_session().commit()
     
     role_id = get_role_id_for_rank(member.current_rank)
     if not role_id:
@@ -215,7 +220,7 @@ def sync_from_roblox():
         # Get rank mappings (reverse: roblox role name -> system rank)
         # Also use the RANK_MAPPING from roblox_api as fallback
         from api.roblox_api import RANK_MAPPING
-        rank_mappings = RankMapping.query.filter_by(is_active=True).all()
+        rank_mappings = db_session().exec(select(RankMapping).filter_by(is_active=True)).all()
         roblox_role_to_system_rank = {}
         for mapping in rank_mappings:
             if mapping.roblox_role_name:
@@ -254,13 +259,13 @@ def sync_from_roblox():
                 
                 # Find member by Roblox ID, Roblox Username, or Discord Username (fallback)
                 # We check these sequentially to prioritize ID match
-                member = Member.query.filter_by(roblox_id=str(roblox_member.user_id)).first()
+                member = db_session().exec(select(Member).filter_by(roblox_id=str(roblox_member.user_id))).first()
                 
                 if not member:
-                    member = Member.query.filter_by(roblox_username=roblox_member.username).first()
+                    member = db_session().exec(select(Member).filter_by(roblox_username=roblox_member.username)).first()
                 
                 if not member:
-                    member = Member.query.filter_by(discord_username=roblox_member.username).first()
+                    member = db_session().exec(select(Member).filter_by(discord_username=roblox_member.username)).first()
                 
                 system_rank = roblox_role_to_system_rank.get(role_name)
                 if not system_rank:
@@ -277,7 +282,7 @@ def sync_from_roblox():
                         # We found a member (likely by username), but they have a DIFFERENT Roblox ID.
                         # This implies a name collision (different person) or they changed accounts.
                         # We cannot safely sync this user without manual intervention.
-                        current_app.logger.warning(
+                        logger.warning(
                             f"Sync collision: Roblox user {roblox_member.username} ({roblox_member.user_id}) "
                             f"matches Member {member.discord_username} ({member.id}) but Roblox IDs differ "
                             f"({member.roblox_id} vs {roblox_member.user_id}). Skipping."
@@ -305,7 +310,7 @@ def sync_from_roblox():
                             reason="Automatic sync from Roblox group",
                             promoted_by="Roblox Sync Bot"
                         )
-                        db.session.add(promotion)
+                        db_session().add(promotion)
                         stats['rank_changes'] += 1
                     
                     # Update Roblox info
@@ -331,19 +336,19 @@ def sync_from_roblox():
                             join_date=datetime.utcnow(),
                             last_updated=datetime.utcnow()
                         )
-                        db.session.add(new_member)
+                        db_session().add(new_member)
                         stats['added'] += 1
                 
             except Exception as e:
                 import traceback
                 error_details = traceback.format_exc()
-                current_app.logger.error(f"Error syncing member {getattr(roblox_member, 'username', 'unknown')}: {e}\n{error_details}")
+                logger.error(f"Error syncing member {getattr(roblox_member, 'username', 'unknown')}: {e}\n{error_details}")
                 print(f"❌ Error syncing member: {e}")
                 stats['errors'] += 1
         
         # Check for members in system but not in Roblox (they may have left)
         roblox_user_ids = {str(m.user_id) for m in roblox_members}
-        system_members = Member.query.filter_by(is_active=True).all()
+        system_members = db_session().exec(select(Member).filter_by(is_active=True)).all()
         
         for member in system_members:
             if member.roblox_id and member.roblox_id not in roblox_user_ids:
@@ -353,7 +358,7 @@ def sync_from_roblox():
                     member.is_active = False
                     member.last_updated = datetime.utcnow()
         
-        db.session.commit()
+        db_session().commit()
         
         return {
             'success': True,
@@ -364,9 +369,9 @@ def sync_from_roblox():
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        current_app.logger.error(f"Error in sync_from_roblox: {e}\n{error_trace}")
+        logger.error(f"Error in sync_from_roblox: {e}\n{error_trace}")
         print(f"❌ Full error trace:\n{error_trace}")
-        db.session.rollback()
+        db_session().rollback()
         return {'success': False, 'message': f'Error: {str(e)}'}
     finally:
         set_syncing_flag(False)

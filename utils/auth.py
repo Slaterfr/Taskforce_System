@@ -5,9 +5,13 @@ HCT password required for AC management
 """
 
 from functools import wraps
-from flask import session, redirect, url_for, flash, current_app, request, jsonify
 import secrets
 import os
+from fastapi import Request
+from fastapi.responses import RedirectResponse, JSONResponse
+from config import settings
+from utils.flash import flash
+import inspect
 
 def check_password(password):
     """Securely check if provided password matches configured staff password"""
@@ -15,7 +19,7 @@ def check_password(password):
         return False
     return secrets.compare_digest(
         str(password),
-        str(current_app.config.get('STAFF_PASSWORD', ''))
+        "task2025"
     )
 
 def check_hct_password(password):
@@ -27,42 +31,68 @@ def check_hct_password(password):
         "vivaElGonk216"
     )
 
-def is_staff():
+def is_staff(request: Request = None):
     """Check if current session is authenticated as staff"""
-    return bool(session.get('is_staff', False))
+    if not request: return False
+    return bool(request.session.get('is_staff', False))
 
-def is_hct():
+def is_hct(request: Request = None):
     """Check if current session is authenticated as HCT"""
-    return bool(session.get('is_hct', False))
+    if not request: return False
+    return bool(request.session.get('is_hct', False))
 
 def staff_required(f):
     """Decorator to require staff authentication for a route"""
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Prefer session-based staff flag (set by `staff_login`) — fall back to request.user if present
-        if not is_staff() and not (getattr(request, 'user', None) and getattr(request.user, 'is_staff', False)):
-            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json
-            if is_ajax:
-                return jsonify({'error': 'authentication_required'}), 401
-            # Save the requested path so staff_login can redirect back after successful login
-            session['next_url'] = request.path
-            flash('You must be staff to access that page', 'warning')
-            return redirect(url_for('staff_login'))
-        return f(*args, **kwargs)
+    async def decorated_function(*args, **kwargs):
+        request = kwargs.get('request')
+        if not request:
+            for arg in args:
+                if isinstance(arg, Request):
+                    request = arg
+                    break
+        
+        if not request or not is_staff(request):
+            if request:
+                is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('accept', '')
+                if is_ajax:
+                    return JSONResponse({'error': 'authentication_required'}, status_code=401)
+                
+                request.session['next_url'] = request.url.path
+                flash(request, 'You must be staff to access that page', 'warning')
+            return RedirectResponse(url='/staff/login', status_code=303)
+            
+        if inspect.iscoroutinefunction(f):
+            return await f(*args, **kwargs)
+        else:
+            return f(*args, **kwargs)
+            
     return decorated_function
 
 def hct_required(f):
     """Decorator to require HCT authentication for a route"""
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # Check if user is HCT authenticated
-        if not is_hct():
-            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json
-            if is_ajax:
-                return redirect(url_for('auth.hct_login'))
-            # Save the requested path so hct_login can redirect back
-            session['next_url'] = request.path
-            flash('You must be High Command Team (HCT) to access that page', 'warning')
-            return redirect(url_for('auth.hct_login'))
-        return f(*args, **kwargs)
+    async def decorated_function(*args, **kwargs):
+        request = kwargs.get('request')
+        if not request:
+            for arg in args:
+                if isinstance(arg, Request):
+                    request = arg
+                    break
+                    
+        if not request or not is_hct(request):
+            if request:
+                is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('accept', '')
+                if is_ajax:
+                    return JSONResponse({'error': 'authentication_required'}, status_code=401)
+                    
+                request.session['next_url'] = request.url.path
+                flash(request, 'You must be High Command Team (HCT) to access that page', 'warning')
+            return RedirectResponse(url='/hct/login', status_code=303)
+            
+        if inspect.iscoroutinefunction(f):
+            return await f(*args, **kwargs)
+        else:
+            return f(*args, **kwargs)
+            
     return decorated_function

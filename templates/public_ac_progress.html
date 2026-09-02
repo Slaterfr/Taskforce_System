@@ -36,7 +36,7 @@
                     <tr>
                         <td>{{ progress.member.current_rank }}</td>
                         <td>
-                            <a href="{{ url_for('public.public_member', member_id=progress.member.id) }}"
+                            <a href="{{ url_for('public_member', member_id=progress.member.id) }}"
                                 class="text-decoration-none">
                                 {{ progress.member.discord_username }}
                             </a>

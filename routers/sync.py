@@ -1,44 +1,50 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, current_app
+import logging
+logger = logging.getLogger(__name__)
+from config import settings
+from fastapi import APIRouter, Request, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from utils.templates import templates, url_for
+from utils.flash import flash
 from services import member_service
 from utils.auth import staff_required
 from utils.roblox_sync import sync_from_roblox
 
-sync_bp = Blueprint('sync', __name__)
+router = APIRouter()
 
 
-@sync_bp.route('/roblox/rank_mappings', methods=['GET', 'POST'])
+@router.api_route('/roblox/rank_mappings', methods=['GET', 'POST'])
 @staff_required
-def manage_rank_mappings():
+async def manage_rank_mappings(request: Request):
     """Manage rank mappings between system ranks and Roblox role IDs"""
     if request.method == 'POST':
-        action = request.form.get('action')
+        action = (await request.form()).get('action')
         
         if action == 'add':
-            system_rank = request.form.get('system_rank', '').strip()
-            roblox_role_id = request.form.get('roblox_role_id', type=int)
-            roblox_role_name = request.form.get('roblox_role_name', '').strip() or None
+            system_rank = (await request.form()).get('system_rank', '').strip()
+            roblox_role_id = int((await request.form()).get('roblox_role_id')) if (await request.form()).get('roblox_role_id') else None
+            roblox_role_name = (await request.form()).get('roblox_role_name', '').strip() or None
             
             if not system_rank or not roblox_role_id:
-                flash('System rank and Roblox role ID are required', 'error')
-                return redirect(url_for('sync.manage_rank_mappings'))
+                flash(request, 'System rank and Roblox role ID are required', 'error')
+                return RedirectResponse(url_for(request, 'manage_rank_mappings'), status_code=303)
             
             result = member_service.add_or_update_rank_mapping(system_rank, roblox_role_id, roblox_role_name)
             if result['success']:
-                flash(result['message'], 'success')
+                flash(request, result['message'], 'success')
             else:
-                flash(result['message'], 'error')
+                flash(request, result['message'], 'error')
         
         elif action == 'delete':
-            mapping_id = request.form.get('mapping_id', type=int)
+            mapping_id = int((await request.form()).get('mapping_id')) if (await request.form()).get('mapping_id') else None
             if mapping_id:
                 if member_service.delete_rank_mapping(mapping_id):
-                    flash('Mapping deleted', 'success')
+                    flash(request, 'Mapping deleted', 'success')
         
         elif action == 'toggle':
-            mapping_id = request.form.get('mapping_id', type=int)
+            mapping_id = int((await request.form()).get('mapping_id')) if (await request.form()).get('mapping_id') else None
             if mapping_id:
                 if member_service.toggle_rank_mapping(mapping_id):
-                    flash('Mapping updated', 'success')
+                    flash(request, 'Mapping updated', 'success')
 
         elif action == 'auto_import':
             # Fetch all roles from Roblox and upsert them into rank_mapping
@@ -46,11 +52,11 @@ def manage_rank_mappings():
                 from utils.roblox_sync import get_roblox_api
                 roblox_api = get_roblox_api()
                 if not roblox_api:
-                    flash('Roblox API not configured — check ROBLOX_GROUP_ID and ROBLOX_COOKIE.', 'error')
+                    flash(request, 'Roblox API not configured — check ROBLOX_GROUP_ID and ROBLOX_COOKIE.', 'error')
                 else:
                     roles = roblox_api.get_group_roles()
                     if not roles:
-                        flash('No roles returned from Roblox. Is the group ID correct?', 'error')
+                        flash(request, 'No roles returned from Roblox. Is the group ID correct?', 'error')
                     else:
                         imported, skipped = 0, 0
                         for role in roles:
@@ -74,46 +80,46 @@ def manage_rank_mappings():
                             'success',
                         )
             except Exception as e:
-                current_app.logger.error(f'Auto-import error: {e}')
-                flash(f'Auto-import failed: {e}', 'error')
+                logger.error(f'Auto-import error: {e}')
+                flash(request, f'Auto-import failed: {e}', 'error')
 
-        return redirect(url_for('sync.manage_rank_mappings'))
+        return RedirectResponse(url_for(request, 'manage_rank_mappings'), status_code=303)
     
     # GET: show all mappings
     mappings = member_service.get_all_rank_mappings()
     
     # Get available roles from Roblox if configured
     roblox_roles = []
-    if current_app.config.get('ROBLOX_GROUP_ID'):
+    if getattr(settings, 'ROBLOX_GROUP_ID', None):
         try:
             from utils.roblox_sync import get_roblox_api
             roblox_api = get_roblox_api()
             if roblox_api:
                 roblox_roles = roblox_api.get_group_roles()
         except Exception as e:
-            current_app.logger.error(f"Error fetching Roblox roles: {e}")
+            logger.error(f"Error fetching Roblox roles: {e}")
     
     # Pass config values to template
     config_info = {
-        'ROBLOX_SYNC_ENABLED': current_app.config.get('ROBLOX_SYNC_ENABLED', False),
-        'ROBLOX_SYNC_INTERVAL': current_app.config.get('ROBLOX_SYNC_INTERVAL', 600),
-        'ROBLOX_GROUP_ID': current_app.config.get('ROBLOX_GROUP_ID', '')
+        'ROBLOX_SYNC_ENABLED': getattr(settings, 'ROBLOX_SYNC_ENABLED', False),
+        'ROBLOX_SYNC_INTERVAL': getattr(settings, 'ROBLOX_SYNC_INTERVAL', 600),
+        'ROBLOX_GROUP_ID': getattr(settings, 'ROBLOX_GROUP_ID', '')
     }
     
-    return render_template('roblox/rank_mappings.html', mappings=mappings, roblox_roles=roblox_roles, config=config_info)
+    return templates.TemplateResponse('roblox/rank_mappings.html', {"request": request, "mappings": mappings, "roblox_roles": roblox_roles, "config": config_info})
 
 
-@sync_bp.route('/roblox/sync_now', methods=['POST'])
+@router.api_route('/roblox/sync_now', methods=['POST'])
 @staff_required
-def sync_now():
+async def sync_now(request: Request):
     """Manually trigger a sync from Roblox"""
     try:
         result = sync_from_roblox()
         if result['success']:
-            flash(result['message'], 'success')
+            flash(request, result['message'], 'success')
         else:
-            flash(f"Sync failed: {result['message']}", 'error')
+            flash(request, f"Sync failed: {result['message']}", 'error')
     except Exception as e:
-        flash(f"Sync error: {str(e)}", 'error')
+        flash(request, f"Sync error: {str(e)}", 'error')
     
-    return redirect(request.referrer or url_for('members.dashboard'))
+    return RedirectResponse(request.referrer or url_for(request, 'dashboard'))

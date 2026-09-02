@@ -1,26 +1,31 @@
+from database.ac_constants import get_member_quota
+from database.engine import db_session
 """Activity Check (AC) business logic."""
 
 from datetime import date, datetime
 
 from sqlalchemy import func
 
-from database.models import db, Member, MonthlyStat
+from sqlmodel import select
+from database.models import Member, MonthlyStat
+from database.ac_constants import (
+    ACTIVITY_TYPES,
+    AC_QUOTAS,
+    get_activity_points,
+    
+    is_limited_activity,
+)
 from database.ac_models import (
     ACPeriod,
     ACExemption,
-    ACTIVITY_TYPES,
-    AC_QUOTAS,
     ActivityEntry,
     InactivityNotice,
     MonthlyActivityEntry,
-    get_activity_points,
     get_hwtm_winner,
     get_leggionary_winner,
-    get_member_quota,
     get_monthly_activity_counts,
     get_scout_winner,
     get_taskmaster_winner,
-    is_limited_activity,
 )
 
 
@@ -41,7 +46,7 @@ def _rank_sort_key(rank_str):
 
 def get_active_period():
     """Return the current active AC period, or None."""
-    return ACPeriod.query.filter_by(is_active=True).first()
+    return db_session().exec(select(ACPeriod).filter_by(is_active=True)).first()
 
 
 def members_with_quota_query():
@@ -52,7 +57,7 @@ def members_with_quota_query():
         for r, q in AC_QUOTAS.items()
         if q and q > 0 and r.lower() not in excluded
     ]
-    return Member.query.filter(
+    return db_session().query(Member).filter(
         Member.is_active == True,
         func.lower(Member.current_rank).in_(allowed),
     ).order_by(Member.discord_username)
@@ -65,10 +70,10 @@ def get_members_with_quota():
 
 def get_activity_stats(period):
     """Aggregate activity counts and points by type for a period."""
-    rows = db.session.query(
+    rows = db_session().query(
         ActivityEntry.activity_type,
-        db.func.count(ActivityEntry.id).label('count'),
-        db.func.sum(ActivityEntry.points).label('total_points'),
+        func.count(ActivityEntry.id).label('count'),
+        func.sum(ActivityEntry.points).label('total_points'),
     ).filter_by(ac_period_id=period.id).group_by(ActivityEntry.activity_type).all()
 
     return {
@@ -92,10 +97,10 @@ def build_member_progress(period):
         if not quota:
             continue
 
-        member_activities = db.session.query(
+        member_activities = db_session().query(
             ActivityEntry.activity_type,
-            db.func.count(ActivityEntry.id),
-            db.func.sum(ActivityEntry.points),
+            func.count(ActivityEntry.id),
+            func.sum(ActivityEntry.points),
         ).filter_by(
             member_id=member.id,
             ac_period_id=period.id,
@@ -108,12 +113,12 @@ def build_member_progress(period):
 
         total_points = sum(stat['points'] for stat in activity_summary.values())
 
-        ia_notice = InactivityNotice.query.filter_by(
+        ia_notice = db_session().query(InactivityNotice).filter_by(
             member_id=member.id,
             ac_period_id=period.id,
         ).first()
 
-        exemption = ACExemption.query.filter_by(
+        exemption = db_session().query(ACExemption).filter_by(
             member_id=member.id,
             ac_period_id=period.id,
         ).first()
@@ -158,9 +163,9 @@ def calculate_title_rewards(all_activities, period):
     """
     titles = {}
 
-    hwtm_winner_id, hwtm_count = get_hwtm_winner(period)
+    hwtm_winner_id, hwtm_count = get_hwtm_winner(period, db_session())
     if hwtm_winner_id and hwtm_count >= 5:
-        winner = Member.query.get(hwtm_winner_id)
+        winner = db_session().get(Member, hwtm_winner_id)
         titles['Host with the Most'] = {
             'winner': winner.discord_username if winner else 'Unknown',
             'count': hwtm_count,
@@ -169,7 +174,7 @@ def calculate_title_rewards(all_activities, period):
             'qualified': True,
         }
     else:
-        activity_counts = get_monthly_activity_counts(period)
+        activity_counts = get_monthly_activity_counts(period, db_session())
         if activity_counts:
             max_events = 0
             top_member_id = None
@@ -180,7 +185,7 @@ def calculate_title_rewards(all_activities, period):
                     top_member_id = member_id
 
             if max_events > 0:
-                winner = Member.query.get(top_member_id)
+                winner = db_session().get(Member, top_member_id)
                 titles['Host with the Most'] = {
                     'winner': (
                         f"{winner.discord_username if winner else 'Unknown'} "
@@ -200,7 +205,7 @@ def calculate_title_rewards(all_activities, period):
                 '5+ events hosted (Training + Raid + Patrol)', period_award=True
             )
 
-    leg_winner_id, leg_count = get_leggionary_winner(period)
+    leg_winner_id, leg_count = get_leggionary_winner(period, db_session())
     titles['Legionnaire'] = _monthly_title(
         period,
         leg_winner_id,
@@ -211,7 +216,7 @@ def calculate_title_rewards(all_activities, period):
         label='events',
     )
 
-    scout_winner_id, scout_count = get_scout_winner(period)
+    scout_winner_id, scout_count = get_scout_winner(period, db_session())
     titles['Scout'] = _monthly_title(
         period,
         scout_winner_id,
@@ -222,7 +227,7 @@ def calculate_title_rewards(all_activities, period):
         label='tryouts',
     )
 
-    taskmaster_winner_id, taskmaster_count = get_taskmaster_winner(period)
+    taskmaster_winner_id, taskmaster_count = get_taskmaster_winner(period, db_session())
     titles['Taskmaster'] = _monthly_title(
         period,
         taskmaster_winner_id,
@@ -251,7 +256,7 @@ def _empty_title(requirement, period_award=False, is_monthly=False):
 
 def _monthly_title(period, winner_id, winner_count, minimum, requirement, count_fn, label):
     if winner_id and winner_count >= minimum:
-        winner = Member.query.get(winner_id)
+        winner = db_session().get(Member, winner_id)
         return {
             'winner': winner.discord_username if winner else 'Unknown',
             'count': winner_count,
@@ -261,7 +266,7 @@ def _monthly_title(period, winner_id, winner_count, minimum, requirement, count_
             'qualified': True,
         }
 
-    activity_counts = get_monthly_activity_counts(period)
+    activity_counts = get_monthly_activity_counts(period, db_session())
     if activity_counts:
         max_count = 0
         top_member_id = None
@@ -272,7 +277,7 @@ def _monthly_title(period, winner_id, winner_count, minimum, requirement, count_
                 top_member_id = member_id
 
         if max_count > 0:
-            winner = Member.query.get(top_member_id)
+            winner = db_session().get(Member, top_member_id)
             return {
                 'winner': (
                     f"{winner.discord_username if winner else 'Unknown'} "
@@ -290,7 +295,7 @@ def _monthly_title(period, winner_id, winner_count, minimum, requirement, count_
 
 def _executor_title():
     month_start = date.today().replace(day=1)
-    monthly_stats = MonthlyStat.query.filter_by(cycle_month=month_start).all()
+    monthly_stats = db_session().exec(select(MonthlyStat).filter_by(cycle_month=month_start)).all()
 
     if not monthly_stats:
         return _empty_title('5+ mission stars (⭐⭐⭐+)', is_monthly=True)
@@ -309,7 +314,7 @@ def _executor_title():
     }
 
     if executor_member_id and max_stars >= 5:
-        executor_member = Member.query.get(executor_member_id)
+        executor_member = db_session().get(Member, executor_member_id)
         return {
             **base,
             'winner': executor_member.discord_username if executor_member else 'Unknown',
@@ -317,7 +322,7 @@ def _executor_title():
             'qualified': True,
         }
     if max_stars > 0:
-        executor_member = Member.query.get(executor_member_id)
+        executor_member = db_session().get(Member, executor_member_id)
         return {
             **base,
             'winner': (
@@ -353,7 +358,7 @@ def generate_title_discord_message(titles, period):
 
 def get_member_period_points(member_id, period_id):
     """Total AC points for a member in a period."""
-    entries = ActivityEntry.query.filter_by(
+    entries = db_session().query(ActivityEntry).filter_by(
         member_id=member_id,
         ac_period_id=period_id,
     ).all()
@@ -397,7 +402,7 @@ def log_activity(
             'valid_types': list(ACTIVITY_TYPES.keys()),
         }
 
-    member = Member.query.filter_by(id=member_id, is_active=True).first()
+    member = db_session().exec(select(Member).filter_by(id=member_id, is_active=True)).first()
     if not member:
         return {
             'success': False,
@@ -426,7 +431,7 @@ def log_activity(
     quantity = max(1, min(999, quantity))
 
     if is_limited_activity(activity_type):
-        existing = ActivityEntry.query.filter_by(
+        existing = db_session().query(ActivityEntry).filter_by(
             member_id=member_id,
             ac_period_id=current_period.id,
             activity_type=activity_type,
@@ -454,9 +459,12 @@ def log_activity(
         )
         for _ in range(quantity)
     ]
-    db.session.bulk_save_objects(activity_entries, return_defaults=True)
+    session = db_session()
+    for entry in activity_entries:
+        session.add(entry)
+    session.flush()
 
-    # Collect the generated IDs (bulk_save_objects populates them when return_defaults=True).
+    # Collect the generated IDs (flush populates them).
     created_ids = [e.id for e in activity_entries]
 
     # Bulk-insert the corresponding MonthlyActivityEntry rows.
@@ -472,9 +480,9 @@ def log_activity(
         )
         for _ in range(quantity)
     ]
-    db.session.bulk_save_objects(monthly_entries)
+    db_session().add_all(monthly_entries)
 
-    db.session.commit()
+    db_session().commit()
 
     quota_progress = get_quota_progress(member, current_period)
 
@@ -496,14 +504,14 @@ def toggle_ia_status(member_id, *, reason='Quick log IA', approved_by='HC Team',
     if not current_period:
         return {'success': False, 'error': 'no_active_period', 'message': 'No active AC period'}
 
-    ia_notice = InactivityNotice.query.filter_by(
+    ia_notice = db_session().query(InactivityNotice).filter_by(
         member_id=member_id,
         ac_period_id=current_period.id,
     ).first()
 
     if ia_notice:
-        db.session.delete(ia_notice)
-        db.session.commit()
+        db_session().delete(ia_notice)
+        db_session().commit()
         return {'success': True, 'is_ia': False, 'message': 'IA removed'}
 
     ia_notice = InactivityNotice(
@@ -515,8 +523,8 @@ def toggle_ia_status(member_id, *, reason='Quick log IA', approved_by='HC Team',
         approved_by=approved_by,
         protects_ac=True,
     )
-    db.session.add(ia_notice)
-    db.session.commit()
+    db_session().add(ia_notice)
+    db_session().commit()
     return {'success': True, 'is_ia': True, 'message': 'IA set'}
 
 
@@ -526,14 +534,14 @@ def toggle_exempt_status(member_id, *, reason='Quick log exemption', approved_by
     if not current_period:
         return {'success': False, 'error': 'no_active_period', 'message': 'No active AC period'}
 
-    exemption = ACExemption.query.filter_by(
+    exemption = db_session().query(ACExemption).filter_by(
         member_id=member_id,
         ac_period_id=current_period.id,
     ).first()
 
     if exemption:
-        db.session.delete(exemption)
-        db.session.commit()
+        db_session().delete(exemption)
+        db_session().commit()
         return {'success': True, 'is_exempt': False, 'message': 'Exemption removed'}
 
     exemption = ACExemption(
@@ -542,14 +550,14 @@ def toggle_exempt_status(member_id, *, reason='Quick log exemption', approved_by
         reason=reason,
         approved_by=approved_by,
     )
-    db.session.add(exemption)
-    db.session.commit()
+    db_session().add(exemption)
+    db_session().commit()
     return {'success': True, 'is_exempt': True, 'message': 'Exemption set'}
 
 
 def delete_activity_entry(activity_id):
     """Delete an activity entry. Returns metadata needed for API responses."""
-    activity = ActivityEntry.query.filter_by(id=activity_id).first()
+    activity = db_session().exec(select(ActivityEntry).filter_by(id=activity_id)).first()
     if not activity:
         return {
             'success': False,
@@ -557,15 +565,15 @@ def delete_activity_entry(activity_id):
             'message': f'Activity with ID {activity_id} not found',
         }
 
-    member = Member.query.get(activity.member_id)
+    member = db_session().get(Member, activity.member_id)
     activity_type = activity.activity_type
     points = activity.points
     ac_period_id = activity.ac_period_id
 
-    db.session.delete(activity)
-    db.session.commit()
+    db_session().delete(activity)
+    db_session().commit()
 
-    current_period = ACPeriod.query.get(ac_period_id)
+    current_period = db_session().get(ACPeriod, ac_period_id)
     if current_period and member:
         quota_progress = get_quota_progress(member, current_period)
     else:
@@ -584,45 +592,45 @@ def delete_activity_entry(activity_id):
 
 def create_period(period_name, start_date, end_date):
     """Deactivate any current period and create a new AC period."""
-    ACPeriod.query.filter_by(is_active=True).update({'is_active': False})
+    db_session().query(ACPeriod).filter_by(is_active=True).update({'is_active': False})
     new_period = ACPeriod(
         period_name=period_name,
         start_date=start_date,
         end_date=end_date,
         is_active=True
     )
-    db.session.add(new_period)
-    db.session.commit()
+    db_session().add(new_period)
+    db_session().commit()
     return new_period
 
 
 def update_period_name(period_id, period_name):
     """Update the name of an AC period."""
-    period = ACPeriod.query.get(period_id)
+    period = db_session().get(ACPeriod, period_id)
     if period:
         period.period_name = period_name
-        db.session.commit()
+        db_session().commit()
         return True
     return False
 
 
 def clear_all_activities(period_id):
     """Delete all activity entries for a period."""
-    deleted_count = ActivityEntry.query.filter_by(ac_period_id=period_id).delete()
-    db.session.commit()
+    deleted_count = db_session().query(ActivityEntry).filter_by(ac_period_id=period_id).delete()
+    db_session().commit()
     return deleted_count
 
 
 def clear_titles(period_id):
     """Delete all title tracking data (monthly activity entries) for a period."""
-    deleted_count = MonthlyActivityEntry.query.filter_by(ac_period_id=period_id).delete()
-    db.session.commit()
+    deleted_count = db_session().query(MonthlyActivityEntry).filter_by(ac_period_id=period_id).delete()
+    db_session().commit()
     return deleted_count
 
 
 def get_period_activities(period_id):
     """Get all activity entries for a period."""
-    return ActivityEntry.query.filter_by(ac_period_id=period_id).all()
+    return db_session().exec(select(ActivityEntry).filter_by(ac_period_id=period_id)).all()
 
 
 def get_quick_log_data(period_id):
@@ -637,28 +645,28 @@ def get_quick_log_data(period_id):
     member_exempt_status = {}
 
     for member in members_with_quota:
-        recent = ActivityEntry.query.filter_by(
+        recent = db_session().query(ActivityEntry).filter_by(
             member_id=member.id,
             ac_period_id=period_id
         ).order_by(ActivityEntry.activity_date.desc()).limit(3).all()
         member_activities[member.id] = recent
 
-        counts = db.session.query(
+        counts = db_session().query(
             ActivityEntry.activity_type,
-            db.func.count(ActivityEntry.id)
+            func.count(ActivityEntry.id)
         ).filter_by(
             member_id=member.id,
             ac_period_id=period_id
         ).group_by(ActivityEntry.activity_type).all()
         member_activity_counts[member.id] = dict(counts)
 
-        ia_notice = InactivityNotice.query.filter_by(
+        ia_notice = db_session().query(InactivityNotice).filter_by(
             member_id=member.id,
             ac_period_id=period_id
         ).first()
         member_ia_status[member.id] = bool(ia_notice)
 
-        exemption = ACExemption.query.filter_by(
+        exemption = db_session().query(ACExemption).filter_by(
             member_id=member.id,
             ac_period_id=period_id
         ).first()
@@ -675,11 +683,11 @@ def get_quick_log_data(period_id):
 
 def get_member_ac_detail(member_id, period_id):
     """Fetch details and aggregates of activities for a member in a period."""
-    member = Member.query.get(member_id)
+    member = db_session().get(Member, member_id)
     if not member:
         return None
 
-    activities = ActivityEntry.query.filter_by(
+    activities = db_session().query(ActivityEntry).filter_by(
         member_id=member_id,
         ac_period_id=period_id
     ).order_by(ActivityEntry.activity_date.desc()).all()
@@ -721,11 +729,11 @@ def get_member_ac_detail(member_id, period_id):
 
 def clear_member_activities(member_id, period_id=None):
     """Clear all activity entries for a member, optionally restricted to a period."""
-    query = ActivityEntry.query.filter_by(member_id=member_id)
+    query = db_session().query(ActivityEntry).filter_by(member_id=member_id)
     if period_id:
         query = query.filter_by(ac_period_id=period_id)
     deleted_count = query.delete(synchronize_session=False)
-    db.session.commit()
+    db_session().commit()
     return deleted_count
 
 
@@ -737,7 +745,7 @@ def get_member_activities(member_id, limit=500):
     remove.  Callers that only need a short preview should pass a smaller limit.
     """
     return (
-        ActivityEntry.query
+        db_session().query(ActivityEntry)
         .filter_by(member_id=member_id)
         .order_by(ActivityEntry.activity_date.desc())
         .limit(limit)
@@ -757,7 +765,7 @@ def count_activities_by_type(member_id, activity_type=None, period_id=None):
         int if activity_type is specified, else dict mapping type → count.
     """
     query = (
-        db.session.query(
+        db_session().query(
             ActivityEntry.activity_type,
             func.count(ActivityEntry.id).label('cnt'),
         )
@@ -790,7 +798,7 @@ def delete_activities_by_type(member_id, activity_type, quantity=1, period_id=No
         dict with ``success``, ``deleted`` count, ``member``, and
         ``quota_progress`` (if a current period exists).
     """
-    member = Member.query.filter_by(id=member_id, is_active=True).first()
+    member = db_session().exec(select(Member).filter_by(id=member_id, is_active=True)).first()
     if not member:
         return {
             'success': False,
@@ -800,7 +808,7 @@ def delete_activities_by_type(member_id, activity_type, quantity=1, period_id=No
 
     # Fetch the target rows ordered newest-first so we delete the most recent.
     target_query = (
-        ActivityEntry.query
+        db_session().query(ActivityEntry)
         .filter(
             ActivityEntry.member_id == member_id,
             ActivityEntry.activity_type == activity_type,
@@ -841,8 +849,8 @@ def delete_activities_by_type(member_id, activity_type, quantity=1, period_id=No
     deleted_count = len(entries_to_delete)
 
     for entry in entries_to_delete:
-        db.session.delete(entry)
-    db.session.commit()
+        db_session().delete(entry)
+    db_session().commit()
 
     # Compute updated quota progress.
     current_period = get_active_period()

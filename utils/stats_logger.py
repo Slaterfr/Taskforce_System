@@ -1,6 +1,11 @@
+from database.engine import db_session
+from sqlmodel import select
 from datetime import datetime, timedelta
-from database.models import db, Member, MemberStats
-from flask import current_app
+from database.models import Member, MemberStats
+from config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 def capture_member_stats():
     """
@@ -9,7 +14,7 @@ def capture_member_stats():
     """
     try:
         # Get all active members
-        members = Member.query.filter_by(is_active=True).all()
+        members = db_session().exec(select(Member).filter_by(is_active=True)).all()
         total_members = len(members)
         
         # Calculate rank distribution
@@ -25,15 +30,15 @@ def capture_member_stats():
             rank_counts=rank_counts
         )
         
-        db.session.add(stats)
-        db.session.commit()
+        db_session().add(stats)
+        db_session().commit()
         
-        current_app.logger.info(f"✅ Captured member stats: {total_members} members")
+        logger.info(f"✅ Captured member stats: {total_members} members")
         return True
         
     except Exception as e:
-        current_app.logger.error(f"❌ Error capturing member stats: {e}")
-        db.session.rollback()
+        logger.error(f"❌ Error capturing member stats: {e}")
+        db_session().rollback()
         return False
 
 def get_stats_history(days=30):
@@ -45,7 +50,7 @@ def get_stats_history(days=30):
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         
         # Get stats ordered by date
-        history = MemberStats.query.filter(
+        history = db_session().query(MemberStats).filter(
             MemberStats.timestamp >= cutoff_date
         ).order_by(MemberStats.timestamp.asc()).all()
         
@@ -62,7 +67,7 @@ def get_stats_history(days=30):
             'latest_ranks': latest_ranks
         }
     except Exception as e:
-        current_app.logger.error(f"❌ Error retrieving stats history: {e}")
+        logger.error(f"❌ Error retrieving stats history: {e}")
         return {
             'dates': [],
             'totals': [],

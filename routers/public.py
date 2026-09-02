@@ -1,41 +1,44 @@
-from flask import Blueprint, render_template, request
-from database.ac_models import ACTIVITY_TYPES
+from fastapi import APIRouter, Request, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from utils.templates import templates, url_for
+from utils.flash import flash
+from database.ac_constants import ACTIVITY_TYPES
 from services import ac_service, member_service
 
-public_bp = Blueprint('public', __name__)
+router = APIRouter()
 
 
-@public_bp.route('/')
-def public_roster():
-    search = request.args.get('search', '')
+@router.get('/')
+async def public_roster(request: Request):
+    search = request.query_params.get('search', '')
     members = member_service.search_members(search)
-    return render_template('public_roster.html', members=members, search=search)
+    return templates.TemplateResponse('public_roster.html', {"request": request, "members": members, "search": search})
 
 
-@public_bp.route('/public/member/<int:member_id>')
-def public_member(member_id):
+@router.get('/public/member/{member_id}')
+async def public_member(request: Request, member_id):
     """Public read-only member view (limited data)"""
     data = member_service.get_public_member_data(member_id)
     if not data:
-        from flask import abort
-        abort(404)
-    return render_template('public_member.html',
-                           member=data['member'],
-                           recent_activities=data['recent_activities'])
+        
+        raise HTTPException(status_code=404, detail='Not Found')
+    return templates.TemplateResponse('public_member.html', {"request": request,
+                           "member":data['member'],
+                           "recent_activities":data['recent_activities']})
 
 
-@public_bp.route('/ac_progress')
-def public_ac_progress():
+@router.get('/ac_progress')
+async def public_ac_progress(request: Request):
     current_period = ac_service.get_active_period()
     if not current_period:
-        return render_template('public_ac_progress.html',
-                             current_period=None,
-                             member_progress=[],
-                             activity_types=ACTIVITY_TYPES)
+        return templates.TemplateResponse('public_ac_progress.html', {"request": request,
+                             "current_period":None,
+                             "member_progress":[],
+                             "activity_types":ACTIVITY_TYPES})
 
     member_progress = ac_service.build_member_progress(current_period)
 
-    return render_template('public_ac_progress.html',
-                         current_period=current_period,
-                         member_progress=member_progress,
-                         activity_types=ACTIVITY_TYPES)
+    return templates.TemplateResponse('public_ac_progress.html', {"request": request,
+                         "current_period":current_period,
+                         "member_progress":member_progress,
+                         "activity_types":ACTIVITY_TYPES})

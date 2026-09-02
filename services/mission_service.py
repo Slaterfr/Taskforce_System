@@ -1,10 +1,15 @@
+from database.engine import db_session
 """Mission tracking business logic."""
 
 from datetime import datetime
 
-from flask import current_app
+from config import settings
+import logging
 
-from database.models import db, Member, Mission, MissionCompletion, MonthlyStat
+logger = logging.getLogger(__name__)
+
+from sqlmodel import select
+from database.models import Member, Mission, MissionCompletion, MonthlyStat
 
 
 def create_mission(data):
@@ -20,7 +25,7 @@ def create_mission(data):
     if not data.get('stars'):
         return {'success': False, 'error': 'stars required'}
 
-    existing = Mission.query.filter_by(
+    existing = db_session().query(Mission).filter_by(
         discord_message_id=data['discord_message_id']
     ).first()
     if existing:
@@ -33,7 +38,7 @@ def create_mission(data):
 
     creator_id = None
     if data.get('created_by_username'):
-        creator = Member.query.filter_by(
+        creator = db_session().query(Member).filter_by(
             discord_username=data['created_by_username']
         ).first()
         if creator:
@@ -60,15 +65,15 @@ def create_mission(data):
         cycle_month=datetime.utcnow().date().replace(day=1),
     )
 
-    db.session.add(mission)
-    db.session.commit()
+    db_session().add(mission)
+    db_session().commit()
 
     return {'success': True, 'mission': mission}
 
 
 def get_mission_by_message_id(discord_message_id):
     """Return a mission by Discord message ID, or None."""
-    return Mission.query.filter_by(discord_message_id=discord_message_id).first()
+    return db_session().exec(select(Mission).filter_by(discord_message_id=discord_message_id)).first()
 
 
 def log_mission_completions(
@@ -86,13 +91,13 @@ def log_mission_completions(
     completers = completers or []
     deleted_completers = deleted_completers or []
 
-    mission = Mission.query.get(mission_id)
+    mission = db_session().get(Mission, mission_id)
     if not mission:
         return {'success': False, 'error': 'Mission not found'}
 
     verified_by = None
     if verified_by_username:
-        verified_by = Member.query.filter_by(
+        verified_by = db_session().query(Member).filter_by(
             discord_username=verified_by_username
         ).first()
 
@@ -101,11 +106,11 @@ def log_mission_completions(
 
     for completer in completers:
         member_username = completer.get('member_username') or completer.get('discord_username')
-        member = Member.query.filter_by(discord_username=member_username).first()
+        member = db_session().exec(select(Member).filter_by(discord_username=member_username)).first()
         if not member:
             continue
 
-        existing = MissionCompletion.query.filter_by(
+        existing = db_session().query(MissionCompletion).filter_by(
             mission_id=mission_id,
             member_id=member.id,
         ).first()
@@ -116,28 +121,28 @@ def log_mission_completions(
                 member_id=member.id,
                 logged_by_id=verified_by.id if verified_by else None,
             )
-            db.session.add(completion)
+            db_session().add(completion)
             stats_added += 1
             update_monthly_stats(member.id, mission.stars, 1)
 
     for deleted_member_username in deleted_completers:
-        member = Member.query.filter_by(
+        member = db_session().query(Member).filter_by(
             discord_username=deleted_member_username
         ).first()
         if not member:
             continue
 
-        completion = MissionCompletion.query.filter_by(
+        completion = db_session().query(MissionCompletion).filter_by(
             mission_id=mission_id,
             member_id=member.id,
         ).first()
 
         if completion:
-            db.session.delete(completion)
+            db_session().delete(completion)
             stats_deleted += 1
             update_monthly_stats(member.id, -mission.stars, -1)
 
-    db.session.commit()
+    db_session().commit()
 
     return {
         'success': True,
@@ -152,7 +157,7 @@ def update_monthly_stats(member_id, stars_delta, missions_delta):
     """Update or create monthly stats for a member."""
     cycle_month = datetime.utcnow().date().replace(day=1)
 
-    stat = MonthlyStat.query.filter_by(
+    stat = db_session().query(MonthlyStat).filter_by(
         member_id=member_id,
         cycle_month=cycle_month,
     ).first()
@@ -164,19 +169,19 @@ def update_monthly_stats(member_id, stars_delta, missions_delta):
             total_stars=max(0, stars_delta),
             missions_completed=max(0, missions_delta),
         )
-        db.session.add(stat)
+        db_session().add(stat)
     else:
         stat.total_stars = max(0, stat.total_stars + stars_delta)
         stat.missions_completed = max(0, stat.missions_completed + missions_delta)
         stat.updated_at = datetime.utcnow()
 
-    db.session.flush()
+    db_session().flush()
 
 
 def get_monthly_leaderboard():
     """Return current month's mission stats ordered by stars."""
     cycle_month = datetime.utcnow().date().replace(day=1)
-    stats = MonthlyStat.query.filter_by(cycle_month=cycle_month).order_by(
+    stats = db_session().query(MonthlyStat).filter_by(cycle_month=cycle_month).order_by(
         MonthlyStat.total_stars.desc(),
         MonthlyStat.missions_completed.desc(),
     ).all()

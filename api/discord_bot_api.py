@@ -3,15 +3,32 @@ Discord Bot API Module
 Provides REST API endpoints for Discord bot integration with TF_System
 """
 
-from flask import Blueprint, request, jsonify, current_app
-from database.models import db
+from aiohttp import request
+from fastapi import APIRouter, Request, Depends
+from fastapi.responses import JSONResponse
+import logging
+_logger = logging.getLogger(__name__)
+
 from services import ac_service, member_service
-from utils.api_auth import api_key_required, log_api_access
+from utils.api_auth import verify_api_key, log_api_access
+from config import settings
 from datetime import datetime
 import requests
 
 # Create Blueprint
-api_bp = Blueprint('discord_bot_api', __name__)
+router = APIRouter()
+
+async def _safe_get_json(request):
+    try:
+        data = await request.json()
+        if isinstance(data, list):
+            return data[0] if data else {}
+        if isinstance(data, dict):
+            return data
+        return {}
+    except Exception:
+        return {}
+
 
 # Discord webhook configuration
 DISCORD_WEBHOOK_URL = None  # Will be set from config
@@ -20,10 +37,10 @@ NOTIFICATION_CHANNEL_ID = "1446175728025735393"
 
 def send_discord_notification(message: str, title: str = "TF System Notification"):
     """Send notification to Discord channel via webhook"""
-    webhook_url = current_app.config.get('DISCORD_NOTIFICATION_WEBHOOK_URL')
+    webhook_url = settings.DISCORD_NOTIFICATION_WEBHOOK_URL
     
     if not webhook_url:
-        current_app.logger.warning("Discord webhook not configured, skipping notification")
+        _logger.warning("Discord webhook not configured, skipping notification")
         return False
     
     try:
@@ -43,7 +60,7 @@ def send_discord_notification(message: str, title: str = "TF System Notification
         response.raise_for_status()
         return True
     except Exception as e:
-        current_app.logger.error(f"Failed to send Discord notification: {e}")
+        _logger.error(f"Failed to send Discord notification: {e}")
         return False
 
 
@@ -51,9 +68,8 @@ def send_discord_notification(message: str, title: str = "TF System Notification
 # SYSTEM STATUS
 # ============================================================================
 
-@api_bp.route('/status', methods=['GET'])
-@api_key_required
-def get_status():
+@router.get('/status', dependencies=[Depends(verify_api_key)])
+async def get_status(request: Request,):
     """
     Get API and system status
     
@@ -66,12 +82,12 @@ def get_status():
         member_count = dashboard.get('member_count')
         db_status = "connected"
     except Exception as e:
-        current_app.logger.error(f"Database check failed: {e}")
+        _logger.error(f"Database check failed: {e}")
         db_status = "error"
         member_count = None
     
     # Check Roblox sync status
-    roblox_sync = current_app.config.get('ROBLOX_SYNC_ENABLED', False)
+    roblox_sync = settings.ROBLOX_SYNC_ENABLED
     
     status_info = {
         'success': True,
@@ -83,41 +99,39 @@ def get_status():
         'total_members': member_count
     }
     
-    log_api_access('/status', 'GET', success=True, response_code=200)
+    log_api_access(request, '/status', 'GET', success=True, response_code=200)
     
-    return jsonify(status_info), 200
+    return JSONResponse(status_info, status_code=200)
 
 
 # ============================================================================
 # AUTHENTICATION
 # ============================================================================
 
-@api_bp.route('/auth/verify', methods=['POST'])
-@api_key_required
-def verify_auth():
+@router.post('/auth/verify', dependencies=[Depends(verify_api_key)])
+async def verify_auth(request: Request):
     """
     Verify API authentication
     
     Returns:
         200: Authentication successful
     """
-    log_api_access('/auth/verify', 'POST', success=True, response_code=200)
+    log_api_access(request, '/auth/verify', 'POST', success=True, response_code=200)
     
-    return jsonify({
+    return JSONResponse({
         'success': True,
         'message': 'API key valid',
         'authenticated': True,
         'timestamp': datetime.utcnow().isoformat()
-    }), 200
+    }, status_code=200)
 
 
 # ============================================================================
 # MEMBER MANAGEMENT
 # ============================================================================
 
-@api_bp.route('/members', methods=['GET'])
-@api_key_required
-def get_members():
+@router.get('/members', dependencies=[Depends(verify_api_key)])
+async def get_members(request: Request):
     """
     Get list of all active members
     
@@ -130,9 +144,9 @@ def get_members():
         200: List of members
     """
     try:
-        search = request.args.get('search', '').strip()
-        rank_filter = request.args.get('rank', '').strip() or None
-        limit = min(int(request.args.get('limit', 100)), 500)  # Max 500
+        search = request.query_params.get('search', '').strip()
+        rank_filter = request.query_params.get('rank', '').strip() or None
+        limit = min(int(request.query_params.get('limit', 100)), 500)  # Max 500
 
         members = member_service.search_members(
             search, rank_filter=rank_filter, limit=limit
@@ -151,27 +165,81 @@ def get_members():
             for m in members
         ]
         
-        log_api_access('/members', 'GET', success=True, response_code=200)
+        log_api_access(request, '/members', 'GET', success=True, response_code=200)
         
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'count': len(members_data),
             'members': members_data
-        }), 200
+        }, status_code=200)
         
     except Exception as e:
-        current_app.logger.error(f"Error getting members: {e}", exc_info=True)
-        log_api_access('/members', 'GET', success=False, response_code=500)
-        return jsonify({
+        _logger.error(f"Error getting members: {e}", exc_info=True)
+        log_api_access(request, '/members', 'GET', success=False, response_code=500)
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error retrieving members: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
-@api_bp.route('/members/<int:member_id>', methods=['GET'])
-@api_key_required
-def get_member(member_id):
+@router.get('/members/search', dependencies=[Depends(verify_api_key)])
+async def search_members(request: Request):
+    """
+    Search for members by name
+    
+    Query Parameters:
+        q (str): Search query (required)
+        field (str): Field to search (discord_username, roblox_username, both)
+    
+    Returns:
+        200: Search results
+    """
+    try:
+        query_str = request.query_params.get('q', '').strip()
+        field = request.query_params.get('field', 'both').lower()
+        
+        if not query_str:
+            return JSONResponse({
+                'success': False,
+                'error': 'missing_query',
+                'message': 'Search query (q) is required'
+            }, status_code=400)
+        
+        # search_members covers discord_username, roblox_username, and rank
+        members = member_service.search_members(query_str, limit=20)
+
+        matches = [
+            {
+                'id': m.id,
+                'discord_username': m.discord_username,
+                'roblox_username': m.roblox_username,
+                'current_rank': m.current_rank
+            }
+            for m in members
+        ]
+        
+        log_api_access(request, '/members/search', 'GET', success=True, response_code=200)
+        
+        return JSONResponse({
+            'success': True,
+            'query': query_str,
+            'matches': matches,
+            'count': len(matches)
+        }, status_code=200)
+        
+    except Exception as e:
+        _logger.error(f"Error searching members: {e}", exc_info=True)
+        log_api_access(request, '/members/search', 'GET', success=False, response_code=500)
+        return JSONResponse({
+            'success': False,
+            'error': 'server_error',
+            'message': f'Error searching members: {str(e)}'
+        }, status_code=500)
+
+
+@router.get('/members/{member_id}', dependencies=[Depends(verify_api_key)])
+async def get_member(request: Request, member_id: int):
     """
     Get detailed information about a specific member
     
@@ -186,12 +254,12 @@ def get_member(member_id):
         member = member_service.get_member(member_id, active_only=True)
 
         if not member:
-            log_api_access(f'/members/{member_id}', 'GET', success=False, response_code=404)
-            return jsonify({
+            log_api_access(request, f'/members/{member_id}', 'GET', success=False, response_code=404)
+            return JSONResponse({
                 'success': False,
                 'error': 'member_not_found',
                 'message': f'Member with ID {member_id} not found'
-            }), 404
+            }, status_code=404)
 
         profile = member_service.get_member_profile_details(member_id)
         recent_activities = ac_service.get_member_activities(member_id, limit=10)
@@ -226,82 +294,35 @@ def get_member(member_id):
             ]
         }
         
-        log_api_access(f'/members/{member_id}', 'GET', success=True, response_code=200)
+        log_api_access(request, f'/members/{member_id}', 'GET', success=True, response_code=200)
         
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'member': member_data
-        }), 200
+        }, status_code=200)
         
     except Exception as e:
-        current_app.logger.error(f"Error getting member {member_id}: {e}", exc_info=True)
-        log_api_access(f'/members/{member_id}', 'GET', success=False, response_code=500)
-        return jsonify({
+        _logger.error(f"Error getting member {member_id}: {e}", exc_info=True)
+        log_api_access(request, f'/members/{member_id}', 'GET', success=False, response_code=500)
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error retrieving member: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
-@api_bp.route('/members/search', methods=['GET'])
-@api_key_required
-def search_members():
-    """
-    Search for members by name
-    
-    Query Parameters:
-        q (str): Search query (required)
-        field (str): Field to search (discord_username, roblox_username, both)
-    
-    Returns:
-        200: Search results
-    """
-    try:
-        query_str = request.args.get('q', '').strip()
-        field = request.args.get('field', 'both').lower()
-        
-        if not query_str:
-            return jsonify({
-                'success': False,
-                'error': 'missing_query',
-                'message': 'Search query (q) is required'
-            }), 400
-        
-        # search_members covers discord_username, roblox_username, and rank
-        members = member_service.search_members(query_str, limit=20)
-
-        matches = [
-            {
-                'id': m.id,
-                'discord_username': m.discord_username,
-                'roblox_username': m.roblox_username,
-                'current_rank': m.current_rank
-            }
-            for m in members
-        ]
-        
-        log_api_access('/members/search', 'GET', success=True, response_code=200)
-        
-        return jsonify({
-            'success': True,
-            'query': query_str,
-            'matches': matches,
-            'count': len(matches)
-        }), 200
-        
     except Exception as e:
-        current_app.logger.error(f"Error searching members: {e}", exc_info=True)
-        log_api_access('/members/search', 'GET', success=False, response_code=500)
-        return jsonify({
+        _logger.error(f"Error searching members: {e}", exc_info=True)
+        log_api_access(request, '/members/search', 'GET', success=False, response_code=500)
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error searching members: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
-@api_bp.route('/members/<int:member_id>/rank', methods=['PATCH'])
-@api_key_required
-def update_member_rank(member_id):
+@router.patch('/members/{member_id}/rank', dependencies=[Depends(verify_api_key)])
+async def update_member_rank(request: Request, member_id: int):
     """
     Update a member's rank
     
@@ -320,18 +341,18 @@ def update_member_rank(member_id):
         404: Member not found
     """
     try:
-        data = request.get_json() or {}
+        data = await _safe_get_json(request)
         new_rank = data.get('rank', '').strip()
         reason = data.get('reason', 'Promoted via Discord Bot').strip()
         promoted_by = data.get('promoted_by', 'Discord Bot').strip()
         discord_user_id = data.get('discord_user_id')
         
         if not new_rank:
-            return jsonify({
+            return JSONResponse({
                 'success': False,
                 'error': 'missing_rank',
                 'message': 'Rank is required'
-            }), 400
+            }, status_code=400)
 
         result = member_service.promote_member(
             member_id,
@@ -342,33 +363,33 @@ def update_member_rank(member_id):
 
         if not result['success']:
             if result.get('error') == 'member_not_found':
-                log_api_access(f'/members/{member_id}/rank', 'PATCH', discord_user_id, False, 404)
-                return jsonify({
+                log_api_access(request, f'/members/{member_id}/rank', 'PATCH', discord_user_id, False, 404)
+                return JSONResponse({
                     'success': False,
                     'error': 'member_not_found',
                     'message': f'Member with ID {member_id} not found'
-                }), 404
+                }, status_code=404)
             if result.get('error') == 'invalid_rank':
-                return jsonify({
+                return JSONResponse({
                     'success': False,
                     'error': 'invalid_rank',
                     'message': result['message'],
                     'valid_ranks': result.get('valid_ranks', []),
-                }), 400
+                }, status_code=400)
             # Catch-all for any other failure (e.g. missing_rank, etc.)
-            log_api_access(f'/members/{member_id}/rank', 'PATCH', discord_user_id, False, 400)
-            return jsonify({
+            log_api_access(request, f'/members/{member_id}/rank', 'PATCH', discord_user_id, False, 400)
+            return JSONResponse({
                 'success': False,
                 'error': result.get('error', 'unknown_error'),
                 'message': result.get('message', 'An unknown error occurred'),
-            }), 400
+            }, status_code=400)
 
         member = result['member']
         old_rank = result['old_rank']
 
 
         if result.get('unchanged'):
-            return jsonify({
+            return JSONResponse({
                 'success': True,
                 'message': 'Rank unchanged (already at specified rank)',
                 'member': {
@@ -376,7 +397,7 @@ def update_member_rank(member_id):
                     'discord_username': member.discord_username,
                     'current_rank': member.current_rank
                 }
-            }), 200
+            }, status_code=200)
 
         roblox_sync_result = result.get('roblox_sync', {'success': False, 'message': 'Roblox sync disabled'})
         
@@ -392,9 +413,9 @@ def update_member_rank(member_id):
             "Rank Update"
         )
         
-        log_api_access(f'/members/{member_id}/rank', 'PATCH', discord_user_id, True, 200)
+        log_api_access(request, f'/members/{member_id}/rank', 'PATCH', discord_user_id, True, 200)
         
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'message': f'Rank updated successfully from {old_rank} to {new_rank}',
             'member': {
@@ -406,23 +427,22 @@ def update_member_rank(member_id):
             },
             'roblox_sync': roblox_sync_result,
             'notification_sent': notification_sent
-        }), 200
+        }, status_code=200)
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error updating rank for member {member_id}: {e}", exc_info=True)
-        log_api_access(f'/members/{member_id}/rank', 'PATCH', 
+        _logger.error(f"Error updating rank for member {member_id}: {e}", exc_info=True)
+        log_api_access(request, f'/members/{member_id}/rank', 'PATCH', 
                       data.get('discord_user_id'), False, 500)
-        return jsonify({
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error updating rank: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
-@api_bp.route('/members', methods=['POST'])
-@api_key_required
-def add_member():
+@router.post('/members', dependencies=[Depends(verify_api_key)])
+async def add_member(request: Request):
     """
     Add a new member to the system
     
@@ -438,18 +458,18 @@ def add_member():
         409: Member already exists
     """
     try:
-        data = request.get_json() or {}
+        data = await _safe_get_json(request)
         discord_username = data.get('discord_username', '').strip()
         roblox_username = data.get('roblox_username', '').strip() or None
         current_rank = data.get('current_rank', 'Aspirant').strip()
         discord_user_id = data.get('discord_user_id')
         
         if not discord_username:
-            return jsonify({
+            return JSONResponse({
                 'success': False,
                 'error': 'missing_discord_username',
                 'message': 'Discord username is required'
-            }), 400
+            }, status_code=400)
 
         result = member_service.create_member(
             discord_username,
@@ -459,18 +479,18 @@ def add_member():
 
         if not result['success']:
             if result.get('error') == 'member_exists':
-                log_api_access('/members', 'POST', discord_user_id, False, 409)
-                return jsonify({
+                log_api_access(request, '/members', 'POST', discord_user_id, False, 409)
+                return JSONResponse({
                     'success': False,
                     'error': 'member_exists',
                     'message': result['message'],
                     'existing_member_id': result.get('existing_member_id'),
-                }), 409
-            return jsonify({
+                }, status_code=409)
+            return JSONResponse({
                 'success': False,
                 'error': result.get('error', 'validation_error'),
                 'message': result.get('message', 'Failed to add member'),
-            }), 400
+            }, status_code=400)
 
         new_member = result['member']
         roblox_sync_result = result.get('roblox_sync', {'success': False, 'message': 'No RobloxUsername provided'})
@@ -485,9 +505,9 @@ def add_member():
             "Member Added"
         )
         
-        log_api_access('/members', 'POST', discord_user_id, True, 201)
+        log_api_access(request, '/members', 'POST', discord_user_id, True, 201)
         
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'message': 'Member added successfully',
             'member': {
@@ -498,22 +518,21 @@ def add_member():
             },
             'roblox_sync': roblox_sync_result,
             'notification_sent': notification_sent
-        }), 201
+        }, status_code=201)
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error adding member: {e}", exc_info=True)
-        log_api_access('/members', 'POST', data.get('discord_user_id'), False, 500)
-        return jsonify({
+        _logger.error(f"Error adding member: {e}", exc_info=True)
+        log_api_access(request, '/members', 'POST', data.get('discord_user_id'), False, 500)
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error adding member: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
-@api_bp.route('/members/<int:member_id>', methods=['DELETE'])
-@api_key_required
-def remove_member(member_id):
+@router.delete('/members/{member_id}', dependencies=[Depends(verify_api_key)])
+async def remove_member(request: Request, member_id: int):
     """
     Remove a member (mark as inactive)
     
@@ -528,18 +547,18 @@ def remove_member(member_id):
         404: Member not found
     """
     try:
-        data = request.get_json() or {}
+        data = await _safe_get_json(request)
         discord_user_id = data.get('discord_user_id')
 
         result = member_service.deactivate_member(member_id)
 
         if not result['success']:
-            log_api_access(f'/members/{member_id}', 'DELETE', discord_user_id, False, 404)
-            return jsonify({
+            log_api_access(request, f'/members/{member_id}', 'DELETE', discord_user_id, False, 404)
+            return JSONResponse({
                 'success': False,
                 'error': 'member_not_found',
                 'message': result.get('message'),
-            }), 404
+            }, status_code=404)
 
         member_name = result.get('member_name', f'Member {member_id}')
 
@@ -553,34 +572,33 @@ def remove_member(member_id):
             "Member Removed"
         )
         
-        log_api_access(f'/members/{member_id}', 'DELETE', discord_user_id, True, 200)
+        log_api_access(request, f'/members/{member_id}', 'DELETE', discord_user_id, True, 200)
         
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'message': f'Member {member_name} removed successfully',
             'roblox_sync': roblox_sync_result,
             'notification_sent': notification_sent
-        }), 200
+        }, status_code=200)
         
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error removing member {member_id}: {e}", exc_info=True)
-        log_api_access(f'/members/{member_id}', 'DELETE', 
+        _logger.error(f"Error removing member {member_id}: {e}", exc_info=True)
+        log_api_access(request, f'/members/{member_id}', 'DELETE', 
                       data.get('discord_user_id'), False, 500)
-        return jsonify({
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error removing member: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
 # ============================================================================
 # RANK MANAGEMENT
 # ============================================================================
 
-@api_bp.route('/ranks', methods=['GET'])
-@api_key_required
-def get_ranks():
+@router.get('/ranks', dependencies=[Depends(verify_api_key)])
+async def get_ranks(request: Request):
     """
     Get list of all available ranks with Roblox mappings
     
@@ -614,31 +632,30 @@ def get_ranks():
                 for r in rank_mappings
             ]
         
-        log_api_access('/ranks', 'GET', success=True, response_code=200)
+        log_api_access(request, '/ranks', 'GET', success=True, response_code=200)
         
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'ranks': ranks_data,
             'count': len(ranks_data)
-        }), 200
+        }, status_code=200)
         
     except Exception as e:
-        current_app.logger.error(f"Error getting ranks: {e}", exc_info=True)
-        log_api_access('/ranks', 'GET', success=False, response_code=500)
-        return jsonify({
+        _logger.error(f"Error getting ranks: {e}", exc_info=True)
+        log_api_access(request, '/ranks', 'GET', success=False, response_code=500)
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error retrieving ranks: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
 # ============================================================================
 # ACTIVITY MANAGEMENT
 # ============================================================================
 
-@api_bp.route('/activity', methods=['POST'])
-@api_key_required
-def log_activity():
+@router.post('/activity', dependencies=[Depends(verify_api_key)])
+async def log_activity(request: Request,):
     """
     Log an activity for a member
     
@@ -656,7 +673,7 @@ def log_activity():
         404: Member not found or no active AC period
     """
     try:
-        data = request.get_json() or {}
+        data = await _safe_get_json(request)
         member_id = data.get('member_id')
         activity_type = data.get('activity_type', '').strip()
         description = data.get('description', '').strip()
@@ -664,29 +681,29 @@ def log_activity():
         discord_user_id = data.get('discord_user_id')
 
         if not member_id:
-            return jsonify({
+            return JSONResponse({
                 'success': False,
                 'error': 'missing_member_id',
                 'message': 'member_id is required'
-            }), 400
+            }, status_code=400)
 
         if not activity_type:
-            return jsonify({
+            return JSONResponse({
                 'success': False,
                 'error': 'missing_activity_type',
                 'message': 'activity_type is required'
-            }), 400
+            }, status_code=400)
 
         activity_date = None
         if activity_date_str:
             try:
                 activity_date = datetime.strptime(activity_date_str, '%Y-%m-%d')
             except ValueError:
-                return jsonify({
+                return JSONResponse({
                     'success': False,
                     'error': 'invalid_date_format',
                     'message': 'activity_date must be in YYYY-MM-DD format'
-                }), 400
+                }, status_code=400)
 
         logged_by = data.get('logged_by', 'Discord Bot')
         if discord_user_id and not data.get('logged_by'):
@@ -705,33 +722,33 @@ def log_activity():
         if not result['success']:
             error = result.get('error')
             if error == 'member_not_found':
-                log_api_access('/activity', 'POST', discord_user_id, False, 404)
-                return jsonify({
+                log_api_access(request, '/activity', 'POST', discord_user_id, False, 404)
+                return JSONResponse({
                     'success': False,
                     'error': 'member_not_found',
                     'message': result['message'],
-                }), 404
+                }, status_code=404)
             if error == 'no_active_period':
-                log_api_access('/activity', 'POST', discord_user_id, False, 404)
-                return jsonify({
+                log_api_access(request, '/activity', 'POST', discord_user_id, False, 404)
+                return JSONResponse({
                     'success': False,
                     'error': 'no_active_period',
                     'message': result['message'],
-                }), 404
+                }, status_code=404)
             if error == 'invalid_activity_type':
-                return jsonify({
+                return JSONResponse({
                     'success': False,
                     'error': 'invalid_activity_type',
                     'message': result['message'],
                     'valid_types': result.get('valid_types', []),
-                }), 400
+                }, status_code=400)
             if error == 'limited_activity_exists':
-                log_api_access('/activity', 'POST', discord_user_id, False, 400)
-                return jsonify({
+                log_api_access(request, '/activity', 'POST', discord_user_id, False, 400)
+                return JSONResponse({
                     'success': False,
                     'error': 'limited_activity_exists',
                     'message': f'Limited activity "{activity_type}" already logged for this period',
-                }), 400
+                }, status_code=400)
 
         member = result['member']
         quantity = result['count']
@@ -756,9 +773,9 @@ def log_activity():
 
         send_discord_notification(notification_message, title="Activity Log")
 
-        log_api_access('/activity', 'POST', discord_user_id, True, 201)
+        log_api_access(request, '/activity', 'POST', discord_user_id, True, 201)
 
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'message': f'Logged {quantity} activity entries',
             'activity': {
@@ -768,22 +785,21 @@ def log_activity():
                 'date': activity_date.isoformat()
             },
             'quota_progress': quota_progress,
-        }), 201
+        }, status_code=201)
 
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error logging activity: {e}", exc_info=True)
-        log_api_access('/activity', 'POST', data.get('discord_user_id'), False, 500)
-        return jsonify({
+        _logger.error(f"Error logging activity: {e}", exc_info=True)
+        log_api_access(request, '/activity', 'POST', data.get('discord_user_id'), False, 500)
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error logging activity: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
-@api_bp.route('/members/<int:member_id>/activities', methods=['GET'])
-@api_key_required
-def get_member_activities(member_id):
+@router.get('/members/{member_id}/activities', dependencies=[Depends(verify_api_key)])
+async def get_member_activities(request: Request, member_id: int):
     """
     Get activities for a specific member
     
@@ -798,16 +814,16 @@ def get_member_activities(member_id):
         404: Member not found
     """
     try:
-        limit = min(int(request.args.get('limit', 50)), 1000)
+        limit = min(int(request.query_params.get('limit', 50)), 1000)
 
         member = member_service.get_member(member_id, active_only=True)
         if not member:
-            log_api_access(f'/members/{member_id}/activities', 'GET', success=False, response_code=404)
-            return jsonify({
+            log_api_access(request, f'/members/{member_id}/activities', 'GET', success=False, response_code=404)
+            return JSONResponse({
                 'success': False,
                 'error': 'member_not_found',
                 'message': f'Member with ID {member_id} not found'
-            }), 404
+            }, status_code=404)
 
         activities = ac_service.get_member_activities(member_id, limit=limit)
 
@@ -822,9 +838,9 @@ def get_member_activities(member_id):
             for a in activities
         ]
         
-        log_api_access(f'/members/{member_id}/activities', 'GET', success=True, response_code=200)
+        log_api_access(request, f'/members/{member_id}/activities', 'GET', success=True, response_code=200)
         
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'member': {
                 'id': member.id,
@@ -832,21 +848,20 @@ def get_member_activities(member_id):
             },
             'activities': activities_data,
             'count': len(activities_data)
-        }), 200
+        }, status_code=200)
         
     except Exception as e:
-        current_app.logger.error(f"Error getting activities for member {member_id}: {e}", exc_info=True)
-        log_api_access(f'/members/{member_id}/activities', 'GET', success=False, response_code=500)
-        return jsonify({
+        _logger.error(f"Error getting activities for member {member_id}: {e}", exc_info=True)
+        log_api_access(request, f'/members/{member_id}/activities', 'GET', success=False, response_code=500)
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error retrieving activities: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
-@api_bp.route('/activity/<int:activity_id>', methods=['DELETE'])
-@api_key_required
-def remove_activity(activity_id):
+@router.delete('/activity/{activity_id}', dependencies=[Depends(verify_api_key)])
+async def remove_activity(request: Request, activity_id: int):
     """
     Remove/delete an activity entry
     
@@ -861,18 +876,18 @@ def remove_activity(activity_id):
         404: Activity not found
     """
     try:
-        data = request.get_json() or {}
+        data = await _safe_get_json(request)
         discord_user_id = data.get('discord_user_id')
 
         result = ac_service.delete_activity_entry(activity_id)
 
         if not result['success']:
-            log_api_access('/activity/<id>', 'DELETE', discord_user_id, False, 404)
-            return jsonify({
+            log_api_access(request, '/activity/{id}', 'DELETE', discord_user_id, False, 404)
+            return JSONResponse({
                 'success': False,
                 'error': 'activity_not_found',
                 'message': result['message'],
-            }), 404
+            }, status_code=404)
 
         member = result['member']
         activity_type = result['activity_type']
@@ -889,9 +904,9 @@ def remove_activity(activity_id):
         )
         send_discord_notification(notification_message, title="Activity Removed")
 
-        log_api_access('/activity/<id>', 'DELETE', discord_user_id, True, 200)
+        log_api_access(request, '/activity/{id}', 'DELETE', discord_user_id, True, 200)
 
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'message': 'Activity removed successfully',
             'activity': {
@@ -900,22 +915,21 @@ def remove_activity(activity_id):
                 'points': points,
             },
             'quota_progress': quota_progress,
-        }), 200
+        }, status_code=200)
 
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error removing activity: {e}", exc_info=True)
-        log_api_access('/activity/<id>', 'DELETE', data.get('discord_user_id'), False, 500)
-        return jsonify({
+        _logger.error(f"Error removing activity: {e}", exc_info=True)
+        log_api_access(request, '/activity/{id}', 'DELETE', data.get('discord_user_id'), False, 500)
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error removing activity: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
-@api_bp.route('/members/<int:member_id>/points', methods=['GET'])
-@api_key_required
-def get_member_points(member_id):
+@router.get('/members/{member_id}/points', dependencies=[Depends(verify_api_key)])
+async def get_member_points(request: Request, member_id: int):
     """
     Get a member's current AC points and quota progress
     
@@ -929,27 +943,27 @@ def get_member_points(member_id):
     try:
         member = member_service.get_member(member_id, active_only=True)
         if not member:
-            log_api_access(f'/members/{member_id}/points', 'GET', success=False, response_code=404)
-            return jsonify({
+            log_api_access(request, f'/members/{member_id}/points', 'GET', success=False, response_code=404)
+            return JSONResponse({
                 'success': False,
                 'error': 'member_not_found',
                 'message': f'Member with ID {member_id} not found'
-            }), 404
+            }, status_code=404)
 
         current_period = ac_service.get_active_period()
         if not current_period:
-            log_api_access(f'/members/{member_id}/points', 'GET', success=False, response_code=404)
-            return jsonify({
+            log_api_access(request, f'/members/{member_id}/points', 'GET', success=False, response_code=404)
+            return JSONResponse({
                 'success': False,
                 'error': 'no_active_period',
                 'message': 'No active AC period'
-            }), 404
+            }, status_code=404)
 
         quota_progress = ac_service.get_quota_progress(member, current_period)
         
-        log_api_access(f'/members/{member_id}/points', 'GET', success=True, response_code=200)
+        log_api_access(request, f'/members/{member_id}/points', 'GET', success=True, response_code=200)
 
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'member': {
                 'id': member.id,
@@ -962,25 +976,24 @@ def get_member_points(member_id):
                 'percentage': quota_progress['percentage'],
                 'period_name': current_period.period_name
             }
-        }), 200
+        }, status_code=200)
         
     except Exception as e:
-        current_app.logger.error(f"Error getting member points: {e}", exc_info=True)
-        log_api_access(f'/members/{member_id}/points', 'GET', success=False, response_code=500)
-        return jsonify({
+        _logger.error(f"Error getting member points: {e}", exc_info=True)
+        log_api_access(request, f'/members/{member_id}/points', 'GET', success=False, response_code=500)
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error retrieving points: {str(e)}'
-        }), 500
+        }, status_code=500)
 
 
 # ============================================================================
 # BULK ACTIVITY REMOVAL BY TYPE
 # ============================================================================
 
-@api_bp.route('/members/<int:member_id>/activities/by-type', methods=['DELETE'])
-@api_key_required
-def remove_activities_by_type(member_id):
+@router.delete('/members/{member_id}/activities/by-type', dependencies=[Depends(verify_api_key)])
+async def remove_activities_by_type(request: Request, member_id: int):
     """
     Remove the N most-recent activity entries of a given type for a member.
 
@@ -995,17 +1008,17 @@ def remove_activities_by_type(member_id):
         404: Member or activities not found
     """
     try:
-        data = request.get_json() or {}
+        data = await _safe_get_json(request)
         activity_type = data.get('activity_type', '').strip()
         quantity = max(1, min(int(data.get('quantity', 1)), 999))
         discord_user_id = data.get('discord_user_id')
 
         if not activity_type:
-            return jsonify({
+            return JSONResponse({
                 'success': False,
                 'error': 'missing_activity_type',
                 'message': 'activity_type is required',
-            }), 400
+            }, status_code=400)
 
         result = ac_service.delete_activities_by_type(
             member_id, activity_type, quantity=quantity
@@ -1014,15 +1027,15 @@ def remove_activities_by_type(member_id):
         if not result['success']:
             error = result.get('error')
             status = 404 if error in ('member_not_found', 'no_activities_found') else 400
-            log_api_access(
+            log_api_access(request, 
                 f'/members/{member_id}/activities/by-type', 'DELETE',
                 discord_user_id, False, status
             )
-            return jsonify({
+            return JSONResponse(content={
                 'success': False,
                 'error': error,
                 'message': result['message'],
-            }), status
+            }, status_code=status)
 
         member = result['member']
         deleted = result['deleted']
@@ -1038,41 +1051,40 @@ def remove_activities_by_type(member_id):
         )
         send_discord_notification(notification_message, title="Activities Removed")
 
-        log_api_access(
+        log_api_access(request, 
             f'/members/{member_id}/activities/by-type', 'DELETE',
             discord_user_id, True, 200
         )
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'message': f'Removed {deleted} "{activity_type}" activity entries',
             'deleted': deleted,
             'activity_type': activity_type,
             'quota_progress': quota_progress,
-        }), 200
+        }, status_code=200)
 
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(
+        _logger.error(
             f'Error bulk-removing activities for member {member_id}: {e}', exc_info=True
         )
-        log_api_access(
+        log_api_access(request, 
             f'/members/{member_id}/activities/by-type', 'DELETE',
             data.get('discord_user_id'), False, 500
         )
-        return jsonify({
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error removing activities: {str(e)}',
-        }), 500
+        }, status_code=500)
 
 
 # ============================================================================
 # ACTIVITY COUNT BY TYPE
 # ============================================================================
 
-@api_bp.route('/members/<int:member_id>/activities/count', methods=['GET'])
-@api_key_required
-def count_member_activities(member_id):
+@router.get('/members/{member_id}/activities/count', dependencies=[Depends(verify_api_key)])
+async def count_member_activities(request: Request, member_id: int):
     """
     Count activity entries for a member, optionally filtered by type and/or
     the current AC period.
@@ -1088,18 +1100,18 @@ def count_member_activities(member_id):
     try:
         member = member_service.get_member(member_id, active_only=True)
         if not member:
-            log_api_access(
+            log_api_access(request, 
                 f'/members/{member_id}/activities/count', 'GET',
                 success=False, response_code=404
             )
-            return jsonify({
+            return JSONResponse({
                 'success': False,
                 'error': 'member_not_found',
                 'message': f'Member with ID {member_id} not found',
-            }), 404
+            }, status_code=404)
 
-        activity_type = request.args.get('type', '').strip() or None
-        period_only = request.args.get('period_only', 'false').lower() == 'true'
+        activity_type = request.query_params.get('type', '').strip() or None
+        period_only = request.query_params.get('period_only', 'false').lower() == 'true'
 
         period_id = None
         if period_only:
@@ -1117,11 +1129,11 @@ def count_member_activities(member_id):
             breakdown = result
             count = sum(breakdown.values())
 
-        log_api_access(
+        log_api_access(request, 
             f'/members/{member_id}/activities/count', 'GET',
             success=True, response_code=200
         )
-        return jsonify({
+        return JSONResponse({
             'success': True,
             'member': {
                 'id': member.id,
@@ -1133,18 +1145,19 @@ def count_member_activities(member_id):
             },
             'count': count,
             'breakdown': breakdown,
-        }), 200
+        }, status_code=200)
 
     except Exception as e:
-        current_app.logger.error(
+        _logger.error(
             f'Error counting activities for member {member_id}: {e}', exc_info=True
         )
-        log_api_access(
+        log_api_access(request, 
             f'/members/{member_id}/activities/count', 'GET',
             success=False, response_code=500
         )
-        return jsonify({
+        return JSONResponse({
             'success': False,
             'error': 'server_error',
             'message': f'Error counting activities: {str(e)}',
-        }), 500
+        }, status_code=500)
+

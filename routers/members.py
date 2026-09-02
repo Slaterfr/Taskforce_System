@@ -1,129 +1,133 @@
-from flask import Blueprint, render_template, request, flash, redirect, url_for, session, current_app
+from config import settings
+from fastapi import APIRouter, Request, Form, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from utils.templates import templates, url_for
+from utils.flash import flash
 from services import member_service
 from utils.auth import staff_required
 
-members_bp = Blueprint('members', __name__)
+router = APIRouter()
 
 
-@members_bp.route('/dashboard')
+@router.get('/dashboard')
 @staff_required
-def dashboard():
+async def dashboard(request: Request):
     dashboard_data = member_service.get_dashboard_data()
-    return render_template('dashboard.html',
-                           member_count=dashboard_data['member_count'],
-                           recent_activities=dashboard_data['recent_activities'])
+    return templates.TemplateResponse('dashboard.html', {"request": request,
+                           "member_count":dashboard_data['member_count'],
+                           "recent_activities":dashboard_data['recent_activities']})
 
 
-@members_bp.route('/members')
+@router.get('/members')
 @staff_required
-def members():
-    search = request.args.get('search', '')
+async def members(request: Request):
+    search = request.query_params.get('search', '')
     members_list = member_service.search_members(search)
-    return render_template('members.html', members=members_list, search=search)
+    return templates.TemplateResponse('members.html', {"request": request, "members": members_list, "search": search})
 
 
-@members_bp.route('/member/<int:member_id>')
+@router.get('/member/{member_id}')
 @staff_required
-def member_detail(member_id):
+async def member_detail(request: Request, member_id):
     detail = member_service.get_member_profile_details(member_id)
     if not detail:
-        from flask import abort
-        abort(404)
-    return render_template('member_detail.html',
-                           member=detail['member'],
-                           activities=detail['activities'],
-                           promotions=detail['promotions'])
+        
+        raise HTTPException(status_code=404, detail='Not Found')
+    return templates.TemplateResponse('member_detail.html', {"request": request,
+                           "member":detail['member'],
+                           "activities":detail['activities'],
+                           "promotions":detail['promotions']})
 
 
-@members_bp.route('/add_member', methods=['GET', 'POST'])
+@router.api_route('/add_member', methods=['GET', 'POST'])
 @staff_required
-def add_member():
+async def add_member(request: Request):
     if request.method == 'POST':
         result = member_service.create_member(
-            request.form.get('discord_username', ''),
-            roblox_username=request.form.get('roblox_username'),
-            current_rank=request.form.get('current_rank', 'Aspirant'),
+            (await request.form()).get('discord_username', ''),
+            roblox_username=(await request.form()).get('roblox_username'),
+            current_rank=(await request.form()).get('current_rank', 'Aspirant'),
         )
 
         if not result['success']:
             if result.get('error') == 'member_exists':
-                flash('Member with this Discord username already exists!', 'error')
+                flash(request, 'Member with this Discord username already exists!', 'error')
             else:
-                flash(result.get('message', 'Failed to add member'), 'error')
-            return redirect(url_for('members.add_member'))
+                flash(request, result.get('message', 'Failed to add member'), 'error')
+            return RedirectResponse(url_for(request, 'add_member'), status_code=303)
 
         member = result['member']
         roblox_sync = result.get('roblox_sync', {})
         if not roblox_sync.get('success') and member.roblox_username:
-            flash(f"Member added, but Roblox sync failed: {roblox_sync.get('message')}", 'warning')
+            flash(request, f"Member added, but Roblox sync failed: {roblox_sync.get('message')}", 'warning')
 
-        flash('Member added', 'success')
-        return redirect(url_for('members.member_detail', member_id=member.id))
+        flash(request, 'Member added', 'success')
+        return RedirectResponse(url_for(request, 'member_detail', member_id=member.id), status_code=303)
 
-    return render_template('add_member.html')
+    return templates.TemplateResponse('add_member.html', {"request": request})
 
 
-@members_bp.route('/member/<int:member_id>/edit', methods=['GET', 'POST'])
+@router.api_route('/member/{member_id}/edit', methods=['GET', 'POST'])
 @staff_required
-def edit_member(member_id):
+async def edit_member(request: Request, member_id):
     member = member_service.get_member(member_id, active_only=False)
     if not member:
-        from flask import abort
-        abort(404)
+        
+        raise HTTPException(status_code=404, detail='Not Found')
     available_ranks = member_service.get_available_ranks()
 
     if request.method == 'POST':
         result = member_service.update_member_profile(
             member_id,
-            discord_username=request.form.get('discord_username', member.discord_username),
-            roblox_username=request.form.get('roblox_username', member.roblox_username),
-            current_rank=request.form.get('current_rank', member.current_rank),
+            discord_username=(await request.form()).get('discord_username', member.discord_username),
+            roblox_username=(await request.form()).get('roblox_username', member.roblox_username),
+            current_rank=(await request.form()).get('current_rank', member.current_rank),
         )
 
         if not result['success']:
-            flash(result.get('message', 'Failed to update member'), 'error')
-            return redirect(url_for('members.edit_member', member_id=member_id))
+            flash(request, result.get('message', 'Failed to update member'), 'error')
+            return RedirectResponse(url_for(request, 'edit_member', member_id=member_id), status_code=303)
 
         roblox_sync = result.get('roblox_sync', {})
         if result.get('rank_changed') and not roblox_sync.get('success'):
             if roblox_sync.get('message') == 'Cannot sync to Roblox (no Roblox ID)':
-                flash('Member updated, but cannot sync to Roblox (no Roblox ID)', 'warning')
-            elif current_app.config.get('ROBLOX_SYNC_ENABLED'):
-                flash(f"Member updated, but Roblox sync failed: {roblox_sync.get('message')}", 'warning')
+                flash(request, 'Member updated, but cannot sync to Roblox (no Roblox ID)', 'warning')
+            elif getattr(settings, 'ROBLOX_SYNC_ENABLED', None):
+                flash(request, f"Member updated, but Roblox sync failed: {roblox_sync.get('message')}", 'warning')
 
-        flash('Member updated', 'success')
-        return redirect(url_for('members.member_detail', member_id=member_id))
+        flash(request, 'Member updated', 'success')
+        return RedirectResponse(url_for(request, 'member_detail', member_id=member_id), status_code=303)
 
-    return render_template('edit_member.html', member=member, available_ranks=available_ranks)
+    return templates.TemplateResponse('edit_member.html', {"request": request, "member": member, "available_ranks": available_ranks})
 
 
-@members_bp.route('/member/<int:member_id>/delete', methods=['POST'])
+@router.api_route('/member/{member_id}/delete', methods=['POST'])
 @staff_required
-def delete_member(member_id):
+async def delete_member(request: Request, member_id):
     result = member_service.deactivate_member(member_id)
     if not result['success']:
-        flash(result.get('message', 'Member not found'), 'error')
-        return redirect(url_for('members.members'))
+        flash(request, result.get('message', 'Member not found'), 'error')
+        return RedirectResponse(url_for(request, 'members'), status_code=303)
 
     roblox_sync = result.get('roblox_sync', {})
-    if not roblox_sync.get('success') and current_app.config.get('ROBLOX_SYNC_ENABLED'):
-        flash(f"Member removed from system, but Roblox sync failed: {roblox_sync.get('message')}", 'warning')
+    if not roblox_sync.get('success') and getattr(settings, 'ROBLOX_SYNC_ENABLED', None):
+        flash(request, f"Member removed from system, but Roblox sync failed: {roblox_sync.get('message')}", 'warning')
 
-    flash('Member removed', 'success')
-    return redirect(url_for('members.members'))
+    flash(request, 'Member removed', 'success')
+    return RedirectResponse(url_for(request, 'members'), status_code=303)
 
 
-@members_bp.route('/promote_member', methods=['GET', 'POST'])
+@router.api_route('/promote_member', methods=['GET', 'POST'])
 @staff_required
-def promote_member():
+async def promote_member(request: Request):
     """Promote a member and record a PromotionLog"""
     available_ranks = member_service.get_available_ranks()
 
     if request.method == 'POST':
-        member_id = request.form.get('member_id', type=int)
-        new_rank = request.form.get('new_rank', '').strip()
-        reason = request.form.get('reason', '').strip()
-        promoted_by = request.form.get('promoted_by', '').strip() or session.get('staff_username', 'Staff')
+        member_id = int((await request.form()).get('member_id')) if (await request.form()).get('member_id') else None
+        new_rank = (await request.form()).get('new_rank', '').strip()
+        reason = (await request.form()).get('reason', '').strip()
+        promoted_by = (await request.form()).get('promoted_by', '').strip() or request.session.get('staff_username', 'Staff')
 
         result = member_service.promote_member(
             member_id,
@@ -133,30 +137,30 @@ def promote_member():
         )
 
         if not result['success']:
-            flash(result.get('message', 'Promotion failed'), 'error')
-            return redirect(url_for('members.promote_member'))
+            flash(request, result.get('message', 'Promotion failed'), 'error')
+            return RedirectResponse(url_for(request, 'promote_member'), status_code=303)
 
         member = result['member']
         roblox_sync = result.get('roblox_sync', {})
         if not result.get('unchanged') and not roblox_sync.get('success'):
             if roblox_sync.get('message') == 'Cannot sync to Roblox (no Roblox ID)':
-                flash('Promotion saved, but cannot sync to Roblox (no Roblox ID)', 'warning')
-            elif current_app.config.get('ROBLOX_SYNC_ENABLED'):
-                flash(f"Promotion saved, but Roblox sync failed: {roblox_sync.get('message')}", 'warning')
+                flash(request, 'Promotion saved, but cannot sync to Roblox (no Roblox ID)', 'warning')
+            elif getattr(settings, 'ROBLOX_SYNC_ENABLED', None):
+                flash(request, f"Promotion saved, but Roblox sync failed: {roblox_sync.get('message')}", 'warning')
 
         flash(
             f'{member.discord_username} promoted from {result["old_rank"]} to {result["new_rank"]}',
             'success',
         )
-        return redirect(url_for('members.member_detail', member_id=member.id))
+        return RedirectResponse(url_for(request, 'member_detail', member_id=member.id), status_code=303)
 
     members_list = member_service.get_all_active_members()
-    return render_template('promote_member.html', members=members_list, available_ranks=available_ranks)
+    return templates.TemplateResponse('promote_member.html', {"request": request, "members": members_list, "available_ranks": available_ranks})
 
 
-@members_bp.route('/stats')
+@router.get('/stats')
 @staff_required
-def stats():
+async def stats(request: Request):
     """Member Statistics Dashboard"""
     from utils.stats_logger import get_stats_history
     import json
@@ -171,11 +175,11 @@ def stats():
         most_populated_rank = max(latest_ranks, key=latest_ranks.get)
         max_count = latest_ranks[most_populated_rank]
 
-    return render_template('stats.html',
-                          dates=json.dumps(data['dates']),
-                          totals=json.dumps(data['totals']),
-                          rank_labels=json.dumps(list(latest_ranks.keys())),
-                          rank_values=json.dumps(list(latest_ranks.values())),
-                          total_members=total_members,
-                          most_populated_rank=most_populated_rank,
-                          most_populated_count=max_count)
+    return templates.TemplateResponse('stats.html', {"request": request,
+                          "dates":json.dumps(data['dates']),
+                          "totals":json.dumps(data['totals']),
+                          "rank_labels":json.dumps(list(latest_ranks.keys())),
+                          "rank_values":json.dumps(list(latest_ranks.values())),
+                          "total_members":total_members,
+                          "most_populated_rank":most_populated_rank,
+                          "most_populated_count":max_count})

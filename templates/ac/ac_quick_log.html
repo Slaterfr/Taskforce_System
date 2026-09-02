@@ -20,7 +20,7 @@
     {% set counts = member_activity_counts.get(m.id, {}) %}
     <tr id="member-row-{{ m.id }}">
       <td>
-        <a href="{{ url_for('ac.ac_member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
+        <a href="{{ url_for('ac_member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
         <div class="text-muted small">{{ m.current_rank }}</div>
       </td>
       <td>
@@ -64,7 +64,7 @@
 
       <td>
         {% if is_staff %}
-        <form method="post" action="{{ url_for('ac.clear_member_activities', member_id=m.id) }}" class="d-inline"
+        <form method="post" action="{{ url_for('clear_member_activities', member_id=m.id) }}" class="d-inline"
           onsubmit="return confirm('Clear all activities for {{ m.discord_username }} in this period?');">
           <input type="hidden" name="period_id" value="{{ current_period.id if current_period }}">
           <button type="submit" class="btn btn-sm btn-danger">Clear All</button>
@@ -85,7 +85,7 @@
         const activityType = this.dataset.activity;
         this.disabled = true;
         try {
-          const res = await fetch("{{ url_for('ac.quick_log_activity') }}", {
+          const res = await fetch("{{ url_for('quick_log_activity') }}", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ member_id: memberId, activity_type: activityType, activity_date: "{{ today }}", logged_by: "HC Team" })
@@ -105,7 +105,7 @@
       btn.addEventListener('click', async function () {
         const activityId = Number(this.dataset.activityId);
         try {
-          const res = await fetch("{{ url_for('ac.delete_ac_activity', activity_id=0) }}".replace('/0', '/' + activityId), {
+          const res = await fetch("{{ url_for('delete_ac_activity', activity_id=0) }}".replace('/0', '/' + activityId), {
             method: 'POST',
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
           });
@@ -129,7 +129,7 @@
         const memberId = Number(this.dataset.member);
         this.disabled = true;
         try {
-          const res = await fetch("{{ url_for('ac.quick_log_ia') }}", {
+          const res = await fetch("{{ url_for('quick_log_ia') }}", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ member_id: memberId, reason: 'Quick log IA', approved_by: 'HC Team' })
@@ -150,7 +150,7 @@
         const memberId = Number(this.dataset.member);
         this.disabled = true;
         try {
-          const res = await fetch("{{ url_for('ac.quick_log_exempt') }}", {
+          const res = await fetch("{{ url_for('quick_log_exempt') }}", {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ member_id: memberId, reason: 'Quick log exemption', approved_by: 'HC Team' })

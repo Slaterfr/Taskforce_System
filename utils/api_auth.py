@@ -1,10 +1,14 @@
+import logging
+logger = logging.getLogger(__name__)
+from config import settings
 """
 API Authentication and Authorization Module
 Handles Discord bot API authentication, rate limiting, and permission checking
 """
 
 from functools import wraps
-from flask import request, jsonify, current_app
+from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
 from collections import defaultdict
 import hashlib
@@ -13,27 +17,26 @@ import time
 # Simple in-memory rate limiting (use Redis in production for distributed systems)
 _rate_limit_storage = defaultdict(list)
 
-def verify_api_key(api_key: str) -> bool:
+async def verify_api_key(request: Request):
     """
-    Verify if the provided API key is valid
+    FastAPI dependency to verify the API key from the Authorization header.
+    Raises HTTPException(401) if the key is missing or invalid.
+    """
+    auth_header = request.headers.get('Authorization', '')
     
-    Args:
-        api_key: The API key to verify
-        
-    Returns:
-        bool: True if valid, False otherwise
-    """
-    configured_key = current_app.config.get('DISCORD_BOT_API_KEY')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        raise HTTPException(status_code=401, detail='Authorization header with Bearer token is required')
+    
+    api_key = auth_header[7:]
+    configured_key = getattr(settings, 'DISCORD_BOT_API_KEY', None)
     
     if not configured_key:
-        current_app.logger.error("DISCORD_BOT_API_KEY not configured in environment")
-        return False
+        logger.error("DISCORD_BOT_API_KEY not configured in environment")
+        raise HTTPException(status_code=500, detail='API key not configured on server')
     
-    # Constant-time comparison to prevent timing attacks
-    if len(api_key) != len(configured_key):
-        return False
-    
-    return hashlib.sha256(api_key.encode()).digest() == hashlib.sha256(configured_key.encode()).digest()
+    if len(api_key) != len(configured_key) or hashlib.sha256(api_key.encode()).digest() != hashlib.sha256(configured_key.encode()).digest():
+        logger.warning(f"Invalid API key attempt from {request.client.host if request.client else 'unknown'}")
+        raise HTTPException(status_code=401, detail='Invalid API key')
 
 
 def get_client_identifier():
@@ -119,7 +122,7 @@ def api_key_required(f):
         api_key = auth_header[7:]  # Remove "Bearer " prefix
         
         if not verify_api_key(api_key):
-            current_app.logger.warning(f"Invalid API key attempt from {request.remote_addr}")
+            logger.warning(f"Invalid API key attempt from {request.remote_addr}")
             return jsonify({
                 'success': False,
                 'error': 'invalid_api_key',
@@ -128,7 +131,7 @@ def api_key_required(f):
         
         # Check rate limiting
         client_id = get_client_identifier()
-        max_requests = current_app.config.get('API_RATE_LIMIT', 100)
+        max_requests = getattr(settings, 'API_RATE_LIMIT', 100)
         is_allowed, rate_info = check_rate_limit(client_id, max_requests)
         
         # Add rate limit headers
@@ -139,7 +142,7 @@ def api_key_required(f):
         }
         
         if not is_allowed:
-            current_app.logger.warning(f"Rate limit exceeded for {client_id}")
+            logger.warning(f"Rate limit exceeded for {client_id}")
             response = jsonify({
                 'success': False,
                 'error': 'rate_limit_exceeded',
@@ -174,30 +177,32 @@ def api_key_required(f):
     return decorated_function
 
 
-def log_api_access(endpoint: str, method: str, user_identifier: str = None, 
+def log_api_access(request: Request, endpoint: str, method: str, user_identifier: str = None, 
                    success: bool = True, response_code: int = 200):
     """
     Log API access for audit trail
     
     Args:
+        request: FastAPI Request object
         endpoint: API endpoint accessed
         method: HTTP method
         user_identifier: Discord user ID or other identifier
         success: Whether the request was successful
         response_code: HTTP response code
     """
+    client_ip = request.client.host if getattr(request, 'client', None) else 'unknown'
     log_message = (
         f"API Access - {method} {endpoint} | "
         f"User: {user_identifier or 'unknown'} | "
         f"Status: {response_code} | "
         f"Success: {success} | "
-        f"IP: {request.remote_addr}"
+        f"IP: {client_ip}"
     )
     
     if success:
-        current_app.logger.info(log_message)
+        logger.info(log_message)
     else:
-        current_app.logger.warning(log_message)
+        logger.warning(log_message)
 
 
 def generate_api_key(length: int = 32) -> str:

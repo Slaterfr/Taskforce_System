@@ -1,25 +1,37 @@
 import os
+import secrets
 from dotenv import load_dotenv
 
 load_dotenv()
 
-class Config:
-    SECRET_KEY = 'Cev_Is_Swifts_Fav_Aparently'  # Change this to a secure random key
-    STAFF_PASSWORD = 'task2025'  # Change this to a secure password
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///database/taskforce.db'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # Roblox API settings
-    ROBLOX_GROUP_ID = os.environ.get('ROBLOX_GROUP_ID') or ''
-    ROBLOX_COOKIE = os.environ.get('ROBLOX_COOKIE') or ''  # .ROBLOSECURITY cookie for write operations
-    ROBLOX_SYNC_ENABLED = os.environ.get('ROBLOX_SYNC_ENABLED', 'false').lower() == 'true'
-    ROBLOX_SYNC_INTERVAL = int(os.environ.get('ROBLOX_SYNC_INTERVAL', '3600'))  # Default 1 hour (3600 seconds)
-    ROBLOX_BACKGROUND_SYNC_ENABLED = os.environ.get('ROBLOX_BACKGROUND_SYNC_ENABLED', str(ROBLOX_SYNC_ENABLED)).lower() == 'true'
-    
-    # Discord Bot API Configuration
-    DISCORD_BOT_API_KEY = os.environ.get('TF_SYSTEM_API_KEY') or os.environ.get('DISCORD_BOT_API_KEY', '')
-    API_RATE_LIMIT = int(os.environ.get('API_RATE_LIMIT', '100'))  # Requests per minute
-    API_ENABLE_LOGGING = os.environ.get('API_ENABLE_LOGGING', 'true').lower() == 'true'
-    
-    # Discord Notifications Configuration
-    DISCORD_NOTIFICATION_WEBHOOK_URL = os.environ.get('DISCORD_NOTIFICATION_WEBHOOK_URL', '')
+
+class Settings:
+    # Security — MUST be set in .env in production
+    SECRET_KEY: str = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+    STAFF_PASSWORD: str = os.environ.get("STAFF_PASSWORD", "")
+
+    # Database
+    DATABASE_URL: str = os.environ.get("DATABASE_URL", "sqlite:///database/taskforce.db")
+
+    # Roblox
+    ROBLOX_GROUP_ID: str = os.environ.get("ROBLOX_GROUP_ID", "")
+    ROBLOX_COOKIE: str = os.environ.get("ROBLOX_COOKIE", "")
+    ROBLOX_SYNC_ENABLED: bool = os.environ.get("ROBLOX_SYNC_ENABLED", "false").lower() == "true"
+    ROBLOX_SYNC_INTERVAL: int = int(os.environ.get("ROBLOX_SYNC_INTERVAL", "3600"))
+    ROBLOX_BACKGROUND_SYNC_ENABLED: bool = os.environ.get(
+        "ROBLOX_BACKGROUND_SYNC_ENABLED",
+        os.environ.get("ROBLOX_SYNC_ENABLED", "false"),
+    ).lower() == "true"
+
+    # Bot API
+    DISCORD_BOT_API_KEY: str = (
+        os.environ.get("TF_SYSTEM_API_KEY") or os.environ.get("DISCORD_BOT_API_KEY", "")
+    )
+    API_RATE_LIMIT: int = int(os.environ.get("API_RATE_LIMIT", "100"))
+    API_ENABLE_LOGGING: bool = os.environ.get("API_ENABLE_LOGGING", "true").lower() == "true"
+
+    # Discord Notifications
+    DISCORD_NOTIFICATION_WEBHOOK_URL: str = os.environ.get("DISCORD_NOTIFICATION_WEBHOOK_URL", "")
+
+
+settings = Settings()
