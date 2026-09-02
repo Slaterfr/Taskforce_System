@@ -16,13 +16,14 @@ ACTIVITY_TYPES: dict = {
     "Cancelled Tryout": {"points": 0.5, "limited": True, "description": "Tryout that was cancelled (1 per cycle)"},
     "Tryout Grading": {"points": 0.5, "limited": True, "description": "Graded tryout results (1 per cycle)"},
     "Dueling Supervision/Evaluation": {"points": 0.5, "limited": True, "description": "Supervised or evaluated dueling (1 per cycle)"},
+    "Joint Combat Training": {"points": 1.5, "limited": False, "description": "Participated in Joint Combat Training (JCT)"},
 }
 
 # Quota requirements by rank
 AC_QUOTAS: dict = {
     "Prospect": 1.0,
     "Commander": 2.0,
-    "Marshal": 3.0,
+    "Marshal": 2.0,
     "General": 3.0,
     "Chief General": 3.0,
 }
