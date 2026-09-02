@@ -1,59 +1,79 @@
 {% extends "base.html" %}
 
-{% block title %}Public Activity Progress - Taskforce{% endblock %}
+{% block title %}AC Progress — Taskforce{% endblock %}
 
 {% block content %}
 {# Safe defaults #}
 {% set member_progress = member_progress|default([]) %}
 {% set current_period = current_period|default(None) %}
 
-<div class="row mb-3">
-    <div class="col-12">
-        <h2 style="color: white;">AC Progress — {{ current_period.period_name if current_period else 'No active period'
-            }}</h2>
+<div class="row mb-4 align-items-center">
+    <div class="col-md-8">
+        <div class="d-flex align-items-center">
+            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; border-radius: 14px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);">
+                <i class="fas fa-chart-line fa-lg" style="color: var(--tf-purple-accent);"></i>
+            </div>
+            <div>
+                <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">Activity Check Progress</h2>
+                <p class="text-white-50 mb-0 small">
+                    Tracking cycle: <strong class="text-white">{{ current_period.period_name if current_period else 'No active cycle' }}</strong>
+                </p>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- Member Progress Table -->
-<div class="card">
-    <div class="card-body p-0">
+<div class="tf-card">
+    <div class="tf-card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-award me-2" style="color: var(--tf-purple-accent);"></i>
+            <h5 class="mb-0 text-white fw-bold">Roster Quota Standings</h5>
+        </div>
+        <span class="badge" style="background: rgba(168, 85, 247, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-family: var(--tf-font-mono);">
+            {{ member_progress|length }} Members Tracked
+        </span>
+    </div>
+    <div class="p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+            <table class="table tf-table align-middle">
+                <thead>
                     <tr>
-                        <th>Rank</th>
-                        <th>Member</th>
-                        <th>Quota</th>
-                        <th>Total Points</th>
-                        <th>Progress</th>
-                        <th>Activity Summary</th>
-                        <th>Status</th>
+                        <th style="width: 15%;">Rank</th>
+                        <th style="width: 18%;">Member</th>
+                        <th style="width: 10%;">Quota</th>
+                        <th style="width: 10%;">Points</th>
+                        <th style="width: 22%;">Progress</th>
+                        <th style="width: 15%;">Activity Breakdown</th>
+                        <th style="width: 10%;" class="text-end">Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% if member_progress %}
                     {% for progress in member_progress %}
                     <tr>
-                        <td>{{ progress.member.current_rank }}</td>
                         <td>
-                            <a href="{{ url_for('public_member', member_id=progress.member.id) }}"
-                                class="text-decoration-none">
+                            <span class="badge" style="background: rgba(126, 34, 206, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 8px;">
+                                {{ progress.member.current_rank }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('public_member', member_id=progress.member.id) }}" class="text-white fw-bold text-decoration-none">
                                 {{ progress.member.discord_username }}
                             </a>
                         </td>
-                        <td>{{ progress.quota }}</td>
-                        <td>{{ progress.points|round(1) }}</td>
-                        <td style="min-width: 150px;">
-                            <div class="progress" style="height: 25px;">
+                        <td>
+                            <span class="text-white fw-semibold">{{ progress.quota }} pts</span>
+                        </td>
+                        <td>
+                            <span class="tf-badge-points">{{ progress.points|round(1) }}</span>
+                        </td>
+                        <td style="min-width: 160px;">
+                            <div class="progress" style="height: 22px;">
                                 {% set pct = progress.percentage|round(0) %}
-                                <div class="progress-bar
-                                        {% if progress.is_exempt %}bg-warning
-                                        {% elif progress.is_protected %}bg-info
-                                        {% elif pct >= 100 %}bg-success
-                                        {% elif pct >= 75 %}bg-primary
-                                        {% elif pct >= 50 %}bg-warning
-                                        {% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ pct }}%;"
-                                    aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar {% if progress.is_exempt %}bg-warning{% elif progress.is_protected %}bg-info{% elif pct >= 100 %}bg-success{% elif pct >= 50 %}bg-primary{% else %}bg-danger{% endif %}"
+                                     role="progressbar" style="width: {{ pct }}%;"
+                                     aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
                                     {% if progress.is_exempt %}Exempt
                                     {% elif progress.is_protected %}IA
                                     {% else %}{{ pct }}%{% endif %}
@@ -63,19 +83,15 @@
                         <td>
                             {% for type in activity_types %}
                             {% if progress.activity_summary.get(type) %}
-                            <div class="badge bg-secondary me-1 mb-1">
-                                {{ progress.activity_summary[type].count }} {{ type }}
-                                <span class="text-warning">({{ progress.activity_summary[type].points|round(1)
-                                    }})</span>
-                            </div>
+                            <span class="badge mb-1" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #ffffff;">
+                                {{ progress.activity_summary[type].count }}x {{ type }}
+                                <span style="color: #fde68a;">({{ progress.activity_summary[type].points|round(1) }})</span>
+                            </span>
                             {% endif %}
                             {% endfor %}
                         </td>
-                        <td>
-                            <span class="badge {% if progress.is_exempt %}bg-warning
-                                    {% elif progress.is_protected %}bg-info
-                                    {% elif progress.percentage >= 100 %}bg-success
-                                    {% else %}bg-warning{% endif %}">
+                        <td class="text-end">
+                            <span class="badge {% if progress.is_exempt %}bg-warning{% elif progress.is_protected %}bg-info{% elif progress.percentage >= 100 %}bg-success{% else %}bg-warning{% endif %}">
                                 {{ progress.status }}
                             </span>
                         </td>
@@ -83,7 +99,10 @@
                     {% endfor %}
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center">No member progress data available.</td>
+                        <td colspan="7" class="text-center py-4 text-white-50">
+                            <i class="fas fa-calendar-times fa-2x mb-2 d-block" style="color: var(--tf-purple-accent);"></i>
+                            No member progress data available for this cycle.
+                        </td>
                     </tr>
                     {% endif %}
                 </tbody>

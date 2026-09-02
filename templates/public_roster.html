@@ -1,44 +1,106 @@
 {% extends "base.html" %}
 
-{% block title %}Roster{% endblock %}
+{% block title %}Public Roster — Taskforce{% endblock %}
 
 {% block content %}
-<h1 style="color: white;">Roster</h1>
-<form class="mb-3" method="get">
-  <div class="input-group">
-    <input class="form-control" name="search" value="{{ search }}" placeholder="Search members...">
-    <button class="btn btn-outline-secondary" type="submit">Search</button>
+<div class="row mb-4 align-items-center">
+  <div class="col-md-7">
+    <div class="d-flex align-items-center">
+      <div class="me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; border-radius: 14px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);">
+        <i class="fas fa-users fa-lg" style="color: var(--tf-purple-accent);"></i>
+      </div>
+      <div>
+        <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">Taskforce Roster</h2>
+        <p class="text-white-50 mb-0 small">Official personnel directory and rank registry.</p>
+      </div>
+    </div>
   </div>
-</form>
+  <div class="col-md-5 mt-3 mt-md-0">
+    <form method="get">
+      <div class="input-group">
+        <input class="form-control" name="search" value="{{ search or '' }}" placeholder="Search members by username or rank...">
+        <button class="btn btn-tf-primary" type="submit">
+          <i class="fas fa-search me-1"></i>Search
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
 
-<table class="table table-hover">
-  <thead>
-    <tr>
-      <th>Rank</th>
-      <th>Discord</th>
-      <th>Roblox</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for m in members %}
-    <tr>
-      <td>{{ m.current_rank }}</td>
-      <td>
-        {% if is_staff %}
-        <a href="{{ url_for('member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
-        {% else %}
-        <a href="{{ url_for('public_member', member_id=m.id) }}">{{ m.discord_username }}</a>
-        {% endif %}
-      </td>
-      <td>{{ m.roblox_username or 'N/A' }}</td>
-      <td>
-        {% if is_staff %}
-        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('edit_member', member_id=m.id) }}">Edit</a>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="tf-card">
+  <div class="tf-card-header d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center">
+      <i class="fas fa-id-card me-2" style="color: var(--tf-purple-accent);"></i>
+      <h5 class="mb-0 text-white fw-bold">Active Members</h5>
+    </div>
+    <span class="badge" style="background: rgba(168, 85, 247, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-family: var(--tf-font-mono);">
+      {{ members|length }} Registered
+    </span>
+  </div>
+  <div class="p-0">
+    <div class="table-responsive">
+      <table class="table tf-table align-middle">
+        <thead>
+          <tr>
+            <th style="width: 25%;">Rank</th>
+            <th style="width: 35%;">Discord User</th>
+            <th style="width: 25%;">Roblox Profile</th>
+            <th style="width: 15%;" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in members %}
+          <tr>
+            <td>
+              <span class="badge" style="background: rgba(126, 34, 206, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-weight: 600; padding: 0.35rem 0.75rem; border-radius: 8px;">
+                <i class="fas fa-shield-alt me-1" style="color: var(--tf-purple-accent);"></i>{{ m.current_rank }}
+              </span>
+            </td>
+            <td>
+              <div class="d-flex align-items-center">
+                <div class="me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(88, 101, 242, 0.2); border: 1px solid rgba(88, 101, 242, 0.4);">
+                  <i class="fab fa-discord" style="color: #5865f2;"></i>
+                </div>
+                {% if is_staff %}
+                <a href="{{ url_for('member_detail', member_id=m.id) }}" class="text-white fw-bold text-decoration-none hover-glow">
+                  {{ m.discord_username }}
+                </a>
+                {% else %}
+                <a href="{{ url_for('public_member', member_id=m.id) }}" class="text-white fw-bold text-decoration-none hover-glow">
+                  {{ m.discord_username }}
+                </a>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              <div class="d-flex align-items-center text-white-50">
+                <i class="fas fa-cube me-2" style="color: #cbd5e1;"></i>
+                <span class="text-white">{{ m.roblox_username or 'N/A' }}</span>
+              </div>
+            </td>
+            <td class="text-end">
+              {% if is_staff %}
+              <a class="btn btn-sm btn-tf-outline" href="{{ url_for('edit_member', member_id=m.id) }}" title="Edit Member">
+                <i class="fas fa-edit me-1"></i>Edit
+              </a>
+              {% else %}
+              <a class="btn btn-sm btn-tf-outline" href="{{ url_for('public_member', member_id=m.id) }}" title="View Profile">
+                <i class="fas fa-eye me-1"></i>View
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="4" class="text-center py-4 text-white-50">
+              <i class="fas fa-search fa-2x mb-2 d-block" style="color: var(--tf-purple-accent);"></i>
+              No members found matching your query.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}

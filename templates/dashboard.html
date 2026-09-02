@@ -1,97 +1,127 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - Taskforce Management{% endblock %}
+{% block title %}Dashboard — Taskforce Management{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row mb-4 align-items-center">
     <div class="col-12">
-        <h1 class="mb-0" , style="color: white;">Dashboard</h1>
-        <p , style="color: white;">Overview of your taskforce management system</p>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-grid gap-2">
-                    {% if is_staff %}
-                    <a href="{{ url_for('add_member') }}" class="btn btn-primary">
-                        <i class="fas fa-user-plus me-2"></i>Add Member
-                    </a>
-                    <a href="{{ url_for('promote_member') }}" class="btn btn-info">
-                        <i class="fas fa-arrow-up me-2"></i>Change Member Rank
-                    </a>
-                    <a href="{{ url_for('members') }}" class="btn btn-secondary">
-                        <i class="fas fa-users-cog me-2"></i>Manage Members
-                    </a>
-                    <a href="{{ url_for('ac_dashboard') }}" class="btn btn-success">
-                        <i class="fas fa-check-circle me-2"></i>AC Dashboard
-                    </a>
-                    
-                    {% else %}
-                    <a href="{{ url_for('public_roster') }}" class="btn btn-primary">
-                        <i class="fas fa-users me-2"></i>View Roster
-                    </a>
-                    <a href="{{ url_for('staff_login') }}" class="btn btn-outline-primary">
-                        <i class="fas fa-sign-in-alt me-2"></i>Staff Login
-                    </a>
-                    {% endif %}
-                </div>
+        <div class="d-flex align-items-center">
+            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; border-radius: 14px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);">
+                <i class="fas fa-gauge-high fa-lg" style="color: var(--tf-purple-accent);"></i>
             </div>
-        </div>
-    </div>
-
-    <div class="col-md-8">
-        <!-- summary cards -->
-        <div class="row">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white p-3">
-                    <h5>Members</h5>
-                    <p class="mb-0">{{ member_count or 0 }}</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-success text-white p-3">
-                    <h5>Recent Activity</h5>
-                    <p class="mb-0">{{ recent_activities|length }}</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-info text-white p-3">
-                    <h5>AC Periods</h5>
-                    <p class="mb-0">—</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-dark text-white p-3 border-secondary">
-                    <h5>Roblox</h5>
-                    {% set sync_enabled = config['ROBLOX_SYNC_ENABLED'] %}
-                    {% set has_cookie = config['ROBLOX_COOKIE'] %}
-
-                    {% if sync_enabled and has_cookie %}
-                    <p class="mb-0 text-success"><i class="fas fa-link me-1"></i>Connected</p>
-                    {% elif sync_enabled and not has_cookie %}
-                    <p class="mb-0 text-danger"><i class="fas fa-unlink me-1"></i>Missing Cookie</p>
-                    {% else %}
-                    <p class="mb-0 text-secondary"><i class="fas fa-pause-circle me-1"></i>Disabled</p>
-                    {% endif %}
-
-                    <a href="{{ url_for('update_cookie') }}" class="btn btn-outline-light btn-sm mt-2">
-                        <i class="fas fa-key me-1"></i> Update
-                    </a>
-                </div>
+            <div>
+                <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">Command Dashboard</h2>
+                <p class="text-white-50 mb-0 small">Overview and operational control of the Taskforce management system.</p>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-8">
-        <!-- optional content / charts -->
+<div class="row mb-4 g-4">
+    <!-- Quick Actions Panel -->
+    <div class="col-lg-4">
+        <div class="tf-card h-100">
+            <div class="tf-card-header d-flex align-items-center">
+                <i class="fas fa-bolt me-2" style="color: var(--tf-purple-accent);"></i>
+                <h5 class="mb-0 text-white fw-bold">Quick Operations</h5>
+            </div>
+            <div class="p-4 d-grid gap-3">
+                {% if is_staff %}
+                <a href="{{ url_for('add_member') }}" class="btn btn-tf-primary py-2 d-flex align-items-center justify-content-between">
+                    <span><i class="fas fa-user-plus me-2"></i>Add Member</span>
+                    <i class="fas fa-chevron-right small"></i>
+                </a>
+                <a href="{{ url_for('promote_member') }}" class="btn btn-tf-outline py-2 d-flex align-items-center justify-content-between">
+                    <span><i class="fas fa-arrow-up me-2" style="color: #38bdf8;"></i>Change Member Rank</span>
+                    <i class="fas fa-chevron-right small"></i>
+                </a>
+                <a href="{{ url_for('members') }}" class="btn btn-tf-outline py-2 d-flex align-items-center justify-content-between">
+                    <span><i class="fas fa-users-cog me-2" style="color: #cbd5e1;"></i>Manage Members</span>
+                    <i class="fas fa-chevron-right small"></i>
+                </a>
+                <a href="{{ url_for('ac_dashboard') }}" class="btn btn-tf-outline py-2 d-flex align-items-center justify-content-between">
+                    <span><i class="fas fa-check-circle me-2" style="color: #34d399;"></i>AC Dashboard</span>
+                    <i class="fas fa-chevron-right small"></i>
+                </a>
+                {% else %}
+                <a href="{{ url_for('public_roster') }}" class="btn btn-tf-primary py-2">
+                    <i class="fas fa-users me-2"></i>View Public Roster
+                </a>
+                <a href="{{ url_for('staff_login') }}" class="btn btn-tf-outline py-2">
+                    <i class="fas fa-sign-in-alt me-2"></i>Staff Login
+                </a>
+                {% endif %}
+            </div>
+        </div>
     </div>
-    <div class="col-md-4">
-        <!-- optional side panel -->
+
+    <!-- Summary Metrics -->
+    <div class="col-lg-8">
+        <div class="row g-3">
+            <div class="col-sm-6">
+                <div class="tf-card p-4 d-flex align-items-center justify-content-between" style="border-left: 4px solid var(--tf-purple-accent);">
+                    <div>
+                        <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Total Members</span>
+                        <h2 class="mb-0 fw-bold text-white mt-1">{{ member_count or 0 }}</h2>
+                        <div class="text-white-50 small mt-1">In active registry</div>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border);">
+                        <i class="fas fa-users fa-lg" style="color: var(--tf-purple-accent);"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6">
+                <div class="tf-card p-4 d-flex align-items-center justify-content-between" style="border-left: 4px solid #10b981;">
+                    <div>
+                        <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Recent Activity</span>
+                        <h2 class="mb-0 fw-bold text-white mt-1">{{ recent_activities|length }}</h2>
+                        <div class="text-white-50 small mt-1">Logged records</div>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);">
+                        <i class="fas fa-chart-line fa-lg" style="color: #34d399;"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6">
+                <div class="tf-card p-4 d-flex align-items-center justify-content-between" style="border-left: 4px solid #38bdf8;">
+                    <div>
+                        <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">AC Modules</span>
+                        <h2 class="mb-0 fw-bold text-white mt-1">Active</h2>
+                        <div class="text-white-50 small mt-1">Dynamic quotas & tracking</div>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3);">
+                        <i class="fas fa-sliders fa-lg" style="color: #38bdf8;"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-sm-6">
+                <div class="tf-card p-4 d-flex align-items-center justify-content-between" style="border-left: 4px solid #f59e0b;">
+                    <div>
+                        <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Roblox Sync</span>
+                        {% set sync_enabled = config['ROBLOX_SYNC_ENABLED'] %}
+                        {% set has_cookie = config['ROBLOX_COOKIE'] %}
+
+                        {% if sync_enabled and has_cookie %}
+                        <div class="text-success fw-bold fs-5 mt-1"><i class="fas fa-link me-1"></i>Connected</div>
+                        {% elif sync_enabled and not has_cookie %}
+                        <div class="text-danger fw-bold fs-5 mt-1"><i class="fas fa-unlink me-1"></i>Missing Cookie</div>
+                        {% else %}
+                        <div class="text-white-50 fw-bold fs-5 mt-1"><i class="fas fa-pause-circle me-1"></i>Disabled</div>
+                        {% endif %}
+
+                        <a href="{{ url_for('update_cookie') }}" class="btn btn-sm btn-tf-outline mt-2" style="font-size: 0.75rem;">
+                            <i class="fas fa-key me-1"></i>Update Cookie
+                        </a>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);">
+                        <i class="fas fa-cube fa-lg" style="color: #fbbf24;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

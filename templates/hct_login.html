@@ -1,19 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}HCT Login{% endblock %}
+{% block title %}HCT Command Clearance — Taskforce{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card p-3">
-            <h4>HCT Login</h4>
-            <p class="text-muted">High Command Team Access Only</p>
-            <form method="post">
-                <div class="mb-3">
-                    <label class="form-label">HCT Password</label>
-                    <input type="password" name="password" class="form-control" required>
+<div class="row justify-content-center py-4">
+    <div class="col-md-5 col-lg-4">
+        <div class="tf-card p-4" style="border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 30px rgba(239, 68, 68, 0.15);">
+            <div class="text-center mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center mb-3" style="width: 58px; height: 58px; border-radius: 16px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); box-shadow: 0 0 25px rgba(239, 68, 68, 0.25);">
+                    <i class="fas fa-crown fa-xl" style="color: #f87171;"></i>
                 </div>
-                <button class="btn btn-danger" type="submit">Login to HCT Area</button>
+                <h4 class="text-white fw-bold mb-1">High Command Access</h4>
+                <p class="text-white-50 small mb-0">Restricted zone: Activity definitions & system quotas</p>
+            </div>
+
+            <form method="post">
+                <div class="mb-4">
+                    <label class="form-label text-white small fw-bold text-uppercase" style="letter-spacing: 0.05em;">HCT Passphrase</label>
+                    <div class="input-group">
+                        <span class="input-group-text" style="background: rgba(12, 7, 22, 0.85); border: 1px solid rgba(239, 68, 68, 0.4); border-right: none; color: #f87171;">
+                            <i class="fas fa-key"></i>
+                        </span>
+                        <input type="password" name="password" class="form-control tf-input" style="border-color: rgba(239, 68, 68, 0.4) !important; border-left: none !important;" placeholder="••••••••••••" required autofocus>
+                    </div>
+                </div>
+                <button class="btn btn-danger w-100 py-2 fw-bold" style="border-radius: 10px; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.35);" type="submit">
+                    <i class="fas fa-shield-halved me-2"></i>Access Command Console
+                </button>
             </form>
         </div>
     </div>

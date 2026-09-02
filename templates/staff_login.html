@@ -1,18 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}Staff Login{% endblock %}
+{% block title %}Staff Authentication — Taskforce{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-6">
-    <div class="card p-3">
-      <h4>Staff Login</h4>
-      <form method="post">
-        <div class="mb-3">
-          <label class="form-label">Password</label>
-          <input type="password" name="password" class="form-control" required>
+<div class="row justify-content-center py-4">
+  <div class="col-md-5 col-lg-4">
+    <div class="tf-card p-4">
+      <div class="text-center mb-4">
+        <div class="d-inline-flex align-items-center justify-content-center mb-3" style="width: 58px; height: 58px; border-radius: 16px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);">
+          <i class="fas fa-shield-cat fa-xl" style="color: var(--tf-purple-accent);"></i>
         </div>
-        <button class="btn btn-primary" type="submit">Login</button>
+        <h4 class="text-white fw-bold mb-1">Staff Access</h4>
+        <p class="text-white-50 small mb-0">Enter your clearance passphrase to manage personnel</p>
+      </div>
+
+      <form method="post">
+        <div class="mb-4">
+          <label class="form-label text-white small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Staff Password</label>
+          <div class="input-group">
+            <span class="input-group-text" style="background: rgba(12, 7, 22, 0.85); border: 1px solid rgba(168, 85, 247, 0.35); border-right: none; color: var(--tf-purple-accent);">
+              <i class="fas fa-lock"></i>
+            </span>
+            <input type="password" name="password" class="form-control tf-input" style="border-left: none !important;" placeholder="••••••••••••" required autofocus>
+          </div>
+        </div>
+        <button class="btn btn-tf-primary w-100 py-2 fw-bold" type="submit">
+          <i class="fas fa-arrow-right-to-bracket me-2"></i>Authenticate
+        </button>
       </form>
     </div>
   </div>

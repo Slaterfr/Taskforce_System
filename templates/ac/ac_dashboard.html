@@ -1,48 +1,51 @@
 {% extends "base.html" %}
 
-{% block title %}Activity Checks - Taskforce Management{% endblock %}
+{% block title %}Activity Checks — Taskforce Management{% endblock %}
 
 {% block content %}
-{# Safe defaults to avoid template errors when context values are missing #}
+{# Safe defaults #}
 {% set member_progress = member_progress|default([]) %}
 {% set current_period = current_period|default(None) %}
 {% set is_staff = is_staff|default(False) %}
 
-<div class="row mb-3">
-    <div class="col-md-8">
-        <h2 style="color: white;">Activity Check — {{ current_period.period_name if current_period else 'No active
-            period' }}</h2>
+<div class="row mb-4 align-items-center">
+    <div class="col-lg-6">
+        <div class="d-flex align-items-center">
+            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; border-radius: 14px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);">
+                <i class="fas fa-clipboard-check fa-lg" style="color: var(--tf-purple-accent);"></i>
+            </div>
+            <div>
+                <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">Activity Check Dashboard</h2>
+                <p class="text-white-50 mb-0 small">
+                    Cycle: <strong class="text-white">{{ current_period.period_name if current_period else 'No active cycle' }}</strong>
+                </p>
+            </div>
+        </div>
     </div>
-    <div class="col-md-4 text-end">
+    <div class="col-lg-6 text-lg-end mt-3 mt-lg-0">
         {% if is_staff %}
-        <a href="{{ url_for('log_activity') }}" class="btn btn-outline-primary me-2">
+        <a href="{{ url_for('log_activity') }}" class="btn btn-tf-primary btn-sm me-1 mb-1">
             <i class="fas fa-plus me-1"></i>Log Activity
         </a>
-        <a href="{{ url_for('quick_log') }}" class="btn btn-outline-success me-2">
-            <i class="fas fa-bolt me-1"></i>Quick Log
+        <a href="{{ url_for('quick_log') }}" class="btn btn-tf-outline btn-sm me-1 mb-1">
+            <i class="fas fa-bolt me-1" style="color: #6ee7b7;"></i>Quick Log
         </a>
         {% if is_hct %}
-        <a href="{{ url_for('ac_config') }}" class="btn btn-outline-light me-2" title="Manage Activities & Quotas">
-            <i class="fas fa-sliders-h me-1"></i>AC Settings
+        <a href="{{ url_for('ac_config') }}" class="btn btn-tf-outline btn-sm me-1 mb-1" title="Manage Activities & Quotas">
+            <i class="fas fa-sliders-h me-1" style="color: var(--tf-purple-accent);"></i>AC Settings
         </a>
         {% endif %}
         {% if current_period %}
-        <a href="{{ url_for('title_rewards') }}" class="btn btn-outline-warning me-2" title="View title rewards">
-            <i class="fas fa-trophy me-1"></i>Title Rewards
+        <a href="{{ url_for('title_rewards') }}" class="btn btn-tf-outline btn-sm me-1 mb-1" title="View title rewards">
+            <i class="fas fa-trophy me-1" style="color: #fde68a;"></i>Titles
         </a>
-        <a href="{{ url_for('edit_ac_period') }}" class="btn btn-outline-info me-2" title="Edit period name">
-            <i class="fas fa-edit me-1"></i>Edit Period
+        <a href="{{ url_for('edit_ac_period') }}" class="btn btn-tf-outline btn-sm me-1 mb-1" title="Edit period name">
+            <i class="fas fa-edit me-1"></i>Edit
         </a>
-        <form action="{{ url_for('clear_all_activities') }}" method="post" class="d-inline-block me-2"
+        <form action="{{ url_for('clear_all_activities') }}" method="post" class="d-inline-block me-1 mb-1"
             onsubmit="return confirm('Are you sure you want to clear ALL activities for ALL members in this period? This cannot be undone!');">
-            <button class="btn btn-outline-danger" type="submit" title="Clear all AC activities">
-                <i class="fas fa-trash-alt me-1"></i>Clear ACs
-            </button>
-        </form>
-        <form action="{{ url_for('clear_titles') }}" method="post" class="d-inline-block me-2"
-            onsubmit="return confirm('Are you sure you want to clear all title tracking data? This will reset monthly activity history for titles!');">
-            <button class="btn btn-outline-warning" type="submit" title="Clear title tracking data">
-                <i class="fas fa-crown me-1"></i>Clear Titles
+            <button class="btn btn-sm btn-tf-outline" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5 !important;" type="submit" title="Clear all AC activities">
+                <i class="fas fa-trash me-1"></i>Clear ACs
             </button>
         </form>
         {% endif %}
@@ -51,44 +54,56 @@
 </div>
 
 <!-- AC Overview Stats -->
-<div class="row mb-4">
+<div class="row mb-4 g-3">
     {% set total_members = member_progress|length %}
     {% set passed_members = member_progress|selectattr('status', 'equalto', 'Passed')|list|length %}
     {% set protected_members = member_progress|selectattr('is_protected')|list|length %}
     {% set at_risk = member_progress|rejectattr('is_protected')|selectattr('percentage', 'lt', 50)|list|length %}
 
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <h5 class="card-title">Total Members</h5>
-                <h2 class="mb-0">{{ total_members }}</h2>
+    <div class="col-sm-6 col-lg-3">
+        <div class="tf-card p-3 d-flex align-items-center justify-content-between" style="border-left: 4px solid var(--tf-purple-accent);">
+            <div>
+                <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Total Members</span>
+                <h2 class="mb-0 fw-bold text-white mt-1">{{ total_members }}</h2>
+            </div>
+            <div class="d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border);">
+                <i class="fas fa-users" style="color: var(--tf-purple-accent);"></i>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <h5 class="card-title">Passed</h5>
-                <h2 class="mb-0">{{ passed_members }}</h2>
+    <div class="col-sm-6 col-lg-3">
+        <div class="tf-card p-3 d-flex align-items-center justify-content-between" style="border-left: 4px solid #10b981;">
+            <div>
+                <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Passed Quota</span>
+                <h2 class="mb-0 fw-bold text-white mt-1">{{ passed_members }}</h2>
+            </div>
+            <div class="d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);">
+                <i class="fas fa-check-circle" style="color: #34d399;"></i>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card bg-info text-white">
-            <div class="card-body">
-                <h5 class="card-title">Protected (IA)</h5>
-                <h2 class="mb-0">{{ protected_members }}</h2>
+    <div class="col-sm-6 col-lg-3">
+        <div class="tf-card p-3 d-flex align-items-center justify-content-between" style="border-left: 4px solid #38bdf8;">
+            <div>
+                <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Protected (IA)</span>
+                <h2 class="mb-0 fw-bold text-white mt-1">{{ protected_members }}</h2>
+            </div>
+            <div class="d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 12px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3);">
+                <i class="fas fa-shield-alt" style="color: #38bdf8;"></i>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card bg-warning text-white">
-            <div class="card-body">
-                <h5 class="card-title">At Risk</h5>
-                <h2 class="mb-0">{{ at_risk }}</h2>
+    <div class="col-sm-6 col-lg-3">
+        <div class="tf-card p-3 d-flex align-items-center justify-content-between" style="border-left: 4px solid #f59e0b;">
+            <div>
+                <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">At Risk (&lt;50%)</span>
+                <h2 class="mb-0 fw-bold text-white mt-1">{{ at_risk }}</h2>
+            </div>
+            <div class="d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 12px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);">
+                <i class="fas fa-triangle-exclamation" style="color: #fbbf24;"></i>
             </div>
         </div>
     </div>
@@ -96,99 +111,87 @@
 
 <!-- Title Rewards Summary -->
 {% if title_winners and title_winners|length > 0 %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card border-warning">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0">
-                    <i class="fas fa-trophy me-2"></i>Title Rewards Winners
-                    <a href="{{ url_for('title_rewards') }}" class="btn btn-sm btn-outline-dark float-end">
-                        View Details <i class="fas fa-arrow-right ms-1"></i>
-                    </a>
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    {% for title, info in title_winners.items() %}
-                    <div class="col-md-3 mb-2">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-medal text-warning me-2"></i>
-                            <div>
-                                <strong>@{{ title }}</strong><br>
-                                <small class="text-muted">{{ info.winner }} ({{ info.count }})</small>
-                            </div>
+<div class="tf-card mb-4">
+    <div class="tf-card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-trophy me-2" style="color: #fbbf24;"></i>
+            <h5 class="mb-0 text-white fw-bold">Title Rewards Leaders</h5>
+        </div>
+        <a href="{{ url_for('title_rewards') }}" class="btn btn-sm btn-tf-outline">
+            View Details <i class="fas fa-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="p-4">
+        <div class="row g-3">
+            {% for title, info in title_winners.items() %}
+            <div class="col-md-3">
+                <div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-medal me-2 fa-lg" style="color: #fbbf24;"></i>
+                        <div>
+                            <strong class="text-white">@{{ title }}</strong>
+                            <div class="text-white-50 small">{{ info.winner }} ({{ info.count }} entries)</div>
                         </div>
                     </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<!-- Activity Type Statistics -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">Activity Statistics</h5>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            {% for type in activity_types %}
-            <div class="col-md-3 mb-3">
-                <div class="border rounded p-3 text-center">
-                    <h6>{{ type }}</h6>
-                    <div class="h3 mb-0">{{ activity_stats.get(type, {}).get('count', 0) }}</div>
-                    <div class="text-muted">
-                        Total: {{ activity_stats.get(type, {}).get('total_points', 0)|round(1) }} points
-                    </div>
-                    <small class="text-muted">{{ activity_types[type].points }} points each</small>
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Member Progress Table -->
-<div class="card">
-    <div class="card-body p-0">
+<div class="tf-card">
+    <div class="tf-card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-list-check me-2" style="color: var(--tf-purple-accent);"></i>
+            <h5 class="mb-0 text-white fw-bold">Member Activity Checks</h5>
+        </div>
+        <span class="badge" style="background: rgba(168, 85, 247, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-family: var(--tf-font-mono);">
+            {{ member_progress|length }} Total
+        </span>
+    </div>
+    <div class="p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+            <table class="table tf-table align-middle">
+                <thead>
                     <tr>
-                        <th>Rank</th>
-                        <th>Member</th>
-                        <th>Quota</th>
-                        <th>Total Points</th>
-                        <th>Progress</th>
-                        <th>Activity Summary</th>
-                        <th>Status</th>
+                        <th style="width: 15%;">Rank</th>
+                        <th style="width: 18%;">Member</th>
+                        <th style="width: 10%;">Quota</th>
+                        <th style="width: 10%;">Points</th>
+                        <th style="width: 22%;">Progress</th>
+                        <th style="width: 15%;">Activity Breakdown</th>
+                        <th style="width: 10%;" class="text-end">Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% if member_progress %}
                     {% for progress in member_progress %}
                     <tr>
-                        <td>{{ progress.member.current_rank }}</td>
                         <td>
-                            <a href="{{ url_for('ac_member_detail', member_id=progress.member.id) }}">
+                            <span class="badge" style="background: rgba(126, 34, 206, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 8px;">
+                                {{ progress.member.current_rank }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('ac_member_detail', member_id=progress.member.id) }}" class="text-white fw-bold text-decoration-none">
                                 {{ progress.member.discord_username }}
                             </a>
                         </td>
-                        <td>{{ progress.quota }}</td>
-                        <td>{{ progress.points|round(1) }}</td>
-                        <td style="min-width: 150px;">
-                            <div class="progress" style="height: 25px;">
+                        <td>
+                            <span class="text-white fw-semibold">{{ progress.quota }} pts</span>
+                        </td>
+                        <td>
+                            <span class="tf-badge-points">{{ progress.points|round(1) }}</span>
+                        </td>
+                        <td style="min-width: 160px;">
+                            <div class="progress" style="height: 22px;">
                                 {% set pct = progress.percentage|round(0) %}
-                                <div class="progress-bar
-                                        {% if progress.is_exempt %}bg-warning
-                                        {% elif progress.is_protected %}bg-info
-                                        {% elif pct >= 100 %}bg-success
-                                        {% elif pct >= 75 %}bg-primary
-                                        {% elif pct >= 50 %}bg-warning
-                                        {% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ pct }}%;"
-                                    aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar {% if progress.is_exempt %}bg-warning{% elif progress.is_protected %}bg-info{% elif pct >= 100 %}bg-success{% elif pct >= 50 %}bg-primary{% else %}bg-danger{% endif %}"
+                                     role="progressbar" style="width: {{ pct }}%;"
+                                     aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
                                     {% if progress.is_exempt %}Exempt
                                     {% elif progress.is_protected %}IA
                                     {% else %}{{ pct }}%{% endif %}
@@ -198,19 +201,15 @@
                         <td>
                             {% for type in activity_types %}
                             {% if progress.activity_summary.get(type) %}
-                            <div class="badge bg-secondary me-1 mb-1">
-                                {{ progress.activity_summary[type].count }} {{ type }}
-                                <span class="text-warning">({{ progress.activity_summary[type].points|round(1)
-                                    }})</span>
-                            </div>
+                            <span class="badge mb-1" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #ffffff;">
+                                {{ progress.activity_summary[type].count }}x {{ type }}
+                                <span style="color: #fde68a;">({{ progress.activity_summary[type].points|round(1) }})</span>
+                            </span>
                             {% endif %}
                             {% endfor %}
                         </td>
-                        <td>
-                            <span class="badge {% if progress.is_exempt %}bg-warning
-                                    {% elif progress.is_protected %}bg-info
-                                    {% elif progress.percentage >= 100 %}bg-success
-                                    {% else %}bg-warning{% endif %}">
+                        <td class="text-end">
+                            <span class="badge {% if progress.is_exempt %}bg-warning{% elif progress.is_protected %}bg-info{% elif progress.percentage >= 100 %}bg-success{% else %}bg-warning{% endif %}">
                                 {{ progress.status }}
                             </span>
                         </td>
@@ -218,7 +217,10 @@
                     {% endfor %}
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center">No member progress data available.</td>
+                        <td colspan="7" class="text-center py-4 text-white-50">
+                            <i class="fas fa-calendar-times fa-2x mb-2 d-block" style="color: var(--tf-purple-accent);"></i>
+                            No member progress data available for this cycle.
+                        </td>
                     </tr>
                     {% endif %}
                 </tbody>
