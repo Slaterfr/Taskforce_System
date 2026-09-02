@@ -423,3 +423,133 @@ async def clear_member_activities(request: Request, member_id):
     deleted_count = ac_service.clear_member_activities(member_id, period_id)
     flash(request, f'Deleted {deleted_count} activity entries for member.', 'success')
     return RedirectResponse(url_for(request, 'ac_member_detail', member_id=member_id), status_code=303)
+
+
+# ============================================================================
+# HCT CONFIGURATION: ACTIVITIES & RANK QUOTAS
+# ============================================================================
+
+@router.get('/config', name='ac_config')
+@hct_required
+async def ac_config(request: Request):
+    """Configuration management panel for activities and rank quotas."""
+    activity_types = ac_service.get_all_activity_types()
+    rank_quotas = ac_service.get_all_rank_quotas()
+    return templates.TemplateResponse('ac/ac_config.html', {
+        "request": request,
+        "activity_types": activity_types,
+        "rank_quotas": rank_quotas,
+    })
+
+
+@router.post('/config/activity/create', name='create_activity_type')
+@hct_required
+async def create_activity_type_route(request: Request):
+    form = await request.form()
+    name = form.get('name', '').strip()
+    points = float(form.get('points', 1.0))
+    is_limited = form.get('is_limited') == 'on'
+    description = form.get('description', '').strip()
+
+    result = ac_service.create_activity_type(
+        name=name,
+        points=points,
+        is_limited=is_limited,
+        description=description,
+    )
+    if result['success']:
+        flash(request, f'Activity "{name}" created successfully ({points} pts).', 'success')
+    else:
+        flash(request, result.get('error', 'Failed to create activity type.'), 'error')
+
+    return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+
+
+@router.post('/config/activity/{activity_id}/edit', name='edit_activity_type')
+@hct_required
+async def edit_activity_type_route(request: Request, activity_id: int):
+    form = await request.form()
+    name = form.get('name', '').strip()
+    points = float(form.get('points', 1.0))
+    is_limited = form.get('is_limited') == 'on'
+    description = form.get('description', '').strip()
+    is_active = form.get('is_active') == 'on'
+
+    result = ac_service.update_activity_type(
+        activity_type_id=activity_id,
+        name=name,
+        points=points,
+        is_limited=is_limited,
+        description=description,
+        is_active=is_active,
+    )
+    if result['success']:
+        flash(request, f'Activity "{name}" updated successfully.', 'success')
+    else:
+        flash(request, result.get('error', 'Failed to update activity type.'), 'error')
+
+    return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+
+
+@router.post('/config/activity/{activity_id}/delete', name='delete_activity_type')
+@hct_required
+async def delete_activity_type_route(request: Request, activity_id: int):
+    result = ac_service.delete_activity_type(activity_id)
+    if result['success']:
+        flash(request, 'Activity type deleted successfully.', 'success')
+    else:
+        flash(request, result.get('error', 'Failed to delete activity type.'), 'error')
+
+    return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+
+
+@router.post('/config/quota/create', name='create_rank_quota')
+@hct_required
+async def create_rank_quota_route(request: Request):
+    form = await request.form()
+    rank_name = form.get('rank_name', '').strip()
+    required_points = float(form.get('required_points', 0.0))
+
+    result = ac_service.create_rank_quota(
+        rank_name=rank_name,
+        required_points=required_points,
+    )
+    if result['success']:
+        flash(request, f'Quota for "{rank_name}" set to {required_points} points.', 'success')
+    else:
+        flash(request, result.get('error', 'Failed to create rank quota.'), 'error')
+
+    return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+
+
+@router.post('/config/quota/{quota_id}/edit', name='edit_rank_quota')
+@hct_required
+async def edit_rank_quota_route(request: Request, quota_id: int):
+    form = await request.form()
+    rank_name = form.get('rank_name', '').strip()
+    required_points = float(form.get('required_points', 0.0))
+
+    result = ac_service.update_rank_quota(
+        quota_id=quota_id,
+        rank_name=rank_name,
+        required_points=required_points,
+    )
+    if result['success']:
+        flash(request, f'Quota for "{rank_name}" updated to {required_points} points.', 'success')
+    else:
+        flash(request, result.get('error', 'Failed to update rank quota.'), 'error')
+
+    return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+
+
+@router.post('/config/quota/{quota_id}/delete', name='delete_rank_quota')
+@hct_required
+async def delete_rank_quota_route(request: Request, quota_id: int):
+    result = ac_service.delete_rank_quota(quota_id)
+    if result['success']:
+        flash(request, 'Rank quota requirement deleted.', 'success')
+    else:
+        flash(request, result.get('error', 'Failed to delete rank quota.'), 'error')
+
+    return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+

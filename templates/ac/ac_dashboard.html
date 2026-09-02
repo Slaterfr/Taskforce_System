@@ -21,6 +21,11 @@
         <a href="{{ url_for('quick_log') }}" class="btn btn-outline-success me-2">
             <i class="fas fa-bolt me-1"></i>Quick Log
         </a>
+        {% if is_hct %}
+        <a href="{{ url_for('ac_config') }}" class="btn btn-outline-light me-2" title="Manage Activities & Quotas">
+            <i class="fas fa-sliders-h me-1"></i>AC Settings
+        </a>
+        {% endif %}
         {% if current_period %}
         <a href="{{ url_for('title_rewards') }}" class="btn btn-outline-warning me-2" title="View title rewards">
             <i class="fas fa-trophy me-1"></i>Title Rewards

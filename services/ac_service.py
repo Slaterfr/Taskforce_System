@@ -91,6 +91,192 @@ def is_limited_activity(activity_type: str, tenant_id: int = 1) -> bool:
     return False
 
 
+# -- Dynamic Activity Types & Rank Quotas Management -------------------------
+
+def get_all_activity_types(tenant_id: int = 1, include_inactive: bool = True) -> list:
+    """Return all ActivityType objects for a tenant, ordered by name."""
+    session = db_session()
+    stmt = select(ActivityType).where(ActivityType.tenant_id == tenant_id)
+    if not include_inactive:
+        stmt = stmt.where(ActivityType.is_active == True)
+    return session.exec(stmt.order_by(ActivityType.name)).all()
+
+
+def create_activity_type(
+    name: str,
+    points: float,
+    is_limited: bool = False,
+    description: str = "",
+    tenant_id: int = 1,
+) -> dict:
+    """Create a new activity type."""
+    name = (name or "").strip()
+    if not name:
+        return {"success": False, "error": "Name is required"}
+
+    session = db_session()
+    existing = session.exec(
+        select(ActivityType).where(
+            ActivityType.tenant_id == tenant_id,
+            func.lower(ActivityType.name) == name.lower(),
+        )
+    ).first()
+    if existing:
+        return {"success": False, "error": f"Activity '{name}' already exists"}
+
+    new_type = ActivityType(
+        tenant_id=tenant_id,
+        name=name,
+        points=float(points),
+        is_limited=bool(is_limited),
+        description=description.strip() if description else None,
+        is_active=True,
+    )
+    session.add(new_type)
+    session.commit()
+    session.refresh(new_type)
+    return {"success": True, "activity_type": new_type}
+
+
+def update_activity_type(
+    activity_type_id: int,
+    name: str,
+    points: float,
+    is_limited: bool,
+    description: str,
+    is_active: bool = True,
+) -> dict:
+    """Update an existing activity type."""
+    name = (name or "").strip()
+    if not name:
+        return {"success": False, "error": "Name is required"}
+
+    session = db_session()
+    act = session.get(ActivityType, activity_type_id)
+    if not act:
+        return {"success": False, "error": "Activity type not found"}
+
+    conflict = session.exec(
+        select(ActivityType).where(
+            ActivityType.tenant_id == act.tenant_id,
+            func.lower(ActivityType.name) == name.lower(),
+            ActivityType.id != activity_type_id,
+        )
+    ).first()
+    if conflict:
+        return {"success": False, "error": f"Another activity named '{name}' already exists"}
+
+    act.name = name
+    act.points = float(points)
+    act.is_limited = bool(is_limited)
+    act.description = description.strip() if description else None
+    act.is_active = bool(is_active)
+    session.add(act)
+    session.commit()
+    session.refresh(act)
+    return {"success": True, "activity_type": act}
+
+
+def delete_activity_type(activity_type_id: int) -> dict:
+    """Delete an activity type."""
+    session = db_session()
+    act = session.get(ActivityType, activity_type_id)
+    if not act:
+        return {"success": False, "error": "Activity type not found"}
+
+    session.delete(act)
+    session.commit()
+    return {"success": True}
+
+
+def get_all_rank_quotas(tenant_id: int = 1) -> list:
+    """Return all RankQuota objects for a tenant, sorted by quota points descending."""
+    session = db_session()
+    return session.exec(
+        select(RankQuota)
+        .where(RankQuota.tenant_id == tenant_id)
+        .order_by(RankQuota.required_points.desc(), RankQuota.rank_name)
+    ).all()
+
+
+def create_rank_quota(
+    rank_name: str,
+    required_points: float,
+    tenant_id: int = 1,
+) -> dict:
+    """Create a new rank quota requirement."""
+    rank_name = (rank_name or "").strip()
+    if not rank_name:
+        return {"success": False, "error": "Rank name is required"}
+
+    session = db_session()
+    existing = session.exec(
+        select(RankQuota).where(
+            RankQuota.tenant_id == tenant_id,
+            func.lower(RankQuota.rank_name) == rank_name.lower(),
+        )
+    ).first()
+    if existing:
+        return {"success": False, "error": f"Quota for rank '{rank_name}' already exists"}
+
+    new_quota = RankQuota(
+        tenant_id=tenant_id,
+        rank_name=rank_name,
+        required_points=float(required_points),
+    )
+    session.add(new_quota)
+    session.commit()
+    session.refresh(new_quota)
+    return {"success": True, "quota": new_quota}
+
+
+def update_rank_quota(
+    quota_id: int,
+    rank_name: str,
+    required_points: float,
+) -> dict:
+    """Update an existing rank quota requirement."""
+    rank_name = (rank_name or "").strip()
+    if not rank_name:
+        return {"success": False, "error": "Rank name is required"}
+
+    session = db_session()
+    quota = session.get(RankQuota, quota_id)
+    if not quota:
+        return {"success": False, "error": "Rank quota not found"}
+
+    conflict = session.exec(
+        select(RankQuota).where(
+            RankQuota.tenant_id == quota.tenant_id,
+            func.lower(RankQuota.rank_name) == rank_name.lower(),
+            RankQuota.id != quota_id,
+        )
+    ).first()
+    if conflict:
+        return {"success": False, "error": f"Another quota for rank '{rank_name}' already exists"}
+
+    quota.rank_name = rank_name
+    quota.required_points = float(required_points)
+    quota.updated_at = datetime.utcnow()
+    session.add(quota)
+    session.commit()
+    session.refresh(quota)
+    return {"success": True, "quota": quota}
+
+
+def delete_rank_quota(quota_id: int) -> dict:
+    """Delete a rank quota requirement."""
+    session = db_session()
+    quota = session.get(RankQuota, quota_id)
+    if not quota:
+        return {"success": False, "error": "Rank quota not found"}
+
+    session.delete(quota)
+    session.commit()
+    return {"success": True}
+
+
+
 # Hardcoded rank order for AC tables: lower number = displayed first (top of table)
 RANK_ORDER = {
     'prospect':      1,

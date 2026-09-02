@@ -31,6 +31,9 @@
           <li class="nav-item"><a class="nav-link" href="{{ url_for('members') }}">Manage</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('stats') }}">Statistics</a></li>
           <li class="nav-item"><a class="nav-link" href="{{ url_for('ac_dashboard') }}">AC</a></li>
+          {% if is_hct %}
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('ac_config') }}">AC Settings</a></li>
+          {% endif %}
           {% endif %}
         </ul>
         <ul class="navbar-nav">
