@@ -14,8 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make start script executable (do this as root)
-RUN chmod +x start.sh
+
 
 # Create instance directory for SQLite database and set permissions
 RUN mkdir -p instance && \
@@ -29,6 +28,6 @@ USER appuser
 EXPOSE 5000
 
 # Use start script to run both services
-CMD ["uvicorn app:app --host 0.0.0.0 --port 5000 "]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000"]
 
 
