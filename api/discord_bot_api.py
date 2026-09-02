@@ -3,7 +3,7 @@ Discord Bot API Module
 Provides REST API endpoints for Discord bot integration with TF_System
 """
 
-from aiohttp import request
+
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
 import logging
