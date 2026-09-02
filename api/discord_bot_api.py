@@ -615,6 +615,7 @@ async def get_ranks(request: Request):
             ranks_data = [
                 {
                     'system_rank': rank,
+                    'rank_name': rank,
                     'roblox_role_id': None,
                     'roblox_role_name': None,
                     'is_active': True
@@ -624,10 +625,11 @@ async def get_ranks(request: Request):
         else:
             ranks_data = [
                 {
-                    'system_rank': r.system_rank,
-                    'roblox_role_id': r.roblox_role_id,
-                    'roblox_role_name': r.roblox_role_name,
-                    'is_active': r.is_active
+                    'system_rank': r if isinstance(r, str) else getattr(r, 'system_rank', str(r)),
+                    'rank_name': r if isinstance(r, str) else getattr(r, 'system_rank', str(r)),
+                    'roblox_role_id': getattr(r, 'roblox_role_id', None) if not isinstance(r, str) else None,
+                    'roblox_role_name': getattr(r, 'roblox_role_name', None) if not isinstance(r, str) else None,
+                    'is_active': getattr(r, 'is_active', True) if not isinstance(r, str) else True
                 }
                 for r in rank_mappings
             ]
@@ -647,6 +649,62 @@ async def get_ranks(request: Request):
             'success': False,
             'error': 'server_error',
             'message': f'Error retrieving ranks: {str(e)}'
+        }, status_code=500)
+
+
+@router.get('/activity-types', dependencies=[Depends(verify_api_key)])
+async def get_activity_types_api(request: Request):
+    """
+    Get all active activity types and their point values
+    
+    Returns:
+        200: List of active activity types
+    """
+    try:
+        activity_types = ac_service.get_all_activity_types(include_inactive=False)
+        data = [act.to_dict() for act in activity_types]
+        
+        log_api_access(request, '/activity-types', 'GET', success=True, response_code=200)
+        return JSONResponse({
+            'success': True,
+            'activity_types': data,
+            'count': len(data)
+        }, status_code=200)
+    except Exception as e:
+        _logger.error(f"Error getting activity types: {e}", exc_info=True)
+        log_api_access(request, '/activity-types', 'GET', success=False, response_code=500)
+        return JSONResponse({
+            'success': False,
+            'error': 'server_error',
+            'message': f'Error retrieving activity types: {str(e)}'
+        }, status_code=500)
+
+
+@router.get('/quotas', dependencies=[Depends(verify_api_key)])
+async def get_quotas_api(request: Request):
+    """
+    Get all configured rank quotas
+    
+    Returns:
+        200: List of rank quota requirements
+    """
+    try:
+        quotas = ac_service.get_all_rank_quotas()
+        data = [q.to_dict() for q in quotas]
+        
+        log_api_access(request, '/quotas', 'GET', success=True, response_code=200)
+        return JSONResponse({
+            'success': True,
+            'quotas': data,
+            'count': len(data)
+        }, status_code=200)
+    except Exception as e:
+        _logger.error(f"Error getting rank quotas: {e}", exc_info=True)
+        log_api_access(request, '/quotas', 'GET', success=False, response_code=500)
+        return JSONResponse({
+            'success': False,
+            'error': 'server_error',
+            'message': f'Error retrieving rank quotas: {str(e)}'
         }, status_code=500)
 
 
