@@ -88,15 +88,32 @@ async def get_status(request: Request,):
     
     # Check Roblox sync status
     roblox_sync = settings.ROBLOX_SYNC_ENABLED
+
+    from utils.tenant_context import get_tenant_id
+    from database.tenant_models import Group
+    from database.engine import get_session
+    from sqlmodel import select
+
+    t_id = get_tenant_id() or 1
+    group_info = None
+    try:
+        with next(get_session()) as session:
+            grp = session.exec(select(Group).where(Group.id == t_id)).first()
+            if grp:
+                group_info = grp.to_dict()
+    except Exception as e:
+        _logger.warning(f"Failed to fetch group info in status: {e}")
     
     status_info = {
         'success': True,
         'status': 'online',
-        'version': '1.0.0',
+        'version': '2.5.0',
         'timestamp': datetime.utcnow().isoformat(),
         'database': db_status,
         'roblox_sync': 'enabled' if roblox_sync else 'disabled',
-        'total_members': member_count
+        'total_members': member_count,
+        'tenant_id': t_id,
+        'group': group_info
     }
     
     log_api_access(request, '/status', 'GET', success=True, response_code=200)
@@ -1218,4 +1235,92 @@ async def count_member_activities(request: Request, member_id: int):
             'error': 'server_error',
             'message': f'Error counting activities: {str(e)}',
         }, status_code=500)
+
+
+# ============================================================================
+# GROUP / TENANT RESOLUTION
+# ============================================================================
+
+@router.get('/groups/by-discord-id/{discord_group_id}', dependencies=[Depends(verify_api_key)])
+async def get_group_by_discord_id(discord_group_id: str, request: Request):
+    """
+    Look up sector / group details by Discord guild ID.
+    Used by Discord bot to dynamically resolve tenant context per Discord server.
+    """
+    try:
+        from database.tenant_models import Group
+        from database.engine import get_session
+        from sqlmodel import select
+
+        with next(get_session()) as session:
+            group = session.exec(select(Group).where(Group.discord_group_id == str(discord_group_id))).first()
+            if not group:
+                log_api_access(request, f'/groups/by-discord-id/{discord_group_id}', 'GET', success=False, response_code=404)
+                return JSONResponse({
+                    'success': False,
+                    'error': 'not_found',
+                    'message': f'No sector configured for Discord Guild ID {discord_group_id}'
+                }, status_code=404)
+
+            log_api_access(request, f'/groups/by-discord-id/{discord_group_id}', 'GET', success=True, response_code=200)
+            return JSONResponse({
+                'success': True,
+                'group': group.to_dict()
+            }, status_code=200)
+
+    except Exception as e:
+        _logger.error(f'Error looking up group for discord_group_id {discord_group_id}: {e}', exc_info=True)
+        return JSONResponse({
+            'success': False,
+            'error': 'server_error',
+            'message': str(e)
+        }, status_code=500)
+
+
+# ============================================================================
+# RANK PERMISSION ENFORCEMENT
+# ============================================================================
+
+@router.post('/permissions/check', dependencies=[Depends(verify_api_key)])
+async def check_permission_endpoint(request: Request):
+    """
+    Check if a Discord or Roblox user has a specific permission in this sector.
+    Target sector is determined by X-Discord-Group-ID or X-Group-ID header.
+    Body: {"discord_user_id": "...", "roblox_id": "...", "action": "promote|log_activity|delete_activity|view_data|manage_ac"}
+    """
+    try:
+        from utils.tenant_context import get_tenant_id
+        from services.permission_service import check_member_permission
+
+        tenant_id = get_tenant_id() or 1
+        data = await _safe_get_json(request)
+
+        discord_id = data.get('discord_user_id') or data.get('discord_id')
+        discord_roles = data.get('discord_roles') or data.get('roles') or []
+        roblox_id = data.get('roblox_id')
+        action = data.get('action') or data.get('permission') or 'view_data'
+
+        result = check_member_permission(
+            tenant_id=tenant_id,
+            discord_id=discord_id,
+            discord_roles=discord_roles,
+            roblox_id=roblox_id,
+            required_permission=action
+        )
+
+        return JSONResponse({
+            'success': True,
+            'tenant_id': tenant_id,
+            **result
+        }, status_code=200)
+
+    except Exception as e:
+        _logger.error(f'Error in check_permission_endpoint: {e}', exc_info=True)
+        return JSONResponse({
+            'success': False,
+            'error': 'server_error',
+            'message': str(e)
+        }, status_code=500)
+
+
 

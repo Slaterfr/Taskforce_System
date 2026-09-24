@@ -87,7 +87,7 @@ class RobloxAPI:
             if csrf_token:
                 return csrf_token
         except Exception as e:
-            print(f"⚠️ Error getting CSRF token from logout endpoint: {e}")
+            print(f"[WARN] Error getting CSRF token from logout endpoint: {e}")
         
         # Method 2: Try making a request to the groups API that would require CSRF
         try:
@@ -104,7 +104,7 @@ class RobloxAPI:
             if csrf_token:
                 return csrf_token
         except Exception as e:
-            print(f"⚠️ Error getting CSRF token from groups API: {e}")
+            print(f"[WARN] Error getting CSRF token from groups API: {e}")
         
         return None
     
@@ -143,29 +143,29 @@ class RobloxAPI:
                 return {'success': True}
             elif response.status_code == 429:  # Rate limited
                 if retry_count < 3:
-                    print("⚠️  Rate limited by Roblox API, waiting 60 seconds...")
+                    print("[WARN] Rate limited by Roblox API, waiting 60 seconds...")
                     time.sleep(60)
                     return self._make_request(url, method, params, json_data, headers, retry_count + 1)
                 else:
-                    print("❌ Max retries reached for rate limit")
+                    print("[ERROR] Max retries reached for rate limit")
                     return None
             elif response.status_code == 401:
-                print("❌ Authentication failed - check your Roblox cookie")
+                print("[ERROR] Authentication failed - check your Roblox cookie")
                 return None
             elif response.status_code == 403:
                 # Don't print for CSRF checks which expect failure
                 if 'X-CSRF-TOKEN' not in request_headers:
-                    print(f"❌ Permission denied - you may not have permission to perform this action")
+                    print(f"[ERROR] Permission denied - you may not have permission to perform this action")
                 return None
             else:
                 error_msg = response.text if hasattr(response, 'text') else 'Unknown error'
-                print(f"❌ API request failed: {response.status_code} - {error_msg[:200]}")
+                print(f"[ERROR] API request failed: {response.status_code} - {error_msg[:200]}")
                 return None
                 
         except (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError, requests.exceptions.Timeout) as e:
             if retry_count < 3:
                 wait_time = 2 * (retry_count + 1)
-                print(f"⚠️  Connection error: {e}. Retrying in {wait_time}s...")
+                print(f"[WARN] Connection error: {e}. Retrying in {wait_time}s...")
                 time.sleep(wait_time)
                 # Re-initialize session on connection error
                 self.session = requests.Session()
@@ -181,10 +181,10 @@ class RobloxAPI:
                 
                 return self._make_request(url, method, params, json_data, headers, retry_count + 1)
             else:
-                print(f"❌ Request error after retries: {e}")
+                print(f"[ERR] Request error after retries: {e}")
                 return None
         except requests.exceptions.RequestException as e:
-            print(f"❌ Request error: {e}")
+            print(f"[ERR] Request error: {e}")
             return None
     
     def get_group_info(self) -> Optional[Dict]:
@@ -207,7 +207,7 @@ class RobloxAPI:
         cursor = ""
         page_count = 0
         
-        print(f"🔄 Fetching members from Roblox group {self.group_id}...")
+        print(f"[SYNC] Fetching members from Roblox group {self.group_id}...")
         
         while True:
             page_count += 1
@@ -220,17 +220,17 @@ class RobloxAPI:
             if cursor:
                 params['cursor'] = cursor
             
-            print(f"📄 Fetching page {page_count}...")
+            print(f"[PAGE] Fetching page {page_count}...")
             data = self._make_request(url, method='GET', params=params)
             
             if not data:
-                print(f"❌ Failed to fetch page {page_count}")
+                print(f"[ERR] Failed to fetch page {page_count}")
                 break
                 
             # Process members from this page
             page_members = data.get('data', [])
             if not page_members:
-                print(f"📄 Page {page_count} has no members, stopping")
+                print(f"[PAGE] Page {page_count} has no members, stopping")
                 break
                 
             for member_data in page_members:
@@ -255,23 +255,23 @@ class RobloxAPI:
                 )
                 members.append(member)
             
-            print(f"📥 Fetched {len(page_members)} members from page {page_count} (Total: {len(members)})")
+            print(f"[DATA] Fetched {len(page_members)} members from page {page_count} (Total: {len(members)})")
             
             # Check if there are more pages
             cursor = data.get('nextPageCursor')
             if not cursor:
-                print(f"📄 No more pages, finished at page {page_count}")
+                print(f"[PAGE] No more pages, finished at page {page_count}")
                 break
                 
             # Don't fetch too many at once (safety limit)
             if len(members) >= limit:
-                print(f"⚠️  Reached limit of {limit} members")
+                print(f"[WARN]  Reached limit of {limit} members")
                 break
             
             # Small delay between pages to be nice to the API
             time.sleep(0.5)
         
-        print(f"✅ Retrieved {len(members)} total members from {page_count} pages")
+        print(f"[OK] Retrieved {len(members)} total members from {page_count} pages")
         return members
     
     def get_user_by_username(self, username: str) -> Optional[Dict]:
@@ -293,7 +293,7 @@ class RobloxAPI:
                 return users[0] if users else None
             
         except requests.exceptions.RequestException as e:
-            print(f"❌ Error fetching user {username}: {e}")
+            print(f"[ERR] Error fetching user {username}: {e}")
         
         return None
     
@@ -319,9 +319,9 @@ class RobloxAPI:
         
         # Make request and capture response details
         try:
-            print(f"🔄 Attempting to update user {user_id} to role {role_id}...")
+            print(f"[SYNC] Attempting to update user {user_id} to role {role_id}...")
             if csrf_token:
-                print(f"🔐 Using CSRF token: {csrf_token[:20]}...")
+                print(f"[KEY] Using CSRF token: {csrf_token[:20]}...")
             
             # Use session
             response = self.session.patch(
@@ -332,15 +332,15 @@ class RobloxAPI:
                 timeout=10
             )
             
-            print(f"📡 Response status: {response.status_code}")
+            print(f"[NET] Response status: {response.status_code}")
             if response.status_code not in [200, 204]:
-                print(f"📄 Response text: {response.text[:300]}")
+                print(f"[PAGE] Response text: {response.text[:300]}")
             
             # If we got a 403, try to get CSRF token from response and retry
             if response.status_code == 403:
                 new_csrf_token = response.headers.get('X-CSRF-TOKEN')
                 if new_csrf_token and new_csrf_token != csrf_token:
-                    print(f"🔐 Got CSRF token from 403 response, retrying...")
+                    print(f"[KEY] Got CSRF token from 403 response, retrying...")
                     csrf_token = new_csrf_token
                     headers['X-CSRF-TOKEN'] = csrf_token
                     response = self.session.patch(
@@ -350,7 +350,7 @@ class RobloxAPI:
                         cookies=self._get_cookies(),
                         timeout=10
                     )
-                    print(f"📡 Retry response status: {response.status_code}")
+                    print(f"[NET] Retry response status: {response.status_code}")
             
             if response.status_code in [200, 204]:
                 # Verify the update actually happened by checking the user's current role
@@ -360,13 +360,13 @@ class RobloxAPI:
                 if user_role:
                     current_role_id = user_role.get('role', {}).get('id')
                     current_role_name = user_role.get('role', {}).get('name', 'Unknown')
-                    print(f"✅ Verification: User's current role is {current_role_name} (ID: {current_role_id})")
+                    print(f"[OK] Verification: User's current role is {current_role_name} (ID: {current_role_id})")
                     if current_role_id == role_id:
                         return True, "Success"
                     else:
                         return False, f"Update appeared successful but role didn't change (expected role ID {role_id}, got {current_role_id})"
                 # If we can't verify, assume success but log it
-                print("⚠️ Could not verify role change (API returned success)")
+                print("[WARN] Could not verify role change (API returned success)")
                 return True, "Success (could not verify)"
             elif response.status_code == 401:
                 return False, "Authentication failed - cookie may be expired"
@@ -380,7 +380,7 @@ class RobloxAPI:
                     error_msg = error_text
                 
                 # Log full response for debugging
-                print(f"❌ Permission denied response: {response.status_code}")
+                print(f"[ERR] Permission denied response: {response.status_code}")
                 print(f"   Response text: {error_text[:500]}")
                 print(f"   URL: {url}")
                 print(f"   Payload: {payload}")
@@ -405,7 +405,7 @@ class RobloxAPI:
     def add_member_to_group(self, user_id: int, role_id: int) -> bool:
         """Add a user to the group with a specific role (requires authentication)"""
         if not self.cookie:
-            print("❌ Cannot add member: No authentication cookie provided")
+            print("[ERR] Cannot add member: No authentication cookie provided")
             return False
         
         # Get CSRF token first
@@ -434,7 +434,7 @@ class RobloxAPI:
             if response.status_code == 403:
                 new_csrf_token = response.headers.get('X-CSRF-TOKEN')
                 if new_csrf_token and new_csrf_token != csrf_token:
-                    print(f"🔐 Got CSRF token from 403 response, retrying...")
+                    print(f"[KEY] Got CSRF token from 403 response, retrying...")
                     csrf_token = new_csrf_token
                     headers['X-CSRF-TOKEN'] = csrf_token
                     response = self.session.post(
@@ -444,17 +444,17 @@ class RobloxAPI:
                         cookies=self._get_cookies(),
                         timeout=10
                     )
-                    print(f"📡 Retry response status: {response.status_code}")
+                    print(f"[NET] Retry response status: {response.status_code}")
             
             return response.status_code in [200, 204]
         except Exception as e:
-            print(f"❌ Error adding member to group: {e}")
+            print(f"[ERR] Error adding member to group: {e}")
             return False
     
     def remove_member_from_group(self, user_id: int) -> bool:
         """Remove a member from the group (requires authentication)"""
         if not self.cookie:
-            print("❌ Cannot remove member: No authentication cookie provided")
+            print("[ERR] Cannot remove member: No authentication cookie provided")
             return False
         
         # Get CSRF token first
@@ -479,7 +479,7 @@ class RobloxAPI:
             if response.status_code == 403:
                 new_csrf_token = response.headers.get('X-CSRF-TOKEN')
                 if new_csrf_token and new_csrf_token != csrf_token:
-                    print(f"🔐 Got CSRF token from 403 response, retrying...")
+                    print(f"[KEY] Got CSRF token from 403 response, retrying...")
                     csrf_token = new_csrf_token
                     headers['X-CSRF-TOKEN'] = csrf_token
                     response = self.session.delete(
@@ -488,11 +488,11 @@ class RobloxAPI:
                         cookies=self._get_cookies(),
                         timeout=10
                     )
-                    print(f"📡 Retry response status: {response.status_code}")
+                    print(f"[NET] Retry response status: {response.status_code}")
             
             return response.status_code in [200, 204]
         except Exception as e:
-            print(f"❌ Error removing member from group: {e}")
+            print(f"[ERR] Error removing member from group: {e}")
             return False
     
     def get_user_id_by_username(self, username: str) -> Optional[int]:
@@ -536,48 +536,60 @@ class RobloxAPI:
         return None
     
     @staticmethod
-    def validate_cookie(cookie: str) -> Optional[Dict]:
+    def validate_cookie(cookie: str) -> Dict:
         """
-        Validate a Roblox cookie and return the user info if valid.
-        Returns None if invalid.
+        Validate a Roblox .ROBLOSECURITY cookie against https://users.roblox.com/v1/users/authenticated.
+        Returns: {"valid": bool, "cookie": Optional[str], "user_id": Optional[int], "username": Optional[str], "error": Optional[str]}
         """
         if not cookie:
-            return None
+            return {"valid": False, "error": "Cookie cannot be empty"}
             
+        cleaned = cookie.strip()
+        if cleaned.startswith(".ROBLOSECURITY="):
+            cleaned = cleaned.split(".ROBLOSECURITY=", 1)[1].strip()
+        cleaned = cleaned.strip('"').strip("'").rstrip(';')
+
         url = "https://users.roblox.com/v1/users/authenticated"
         headers = {
             'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json'
         }
-        cookies = {'.ROBLOSECURITY': cookie}
+        cookies = {'.ROBLOSECURITY': cleaned}
         
         try:
             response = requests.get(url, headers=headers, cookies=cookies, timeout=10)
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                return {
+                    "valid": True,
+                    "cookie": cleaned,
+                    "user_id": data.get("id"),
+                    "username": data.get("name"),
+                    "display_name": data.get("displayName")
+                }
+            else:
+                return {"valid": False, "error": f"Roblox rejected cookie (HTTP {response.status_code})"}
         except Exception as e:
-            print(f"Error validating cookie: {e}")
-            
-        return None
+            return {"valid": False, "error": f"Connection error: {str(e)}"}
 
     def test_connection(self) -> bool:
         """Test if we can connect to the Roblox API and fetch group info"""
-        print(f"🔍 Testing connection to Roblox group {self.group_id}...")
+        print(f"[TEST] Testing connection to Roblox group {self.group_id}...")
         
         # Check which account the cookie belongs to
         current_user = self.get_current_user()
         if current_user:
-            print(f"🔐 Authenticated as: {current_user.get('name', 'Unknown')} (ID: {current_user.get('id', 'Unknown')})")
+            print(f"[AUTH] Authenticated as: {current_user.get('name', 'Unknown')} (ID: {current_user.get('id', 'Unknown')})")
         
         group_info = self.get_group_info()
         if group_info:
-            print(f"✅ Connected to group: {group_info.get('name', 'Unknown')}")
-            print(f"📊 Group has {group_info.get('memberCount', 0)} members")
+            print(f"[SUCCESS] Connected to group: {group_info.get('name', 'Unknown')}")
+            print(f"[STATS] Group has {group_info.get('memberCount', 0)} members")
             return True
         else:
-            print(f"❌ Failed to connect to group {self.group_id}")
-            print("💡 Make sure the group ID is correct and the group is public")
+            print(f"[ERROR] Failed to connect to group {self.group_id}")
+            print("[INFO] Make sure the group ID is correct and the group is public")
             return False
 
 # Rank mapping - customize this for your specific group

@@ -11,6 +11,7 @@ class ACPeriod(SQLModel, table=True):
     __tablename__ = "ac_periods"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: int = Field(default=1, index=True)
     period_name: str = Field(max_length=100)
     start_date: datetime
     end_date: datetime
@@ -40,6 +41,7 @@ class ACPeriod(SQLModel, table=True):
     def to_dict(self) -> dict:
         return {
             "id": self.id,
+            "tenant_id": self.tenant_id,
             "period_name": self.period_name,
             "start_date": self.start_date.strftime("%Y-%m-%d"),
             "end_date": self.end_date.strftime("%Y-%m-%d"),
@@ -52,6 +54,7 @@ class ActivityEntry(SQLModel, table=True):
     __tablename__ = "activity_entries"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: int = Field(default=1, index=True)
     member_id: int = Field(foreign_key="members.id")
     ac_period_id: int = Field(foreign_key="ac_periods.id")
     activity_type: str = Field(max_length=50)
@@ -67,6 +70,7 @@ class ActivityEntry(SQLModel, table=True):
     def to_dict(self) -> dict:
         return {
             "id": self.id,
+            "tenant_id": self.tenant_id,
             "activity_type": self.activity_type,
             "points": self.points,
             "description": self.description,
@@ -80,6 +84,7 @@ class MonthlyActivityEntry(SQLModel, table=True):
     __tablename__ = "monthly_activity_entries"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: int = Field(default=1, index=True)
     member_id: int = Field(foreign_key="members.id")
     ac_period_id: int = Field(foreign_key="ac_periods.id")
     activity_type: str = Field(max_length=50)
@@ -94,6 +99,7 @@ class MonthlyActivityEntry(SQLModel, table=True):
     def to_dict(self) -> dict:
         return {
             "id": self.id,
+            "tenant_id": self.tenant_id,
             "activity_type": self.activity_type,
             "points": self.points,
             "description": self.description,
@@ -107,6 +113,7 @@ class InactivityNotice(SQLModel, table=True):
     __tablename__ = "inactivity_notices"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: int = Field(default=1, index=True)
     member_id: int = Field(foreign_key="members.id")
     ac_period_id: int = Field(foreign_key="ac_periods.id")
     start_date: datetime
@@ -127,6 +134,7 @@ class InactivityNotice(SQLModel, table=True):
     def to_dict(self) -> dict:
         return {
             "id": self.id,
+            "tenant_id": self.tenant_id,
             "start_date": self.start_date.strftime("%Y-%m-%d"),
             "end_date": self.end_date.strftime("%Y-%m-%d"),
             "reason": self.reason,
@@ -139,6 +147,7 @@ class ACExemption(SQLModel, table=True):
     __tablename__ = "ac_exemptions"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: int = Field(default=1, index=True)
     member_id: int = Field(foreign_key="members.id")
     ac_period_id: int = Field(foreign_key="ac_periods.id")
     reason: Optional[str] = None
@@ -150,6 +159,7 @@ class ACExemption(SQLModel, table=True):
     def to_dict(self) -> dict:
         return {
             "id": self.id,
+            "tenant_id": self.tenant_id,
             "member_id": self.member_id,
             "ac_period_id": self.ac_period_id,
             "reason": self.reason,
@@ -162,6 +172,7 @@ class PeriodStatistics(SQLModel, table=True):
     __tablename__ = "period_statistics"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: int = Field(default=1, index=True)
     member_id: int = Field(foreign_key="members.id")
     ac_period_id: int = Field(foreign_key="ac_periods.id")
     raids_count: int = Field(default=0)
@@ -241,6 +252,35 @@ class RankQuota(SQLModel, table=True):
         }
 
 
+class Title(SQLModel, table=True):
+    __tablename__ = "titles"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tenant_id: int = Field(default=1, index=True)
+    name: str = Field(max_length=100, index=True)
+    description: Optional[str] = Field(default=None, max_length=255)
+    activity_required: str = Field(max_length=100)
+    quantity_required: int = Field(default=5)
+    period_type: str = Field(default="monthly", max_length=50)  # 'monthly' or 'cycle'
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "tenant_id": self.tenant_id,
+            "name": self.name,
+            "description": self.description,
+            "activity_required": self.activity_required,
+            "quantity_required": self.quantity_required,
+            "period_type": self.period_type,
+            "is_active": self.is_active,
+            "created_at": self.created_at.strftime("%Y-%m-%d %H:%M"),
+            "updated_at": self.updated_at.strftime("%Y-%m-%d %H:%M"),
+        }
+
+
 # -- Statistical helpers (require a Session, no more Model.query) --------------
 
 def get_month_group(ac_period: ACPeriod) -> tuple:
@@ -307,14 +347,21 @@ def capture_period_statistics(ac_period: ACPeriod, session: Session) -> None:
     session.commit()
 
 
-def _get_periods_in_group(ac_period: ACPeriod, session: Session) -> list:
+def _get_periods_in_group(ac_period: ACPeriod, session: Optional[Session] = None) -> list:
+    if session is None:
+        from database.engine import db_session
+        session = db_session()
     month_group = get_month_group(ac_period)
-    all_periods = session.exec(select(ACPeriod)).all()
+    tenant_id = getattr(ac_period, "tenant_id", 1) or 1
+    all_periods = session.exec(select(ACPeriod).where(ACPeriod.tenant_id == tenant_id)).all()
     return [p for p in all_periods if get_month_group(p) == month_group]
 
 
-def get_accumulated_stats(ac_period: ACPeriod, session: Session) -> dict:
+def get_accumulated_stats(ac_period: ACPeriod, session: Optional[Session] = None) -> dict:
     """Accumulated PeriodStatistics across all periods in the same month group."""
+    if session is None:
+        from database.engine import db_session
+        session = db_session()
     periods = _get_periods_in_group(ac_period, session)
     if not periods:
         return {}
@@ -337,8 +384,11 @@ def get_accumulated_stats(ac_period: ACPeriod, session: Session) -> dict:
     return accumulated
 
 
-def get_monthly_activity_counts(ac_period: ACPeriod, session: Session) -> dict:
+def get_monthly_activity_counts(ac_period: ACPeriod, session: Optional[Session] = None) -> dict:
     """Activity counts from MonthlyActivityEntry for all periods in the same month group."""
+    if session is None:
+        from database.engine import db_session
+        session = db_session()
     periods = _get_periods_in_group(ac_period, session)
     if not periods:
         return {}
@@ -360,7 +410,10 @@ def get_monthly_activity_counts(ac_period: ACPeriod, session: Session) -> dict:
     return activity_map
 
 
-def get_hwtm_winner(ac_period: ACPeriod, session: Session) -> tuple:
+def get_hwtm_winner(ac_period: ACPeriod, session: Optional[Session] = None) -> tuple:
+    if session is None:
+        from database.engine import db_session
+        session = db_session()
     counts = get_monthly_activity_counts(ac_period, session)
     if not counts:
         return None, 0
@@ -372,7 +425,10 @@ def get_hwtm_winner(ac_period: ACPeriod, session: Session) -> tuple:
     return winner_id, max_events
 
 
-def get_leggionary_winner(ac_period: ACPeriod, session: Session) -> tuple:
+def get_leggionary_winner(ac_period: ACPeriod, session: Optional[Session] = None) -> tuple:
+    if session is None:
+        from database.engine import db_session
+        session = db_session()
     counts = get_monthly_activity_counts(ac_period, session)
     if not counts:
         return None, 0
@@ -384,7 +440,10 @@ def get_leggionary_winner(ac_period: ACPeriod, session: Session) -> tuple:
     return (winner_id, max_events) if max_events >= 5 else (None, 0)
 
 
-def get_scout_winner(ac_period: ACPeriod, session: Session) -> tuple:
+def get_scout_winner(ac_period: ACPeriod, session: Optional[Session] = None) -> tuple:
+    if session is None:
+        from database.engine import db_session
+        session = db_session()
     counts = get_monthly_activity_counts(ac_period, session)
     if not counts:
         return None, 0
@@ -395,7 +454,10 @@ def get_scout_winner(ac_period: ACPeriod, session: Session) -> tuple:
     return (winner_id, max_t) if max_t >= 5 else (None, 0)
 
 
-def get_taskmaster_winner(ac_period: ACPeriod, session: Session) -> tuple:
+def get_taskmaster_winner(ac_period: ACPeriod, session: Optional[Session] = None) -> tuple:
+    if session is None:
+        from database.engine import db_session
+        session = db_session()
     counts = get_monthly_activity_counts(ac_period, session)
     if not counts:
         return None, 0

@@ -14,35 +14,47 @@ from utils.flash import flash
 import inspect
 
 def check_password(password):
-    """Securely check if provided password matches configured staff password"""
-    if not password:
-        return False
-    return secrets.compare_digest(
-        str(password),
-        "task2025"
-    )
+    """Deprecated: Password authentication has been sunset in favor of Roblox OAuth."""
+    return False
 
 def check_hct_password(password):
-    """Securely check if provided password matches configured HCT password"""
-    if not password:
-        return False
-    return secrets.compare_digest(
-        str(password),
-        "vivaElGonk216"
-    )
+    """Deprecated: Password authentication has been sunset in favor of Roblox OAuth."""
+    return False
 
 def is_staff(request: Request = None):
-    """Check if current session is authenticated as staff"""
+    """Check if current session is authenticated as staff in the active sector."""
     if not request: return False
-    return bool(request.session.get('is_staff', False))
+    if bool(request.session.get('is_staff', False)):
+        return True
+    ctx = getattr(request.state, "tenant_context", None)
+    if not ctx:
+        from utils.tenant_context import extract_tenant_context
+        ctx = extract_tenant_context(request)
+    if ctx:
+        perms = ctx.get("permissions", [])
+        role = ctx.get("system_role", "")
+        if "manage_members" in perms or role in ["staff", "hct", "admin"]:
+            return True
+    return False
 
 def is_hct(request: Request = None):
-    """Check if current session is authenticated as HCT"""
+    """Check if current session is authenticated as HCT in the active sector."""
     if not request: return False
-    return bool(request.session.get('is_hct', False))
+    if bool(request.session.get('is_hct', False)):
+        return True
+    ctx = getattr(request.state, "tenant_context", None)
+    if not ctx:
+        from utils.tenant_context import extract_tenant_context
+        ctx = extract_tenant_context(request)
+    if ctx:
+        perms = ctx.get("permissions", [])
+        role = ctx.get("system_role", "")
+        if "edit_config" in perms or role in ["hct", "admin"]:
+            return True
+    return False
 
 def staff_required(f):
-    """Decorator to require staff authentication for a route"""
+    """Decorator to require staff clearance via Roblox OAuth in the active sector."""
     @wraps(f)
     async def decorated_function(*args, **kwargs):
         request = kwargs.get('request')
@@ -59,8 +71,11 @@ def staff_required(f):
                     return JSONResponse({'error': 'authentication_required'}, status_code=401)
                 
                 request.session['next_url'] = request.url.path
-                flash(request, 'You must be staff to access that page', 'warning')
-            return RedirectResponse(url='/staff/login', status_code=303)
+                if request.cookies.get("tf_user_token"):
+                    flash(request, 'Staff clearance required in this sector.', 'warning')
+                    return RedirectResponse(url='/portal/select-group', status_code=303)
+                flash(request, 'Staff clearance required. Please log in with Roblox.', 'warning')
+            return RedirectResponse(url='/auth/roblox/login', status_code=303)
             
         if inspect.iscoroutinefunction(f):
             return await f(*args, **kwargs)
@@ -70,7 +85,7 @@ def staff_required(f):
     return decorated_function
 
 def hct_required(f):
-    """Decorator to require HCT authentication for a route"""
+    """Decorator to require HCT clearance via Roblox OAuth in the active sector."""
     @wraps(f)
     async def decorated_function(*args, **kwargs):
         request = kwargs.get('request')
@@ -87,8 +102,11 @@ def hct_required(f):
                     return JSONResponse({'error': 'authentication_required'}, status_code=401)
                     
                 request.session['next_url'] = request.url.path
-                flash(request, 'You must be High Command Team (HCT) to access that page', 'warning')
-            return RedirectResponse(url='/hct/login', status_code=303)
+                if request.cookies.get("tf_user_token"):
+                    flash(request, 'High Command (HCT) clearance required in this sector.', 'warning')
+                    return RedirectResponse(url='/portal/select-group', status_code=303)
+                flash(request, 'High Command (HCT) clearance required. Please log in with Roblox.', 'warning')
+            return RedirectResponse(url='/auth/roblox/login', status_code=303)
             
         if inspect.iscoroutinefunction(f):
             return await f(*args, **kwargs)

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Developer Portal Auth — Taskforce{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+  <div class="col-md-6 col-lg-5">
+    <div class="tf-card p-4">
+      <div class="text-center mb-4">
+        <div class="d-inline-flex align-items-center justify-content-center mb-3" style="width: 58px; height: 58px; border-radius: 16px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);">
+          <i class="fas fa-terminal fa-xl" style="color: var(--tf-purple-accent);"></i>
+        </div>
+        <h4 class="text-white fw-bold mb-1">Developer Multi-Tenant Login</h4>
+        <p class="text-white-50 small mb-0">Simulate Roblox OAuth accounts for testing multi-tenant sectors</p>
+      </div>
+
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label text-white small fw-bold text-uppercase">Roblox User ID</label>
+          <input type="text" name="roblox_id" class="form-control tf-input" value="12345678" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-white small fw-bold text-uppercase">Roblox Username</label>
+          <input type="text" name="username" class="form-control tf-input" value="TestCommander" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label text-white small fw-bold text-uppercase">Simulated Roblox Rank (1 - 255)</label>
+          <select name="rank" class="form-select tf-input">
+            <option value="255">Rank 255 (Group Owner / Admin)</option>
+            <option value="250" selected>Rank 250 (General / HCT)</option>
+            <option value="150">Rank 150 (Staff / Officer)</option>
+            <option value="50">Rank 50 (Regular Member)</option>
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label text-white small fw-bold text-uppercase">Target Sector / Group</label>
+          <select name="group_id" class="form-select tf-input">
+            {% for g in groups %}
+            <option value="{{ g.id }}">{{ g.name }} (Roblox Group ID: {{ g.roblox_group_id }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <button class="btn btn-tf-primary w-100 py-2 fw-bold" type="submit">
+          <i class="fas fa-arrow-right-to-bracket me-2"></i>Authenticate in Dev Mode
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -38,6 +38,52 @@ async def verify_api_key(request: Request):
         logger.warning(f"Invalid API key attempt from {request.client.host if request.client else 'unknown'}")
         raise HTTPException(status_code=401, detail='Invalid API key')
 
+    # Resolve target tenant (default to 1 for backwards compatibility)
+    tenant_id = 1
+    x_group_id = request.headers.get("X-Group-ID") or request.query_params.get("group_id")
+    x_roblox_group_id = request.headers.get("X-Roblox-Group-ID") or request.query_params.get("roblox_group_id")
+    x_discord_group_id = (
+        request.headers.get("X-Discord-Group-ID")
+        or request.headers.get("X-Discord-Guild-ID")
+        or request.query_params.get("discord_group_id")
+        or request.query_params.get("discord_guild_id")
+    )
+
+    if x_group_id:
+        try:
+            tenant_id = int(x_group_id)
+        except ValueError:
+            pass
+    elif x_roblox_group_id:
+        try:
+            from database.tenant_models import Group
+            from database.engine import get_session
+            from sqlmodel import select
+            with next(get_session()) as session:
+                grp = session.exec(select(Group).where(Group.roblox_group_id == str(x_roblox_group_id))).first()
+                if grp:
+                    tenant_id = grp.id
+        except Exception as e:
+            logger.warning(f"Failed to lookup group by roblox_group_id {x_roblox_group_id}: {e}")
+    elif x_discord_group_id:
+        try:
+            from database.tenant_models import Group
+            from database.engine import get_session
+            from sqlmodel import select
+            with next(get_session()) as session:
+                grp = session.exec(select(Group).where(Group.discord_group_id == str(x_discord_group_id))).first()
+                if grp:
+                    tenant_id = grp.id
+        except Exception as e:
+            logger.warning(f"Failed to lookup group by discord_group_id {x_discord_group_id}: {e}")
+
+    from utils.tenant_context import set_tenant_context
+    set_tenant_context(
+        tenant_id=tenant_id,
+        permissions=["view_roster", "view_ac_progress", "manage_members", "log_activity", "manage_ac", "edit_config"],
+        system_role="admin"
+    )
+
 
 def get_client_identifier():
     """Get unique identifier for rate limiting (API key hash or IP)"""

@@ -1,8 +1,9 @@
 """Activity Check (AC) business logic."""
 
+from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 from sqlalchemy import func
-from sqlmodel import select
+from sqlmodel import select, Session
 
 from database.engine import db_session
 from database.models import Member, MonthlyStat
@@ -18,6 +19,8 @@ from database.ac_models import (
     MonthlyActivityEntry,
     ActivityType,
     RankQuota,
+    Title,
+    _get_periods_in_group,
     get_hwtm_winner,
     get_leggionary_winner,
     get_monthly_activity_counts,
@@ -276,6 +279,131 @@ def delete_rank_quota(quota_id: int) -> dict:
     return {"success": True}
 
 
+# -- Dynamic Titles & Accolades Management -----------------------------------
+
+def get_all_titles(tenant_id: int = 1, include_inactive: bool = True) -> list:
+    """Return all Title objects for a tenant, sorted by name."""
+    session = db_session()
+    stmt = select(Title).where(Title.tenant_id == tenant_id)
+    if not include_inactive:
+        stmt = stmt.where(Title.is_active == True)
+    return session.exec(stmt.order_by(Title.period_type.desc(), Title.name)).all()
+
+
+def create_title(
+    name: str,
+    activity_required: str,
+    quantity_required: int = 5,
+    description: str = "",
+    period_type: str = "monthly",
+    tenant_id: int = 1,
+) -> dict:
+    """Create a new title reward definition."""
+    name = (name or "").strip()
+    activity_required = (activity_required or "").strip()
+    if not name:
+        return {"success": False, "error": "Title name is required"}
+    if not activity_required:
+        return {"success": False, "error": "Activity requirement is required"}
+
+    try:
+        qty = int(quantity_required)
+        if qty < 1:
+            qty = 1
+    except (ValueError, TypeError):
+        qty = 5
+
+    session = db_session()
+    existing = session.exec(
+        select(Title).where(
+            Title.tenant_id == tenant_id,
+            func.lower(Title.name) == name.lower(),
+        )
+    ).first()
+    if existing:
+        return {"success": False, "error": f"Title '{name}' already exists in this sector"}
+
+    new_title = Title(
+        tenant_id=tenant_id,
+        name=name,
+        description=description.strip() if description else None,
+        activity_required=activity_required,
+        quantity_required=qty,
+        period_type=period_type if period_type in ["monthly", "cycle"] else "monthly",
+        is_active=True,
+    )
+    session.add(new_title)
+    session.commit()
+    session.refresh(new_title)
+    return {"success": True, "title": new_title}
+
+
+def update_title(
+    title_id: int,
+    name: str,
+    activity_required: str,
+    quantity_required: int,
+    description: str = "",
+    period_type: str = "monthly",
+    is_active: bool = True,
+) -> dict:
+    """Update an existing title reward definition."""
+    name = (name or "").strip()
+    activity_required = (activity_required or "").strip()
+    if not name:
+        return {"success": False, "error": "Title name is required"}
+    if not activity_required:
+        return {"success": False, "error": "Activity requirement is required"}
+
+    try:
+        qty = int(quantity_required)
+        if qty < 1:
+            qty = 1
+    except (ValueError, TypeError):
+        qty = 5
+
+    session = db_session()
+    title = session.get(Title, title_id)
+    if not title:
+        return {"success": False, "error": "Title not found"}
+
+    conflict = session.exec(
+        select(Title).where(
+            Title.tenant_id == title.tenant_id,
+            func.lower(Title.name) == name.lower(),
+            Title.id != title_id,
+        )
+    ).first()
+    if conflict:
+        return {"success": False, "error": f"Another title named '{name}' already exists in this sector"}
+
+    title.name = name
+    title.description = description.strip() if description else None
+    title.activity_required = activity_required
+    title.quantity_required = qty
+    title.period_type = period_type if period_type in ["monthly", "cycle"] else "monthly"
+    title.is_active = bool(is_active)
+    title.updated_at = datetime.utcnow()
+
+    session.add(title)
+    session.commit()
+    session.refresh(title)
+    return {"success": True, "title": title}
+
+
+def delete_title(title_id: int) -> dict:
+    """Delete a title definition."""
+    session = db_session()
+    title = session.get(Title, title_id)
+    if not title:
+        return {"success": False, "error": "Title not found"}
+
+    session.delete(title)
+    session.commit()
+    return {"success": True}
+
+
+
 
 # Hardcoded rank order for AC tables: lower number = displayed first (top of table)
 RANK_ORDER = {
@@ -404,183 +532,153 @@ def build_member_progress(period):
     return member_progress
 
 
+def _matches_activity_requirement(entry_act_type: str, req: str) -> bool:
+    """Case-insensitive matcher for title activity requirements including presets."""
+    t = (entry_act_type or "").strip().lower()
+    r = (req or "").strip().lower()
+    if r in ["all", "all activities", "all activities (combined)", "any"]:
+        return True
+    if "events" in r or "training + raid + patrol" in r:
+        return t in ["training", "raid", "patrol"]
+    if "raids + patrols" in r or "raid + patrol" in r:
+        return t in ["raid", "patrol"]
+    return t == r
+
+
+def ensure_default_titles_for_tenant(tenant_id: int, session: Optional[Session] = None):
+    """Seed standard sector titles for tenant 1 if no titles exist yet."""
+    if session is None:
+        session = db_session()
+    existing = session.exec(select(Title).where(Title.tenant_id == tenant_id)).first()
+    if not existing and tenant_id == 1:
+        default_titles = [
+            Title(
+                tenant_id=1,
+                name="Host with the Most",
+                activity_required="Events (Training + Raid + Patrol)",
+                quantity_required=5,
+                period_type="cycle",
+                description="5+ events hosted (Training + Raid + Patrol)",
+                is_active=True,
+            ),
+            Title(
+                tenant_id=1,
+                name="Legionnaire",
+                activity_required="Raids + Patrols",
+                quantity_required=5,
+                period_type="monthly",
+                description="5+ raids and patrols hosted across month",
+                is_active=True,
+            ),
+            Title(
+                tenant_id=1,
+                name="Scout",
+                activity_required="Tryout",
+                quantity_required=5,
+                period_type="monthly",
+                description="5+ tryouts hosted across month",
+                is_active=True,
+            ),
+            Title(
+                tenant_id=1,
+                name="Taskmaster",
+                activity_required="Mission",
+                quantity_required=5,
+                period_type="monthly",
+                description="5+ missions posted across month",
+                is_active=True,
+            ),
+        ]
+        session.add_all(default_titles)
+        session.commit()
+
+
 def calculate_title_rewards(all_activities, period):
     """
-    Calculate title reward winners based on activity counts for the current period.
-    Reads from MonthlyActivityEntry for persistent title tracking.
+    Calculate title reward winners based strictly on what is in the database for each group.
+    Uses MonthlyActivityEntry for persistent title tracking across multiple cycles
+    for monthly awards, and ActivityEntry for cycle-specific awards.
     """
     titles = {}
+    session = db_session()
+    tenant_id = getattr(period, "tenant_id", 1) or 1
 
-    hwtm_winner_id, hwtm_count = get_hwtm_winner(period, db_session())
-    if hwtm_winner_id and hwtm_count >= 5:
-        winner = db_session().get(Member, hwtm_winner_id)
-        titles['Host with the Most'] = {
-            'winner': winner.discord_username if winner else 'Unknown',
-            'count': hwtm_count,
-            'requirement': '5+ events hosted (Training + Raid + Patrol)',
-            'period_award': True,
-            'qualified': True,
-        }
-    else:
-        activity_counts = get_monthly_activity_counts(period, db_session())
-        if activity_counts:
-            max_events = 0
-            top_member_id = None
-            for member_id, counts in activity_counts.items():
-                combined = counts['trainings'] + counts['raids'] + counts['patrols']
-                if combined > max_events:
-                    max_events = combined
-                    top_member_id = member_id
+    # Ensure default titles exist in DB for Taskforce (Tenant 1)
+    ensure_default_titles_for_tenant(tenant_id, session)
 
-            if max_events > 0:
-                winner = db_session().get(Member, top_member_id)
-                titles['Host with the Most'] = {
-                    'winner': (
-                        f"{winner.discord_username if winner else 'Unknown'} "
-                        f"(Not Qualified - {max_events} events)"
-                    ),
-                    'count': max_events,
-                    'requirement': '5+ events hosted (Training + Raid + Patrol)',
-                    'period_award': True,
-                    'qualified': False,
-                }
-            else:
-                titles['Host with the Most'] = _empty_title(
-                    '5+ events hosted (Training + Raid + Patrol)', period_award=True
-                )
+    # 1. Fetch configured titles strictly from the database for this group
+    title_defs = session.exec(
+        select(Title).where(Title.tenant_id == tenant_id, Title.is_active == True)
+    ).all()
+
+    if not title_defs:
+        return titles
+
+    periods_in_month = _get_periods_in_group(period, session)
+    month_period_ids = [p.id for p in periods_in_month]
+
+    for title_def in title_defs:
+        is_monthly = (title_def.period_type == "monthly")
+        
+        # Select persistent data source
+        if is_monthly:
+            # Query MonthlyActivityEntry across all periods in this month group (replicated & persistent)
+            entries = session.exec(
+                select(MonthlyActivityEntry).where(MonthlyActivityEntry.ac_period_id.in_(month_period_ids))
+            ).all()
         else:
-            titles['Host with the Most'] = _empty_title(
-                '5+ events hosted (Training + Raid + Patrol)', period_award=True
-            )
+            # Single AC Cycle: query ActivityEntry for this period, falling back to MonthlyActivityEntry for period
+            entries = session.exec(
+                select(ActivityEntry).where(ActivityEntry.ac_period_id == period.id)
+            ).all()
+            if not entries:
+                entries = session.exec(
+                    select(MonthlyActivityEntry).where(MonthlyActivityEntry.ac_period_id == period.id)
+                ).all()
 
-    leg_winner_id, leg_count = get_leggionary_winner(period, db_session())
-    titles['Legionnaire'] = _monthly_title(
-        period,
-        leg_winner_id,
-        leg_count,
-        5,
-        '5+ events hosted (Raids + Patrols - monthly)',
-        count_fn=lambda counts: counts['raids'] + counts['patrols'],
-        label='events',
-    )
+        # Tally counts per member matching the activity criteria
+        member_counts = {}
+        for e in entries:
+            if _matches_activity_requirement(e.activity_type, title_def.activity_required):
+                member_counts[e.member_id] = member_counts.get(e.member_id, 0) + 1
 
-    scout_winner_id, scout_count = get_scout_winner(period, db_session())
-    titles['Scout'] = _monthly_title(
-        period,
-        scout_winner_id,
-        scout_count,
-        5,
-        '5+ tryouts - monthly',
-        count_fn=lambda counts: counts['tryouts'],
-        label='tryouts',
-    )
-
-    taskmaster_winner_id, taskmaster_count = get_taskmaster_winner(period, db_session())
-    titles['Taskmaster'] = _monthly_title(
-        period,
-        taskmaster_winner_id,
-        taskmaster_count,
-        5,
-        '5+ missions - monthly',
-        count_fn=lambda counts: counts['missions'],
-        label='missions',
-    )
-
-    titles['Executor'] = _executor_title()
-
-    return titles
-
-
-def _empty_title(requirement, period_award=False, is_monthly=False):
-    return {
-        'winner': 'No participants',
-        'count': 0,
-        'requirement': requirement,
-        'period_award': period_award,
-        'is_monthly': is_monthly,
-        'qualified': False,
-    }
-
-
-def _monthly_title(period, winner_id, winner_count, minimum, requirement, count_fn, label):
-    if winner_id and winner_count >= minimum:
-        winner = db_session().get(Member, winner_id)
-        return {
-            'winner': winner.discord_username if winner else 'Unknown',
-            'count': winner_count,
-            'requirement': requirement,
-            'period_award': False,
-            'is_monthly': True,
-            'qualified': True,
-        }
-
-    activity_counts = get_monthly_activity_counts(period, db_session())
-    if activity_counts:
+        # Determine top performer
         max_count = 0
         top_member_id = None
-        for member_id, counts in activity_counts.items():
-            value = count_fn(counts)
-            if value > max_count:
-                max_count = value
-                top_member_id = member_id
+        for m_id, count in member_counts.items():
+            if count > max_count:
+                max_count = count
+                top_member_id = m_id
 
-        if max_count > 0:
-            winner = db_session().get(Member, top_member_id)
-            return {
-                'winner': (
-                    f"{winner.discord_username if winner else 'Unknown'} "
-                    f"(Not Qualified - {max_count} {label})"
-                ),
-                'count': max_count,
-                'requirement': requirement,
-                'period_award': False,
-                'is_monthly': True,
-                'qualified': False,
-            }
+        # Format requirement display label
+        req_label = f"{title_def.quantity_required}+ {title_def.activity_required}"
+        if title_def.description:
+            req_label += f" ({title_def.description})"
+        if is_monthly:
+            req_label += " - monthly"
 
-    return _empty_title(requirement, is_monthly=True)
+        winner_name = "No participants"
+        is_qualified = False
+        if top_member_id:
+            winner_member = session.get(Member, top_member_id)
+            if winner_member:
+                winner_name = winner_member.discord_username or winner_member.roblox_username or "Unknown"
+            is_qualified = max_count >= title_def.quantity_required
 
-
-def _executor_title():
-    month_start = date.today().replace(day=1)
-    monthly_stats = db_session().exec(select(MonthlyStat).filter_by(cycle_month=month_start)).all()
-
-    if not monthly_stats:
-        return _empty_title('5+ mission stars (⭐⭐⭐+)', is_monthly=True)
-
-    max_stars = 0
-    executor_member_id = None
-    for stat in monthly_stats:
-        if stat.total_stars > max_stars:
-            max_stars = stat.total_stars
-            executor_member_id = stat.member_id
-
-    base = {
-        'requirement': '5+ mission stars (⭐⭐⭐+)',
-        'period_award': False,
-        'is_monthly': True,
-    }
-
-    if executor_member_id and max_stars >= 5:
-        executor_member = db_session().get(Member, executor_member_id)
-        return {
-            **base,
-            'winner': executor_member.discord_username if executor_member else 'Unknown',
-            'count': max_stars,
-            'qualified': True,
+        titles[title_def.name] = {
+            'winner': winner_name,
+            'count': max_count,
+            'requirement': req_label,
+            'period_award': not is_monthly,
+            'is_monthly': is_monthly,
+            'qualified': is_qualified,
+            'has_participants': max_count > 0,
+            'quantity_required': title_def.quantity_required,
+            'activity_required': title_def.activity_required,
+            'description': title_def.description or '',
         }
-    if max_stars > 0:
-        executor_member = db_session().get(Member, executor_member_id)
-        return {
-            **base,
-            'winner': (
-                f"{executor_member.discord_username if executor_member else 'Unknown'} "
-                f"(Not Qualified - {max_stars} stars)"
-            ),
-            'count': max_stars,
-            'qualified': False,
-        }
-    return _empty_title('5+ mission stars (⭐⭐⭐+)', is_monthly=True)
+
+    return titles
 
 
 def generate_title_discord_message(titles, period):
@@ -694,9 +792,12 @@ def log_activity(
 
     is_limited = is_limited_activity(activity_type)
 
+    tenant_id = getattr(current_period, "tenant_id", 1) or 1
+
     # Build all ActivityEntry objects at once, then bulk-insert for efficiency.
     activity_entries = [
         ActivityEntry(
+            tenant_id=tenant_id,
             member_id=member_id,
             ac_period_id=current_period.id,
             activity_type=activity_type,
@@ -719,6 +820,7 @@ def log_activity(
     # Bulk-insert the corresponding MonthlyActivityEntry rows.
     monthly_entries = [
         MonthlyActivityEntry(
+            tenant_id=tenant_id,
             member_id=member_id,
             ac_period_id=current_period.id,
             activity_type=activity_type,
@@ -729,9 +831,8 @@ def log_activity(
         )
         for _ in range(quantity)
     ]
-    db_session().add_all(monthly_entries)
-
-    db_session().commit()
+    session.add_all(monthly_entries)
+    session.commit()
 
     quota_progress = get_quota_progress(member, current_period)
 
@@ -839,17 +940,29 @@ def delete_activity_entry(activity_id):
     }
 
 
-def create_period(period_name, start_date, end_date):
-    """Deactivate any current period and create a new AC period."""
-    db_session().query(ACPeriod).filter_by(is_active=True).update({'is_active': False})
+def create_period(period_name, start_date, end_date, tenant_id: int = None):
+    """Deactivate any current period for this sector and create a new AC period."""
+    effective_tenant = tenant_id or get_tenant_id() or 1
+    session = db_session()
+    
+    # Deactivate only active periods belonging to THIS sector
+    active_periods = session.exec(
+        select(ACPeriod).where(ACPeriod.tenant_id == effective_tenant, ACPeriod.is_active == True)
+    ).all()
+    for p in active_periods:
+        p.is_active = False
+        session.add(p)
+
     new_period = ACPeriod(
+        tenant_id=effective_tenant,
         period_name=period_name,
         start_date=start_date,
         end_date=end_date,
         is_active=True
     )
-    db_session().add(new_period)
-    db_session().commit()
+    session.add(new_period)
+    session.commit()
+    session.refresh(new_period)
     return new_period
 
 
@@ -870,9 +983,21 @@ def clear_all_activities(period_id):
     return deleted_count
 
 
-def clear_titles(period_id):
-    """Delete all title tracking data (monthly activity entries) for a period."""
-    deleted_count = db_session().query(MonthlyActivityEntry).filter_by(ac_period_id=period_id).delete()
+def clear_titles(period_id=None, tenant_id: int = 1):
+    """Delete title tracking data (monthly activity entries). If period_id is provided, deletes for that period, otherwise for the whole tenant."""
+    query = db_session().query(MonthlyActivityEntry).filter(MonthlyActivityEntry.tenant_id == tenant_id)
+    if period_id is not None:
+        query = query.filter(MonthlyActivityEntry.ac_period_id == period_id)
+    deleted_count = query.delete(synchronize_session=False)
+    db_session().commit()
+    return deleted_count
+
+
+def clear_all_monthly_entries(tenant_id: int = 1) -> int:
+    """Delete all monthly activity entries for a tenant so they don't accumulate indefinitely."""
+    deleted_count = db_session().query(MonthlyActivityEntry).filter(
+        MonthlyActivityEntry.tenant_id == tenant_id
+    ).delete(synchronize_session=False)
     db_session().commit()
     return deleted_count
 

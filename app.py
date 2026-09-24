@@ -25,31 +25,35 @@ scheduler = _make_scheduler()
 
 
 def _sync_job():
-    """Blocking Roblox sync - called via asyncio.to_thread so it does not block the loop."""
+    """Blocking multi-tenant Roblox sync across all active registered groups."""
     from database.engine import get_session
+    from sqlmodel import select
+    from database.tenant_models import Group
     from utils.roblox_sync import sync_from_roblox
 
-    session_gen = get_session()
-    session = next(session_gen)
-    try:
-        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"\n{'='*60}\n?? [{ts}] Starting automatic Roblox sync...\n{'='*60}")
-        result = sync_from_roblox()
-        if result.get("success"):
-            stats = result.get("stats", {})
-            print(
-                f"? Roblox sync completed: {stats.get('added', 0)} added, "
-                f"{stats.get('updated', 0)} updated, {stats.get('rank_changes', 0)} rank changes"
-            )
-        else:
-            print(f"??  Roblox sync failed: {result.get('message', 'Unknown error')}")
-    except Exception as exc:
-        print(f"? Background Roblox sync error: {exc}")
-    finally:
+    with next(get_session()) as session:
         try:
-            session_gen.close()
-        except Exception:
-            pass
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"\n{'='*60}\n🔄 [{ts}] Starting automatic multi-sector Roblox sync...\n{'='*60}")
+            groups = session.exec(select(Group).where(Group.is_active == True)).all()
+            if not groups:
+                print("⚠️ No active sectors found in database to sync.")
+                return
+
+            for grp in groups:
+                print(f"📡 Syncing sector '{grp.name}' (ID: {grp.id}, Roblox Group: {grp.roblox_group_id})...")
+                result = sync_from_roblox(tenant_id=grp.id, roblox_group_id=grp.roblox_group_id)
+                if result.get("success"):
+                    stats = result.get("stats", {})
+                    print(
+                        f"✅ [{grp.name}] Sync completed: {stats.get('added', 0)} added, "
+                        f"{stats.get('updated', 0)} updated, {stats.get('rank_changes', 0)} rank changes, "
+                        f"{stats.get('roles_mapped', 0)} roles mapped."
+                    )
+                else:
+                    print(f"⚠️ [{grp.name}] Sync warning/failed: {result.get('message', 'Unknown error')}")
+        except Exception as exc:
+            print(f"❌ Background multi-tenant Roblox sync error: {exc}")
 
 
 async def _async_sync_job():
@@ -57,20 +61,42 @@ async def _async_sync_job():
 
 
 def _stats_job():
+    """Captures member stats snapshot across all active tenant groups."""
+    from database.engine import get_session
+    from sqlmodel import select
+    from database.tenant_models import Group
     from utils.stats_logger import capture_member_stats
+
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"\n?? [{ts}] Capturing member statistics...")
-    capture_member_stats()
+    print(f"\n📊 [{ts}] Capturing member statistics across all sectors...")
+    with next(get_session()) as session:
+        try:
+            groups = session.exec(select(Group).where(Group.is_active == True)).all()
+            for grp in groups:
+                capture_member_stats(tenant_id=grp.id)
+        except Exception as exc:
+            print(f"❌ Error capturing sector stats: {exc}")
 
 
 async def _async_stats_job():
     await asyncio.to_thread(_stats_job)
 
 
+
 # -- Lifespan (replaces Flask before_first_request / teardown) -----------------
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure default executor is active and shutdown flag is cleared
+    try:
+        loop = asyncio.get_running_loop()
+        if getattr(loop, "_executor_shutdown_called", False):
+            loop._executor_shutdown_called = False
+            import concurrent.futures
+            loop._default_executor = concurrent.futures.ThreadPoolExecutor(thread_name_prefix="asyncio")
+    except Exception:
+        pass
+
     # Startup
     create_db()
     print("\n? Database tables verified.\n")
@@ -119,6 +145,9 @@ app = FastAPI(
     # docs_url=None, redoc_url=None,
 )
 
+from utils.tenant_context import TenantContextMiddleware
+
+app.add_middleware(TenantContextMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.SECRET_KEY,
@@ -136,18 +165,23 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # -- Register routers -----------------------------------------------------------
 
+from routers.roblox_auth import router as roblox_auth_router
 from routers.auth import router as auth_router
 from routers.public import router as public_router
 from routers.members import router as members_router
 from routers.ac import router as ac_router
 from routers.sync import router as sync_router
+from routers.group_settings import router as group_settings_router
 from routers.missions import router as missions_router
 from api.discord_bot_api import router as bot_api_router
 
+app.include_router(roblox_auth_router)
 app.include_router(auth_router)
 app.include_router(public_router)
 app.include_router(members_router)
 app.include_router(ac_router, prefix="/ac")
 app.include_router(sync_router)
+app.include_router(group_settings_router)
 app.include_router(missions_router, prefix="/api/v1/missions")
 app.include_router(bot_api_router, prefix="/api/v1")
+

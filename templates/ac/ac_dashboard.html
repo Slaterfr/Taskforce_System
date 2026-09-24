@@ -48,6 +48,12 @@
                 <i class="fas fa-trash me-1"></i>Clear ACs
             </button>
         </form>
+        <form action="{{ url_for('clear_monthly_entries') }}" method="post" class="d-inline-block me-1 mb-1"
+            onsubmit="return confirm('⚠️ Are you sure you want to delete ALL accumulated monthly entries for this group?\n\nThis will reset accumulated monthly title counts to 0 so they don\'t keep accumulating. This cannot be undone!');">
+            <button class="btn btn-sm btn-tf-outline" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5 !important;" type="submit" title="Delete all accumulated monthly title entries">
+                <i class="fas fa-trash-can me-1"></i>Clear Monthly
+            </button>
+        </form>
         {% endif %}
         {% endif %}
     </div>
@@ -125,12 +131,27 @@
         <div class="row g-3">
             {% for title, info in title_winners.items() %}
             <div class="col-md-3">
-                <div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-medal me-2 fa-lg" style="color: #fbbf24;"></i>
-                        <div>
-                            <strong class="text-white">@{{ title }}</strong>
-                            <div class="text-white-50 small">{{ info.winner }} ({{ info.count }} entries)</div>
+                <div class="p-3 rounded h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid {% if info.qualified %}rgba(251, 191, 36, 0.35){% else %}rgba(255, 255, 255, 0.08){% endif %}; transition: all 0.2s ease;">
+                    <div class="d-flex align-items-start">
+                        <i class="fas {% if info.qualified %}fa-crown{% elif info.has_participants %}fa-medal{% else %}fa-trophy{% endif %} me-2 fa-lg mt-1" style="color: {% if info.qualified %}#fbbf24{% elif info.has_participants %}#94a3b8{% else %}#475569{% endif %};"></i>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong class="text-white">@{{ title }}</strong>
+                                {% if info.qualified %}
+                                <span class="badge" style="background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); font-size: 0.65rem;">Qualified</span>
+                                {% elif info.has_participants %}
+                                <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25); font-size: 0.65rem;">Leading</span>
+                                {% endif %}
+                            </div>
+                            <div class="small">
+                                {% if info.has_participants %}
+                                <div class="text-white fw-semibold">{{ info.winner }}</div>
+                                <div class="text-white-50" style="font-size: 0.75rem;">{{ info.count }} entries &bull; {% if info.is_monthly %}Monthly{% else %}Cycle{% endif %}</div>
+                                {% else %}
+                                <div class="text-white-50 fst-italic">No participants</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">0 entries</div>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>

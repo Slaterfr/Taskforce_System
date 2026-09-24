@@ -1,10 +1,18 @@
-:root {
+/* ==========================================================================
+   DYNAMIC MULTI-TENANT THEME SYSTEM (8 SECTOR THEMES)
+   ========================================================================== */
+
+:root,
+html:not([data-theme]),
+html[data-theme="neon_purple"] {
     --tf-font-main: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --tf-font-mono: 'JetBrains Mono', monospace;
     --tf-bg-void: #09060f;
     --tf-bg-surface: rgba(14, 8, 24, 0.94);
     --tf-bg-surface-elevated: rgba(22, 13, 38, 0.96);
     --tf-bg-surface-hover: rgba(45, 27, 75, 0.7);
+    --tf-nav-bg: rgba(14, 9, 24, 0.92);
+    --tf-footer-bg: rgba(14, 9, 24, 0.94);
     --tf-border: rgba(168, 85, 247, 0.28);
     --tf-border-glow: rgba(168, 85, 247, 0.6);
     --tf-purple-deep: #250d38;
@@ -16,21 +24,354 @@
     --tf-text-primary: #ffffff;
     --tf-text-secondary: #f1f5f9;
     --tf-text-muted: #e2e8f0;
+    --tf-heading-color: #ffffff;
+    --tf-heading-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    --tf-label-color: #ffffff;
+    --tf-input-bg: rgba(14, 8, 24, 0.88);
+    --tf-input-border: rgba(168, 85, 247, 0.35);
+    --tf-input-focus-bg: rgba(22, 12, 38, 0.96);
+    --tf-table-header-bg: rgba(30, 16, 50, 0.95);
+    --tf-table-header-color: #d8b4fe;
+    --tf-table-border: rgba(168, 85, 247, 0.12);
+    --tf-table-hover-bg: rgba(45, 27, 75, 0.65);
+    --tf-card-shadow: 0 16px 45px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --tf-nav-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    --tf-footer-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5);
+    --tf-nav-link-color: #f1f5f9;
+    --tf-nav-link-hover-color: #ffffff;
+    --tf-nav-link-active-color: #ffffff;
+    --tf-nav-link-active-bg: rgba(168, 85, 247, 0.35);
+    --tf-nav-link-active-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
+    --tf-bg-pattern: 
+        radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.18) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.12) 0px, transparent 50%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
 }
+
+/* 2. CLEAN LIGHT (Light Mode) */
+html[data-theme="clean_light"] {
+    --tf-bg-void: #f1f5f9;
+    --tf-bg-surface: #ffffff;
+    --tf-bg-surface-elevated: #ffffff;
+    --tf-bg-surface-hover: #f8fafc;
+    --tf-nav-bg: rgba(255, 255, 255, 0.95);
+    --tf-footer-bg: rgba(255, 255, 255, 0.95);
+    --tf-border: rgba(203, 213, 225, 0.85);
+    --tf-border-glow: rgba(37, 99, 235, 0.35);
+    --tf-purple-deep: #eff6ff;
+    --tf-purple-primary: #2563eb;
+    --tf-purple-gradient: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #3b82f6 100%);
+    --tf-purple-accent: #2563eb;
+    --tf-purple-glow: rgba(37, 99, 235, 0.25);
+    --tf-purple-subtle: rgba(37, 99, 235, 0.1);
+    --tf-text-primary: #0f172a;
+    --tf-text-secondary: #334155;
+    --tf-text-muted: #64748b;
+    --tf-heading-color: #0f172a;
+    --tf-heading-shadow: none;
+    --tf-label-color: #1e293b;
+    --tf-input-bg: #ffffff;
+    --tf-input-border: #cbd5e1;
+    --tf-input-focus-bg: #ffffff;
+    --tf-table-header-bg: #f8fafc;
+    --tf-table-header-color: #1e293b;
+    --tf-table-border: #e2e8f0;
+    --tf-table-hover-bg: #f1f5f9;
+    --tf-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.06);
+    --tf-nav-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    --tf-footer-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+    --tf-nav-link-color: #334155;
+    --tf-nav-link-hover-color: #0f172a;
+    --tf-nav-link-active-color: #2563eb;
+    --tf-nav-link-active-bg: rgba(37, 99, 235, 0.08);
+    --tf-nav-link-active-shadow: 0 0 10px rgba(37, 99, 235, 0.15);
+    --tf-bg-pattern: 
+        radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.07) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
+        linear-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+}
+
+/* 3. NEUTRAL / SLATE CHARCOAL (Matte / Non-Neon) */
+html[data-theme="neutral"] {
+    --tf-bg-void: #0b0f19;
+    --tf-bg-surface: rgba(15, 23, 42, 0.94);
+    --tf-bg-surface-elevated: rgba(30, 41, 59, 0.96);
+    --tf-bg-surface-hover: rgba(51, 65, 85, 0.7);
+    --tf-nav-bg: rgba(15, 23, 42, 0.95);
+    --tf-footer-bg: rgba(15, 23, 42, 0.95);
+    --tf-border: rgba(100, 116, 139, 0.28);
+    --tf-border-glow: rgba(148, 163, 184, 0.5);
+    --tf-purple-deep: #1e293b;
+    --tf-purple-primary: #475569;
+    --tf-purple-gradient: linear-gradient(135deg, #334155 0%, #475569 50%, #64748b 100%);
+    --tf-purple-accent: #94a3b8;
+    --tf-purple-glow: rgba(148, 163, 184, 0.2);
+    --tf-purple-subtle: rgba(148, 163, 184, 0.12);
+    --tf-text-primary: #f8fafc;
+    --tf-text-secondary: #cbd5e1;
+    --tf-text-muted: #94a3b8;
+    --tf-heading-color: #ffffff;
+    --tf-heading-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    --tf-label-color: #ffffff;
+    --tf-input-bg: rgba(15, 23, 42, 0.9);
+    --tf-input-border: rgba(100, 116, 139, 0.35);
+    --tf-input-focus-bg: rgba(30, 41, 59, 0.98);
+    --tf-table-header-bg: rgba(30, 41, 59, 0.96);
+    --tf-table-header-color: #e2e8f0;
+    --tf-table-border: rgba(100, 116, 139, 0.15);
+    --tf-table-hover-bg: rgba(51, 65, 85, 0.65);
+    --tf-card-shadow: 0 16px 45px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --tf-nav-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    --tf-footer-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5);
+    --tf-nav-link-color: #e2e8f0;
+    --tf-nav-link-hover-color: #ffffff;
+    --tf-nav-link-active-color: #ffffff;
+    --tf-nav-link-active-bg: rgba(100, 116, 139, 0.35);
+    --tf-nav-link-active-shadow: 0 0 12px rgba(100, 116, 139, 0.3);
+    --tf-bg-pattern: 
+        radial-gradient(at 50% 0%, rgba(71, 85, 105, 0.16) 0px, transparent 60%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* 4. DARK MATTE / DEEP GRAPHITE (Matte / Non-Neon) */
+html[data-theme="dark_matte"] {
+    --tf-bg-void: #111113;
+    --tf-bg-surface: rgba(24, 24, 27, 0.95);
+    --tf-bg-surface-elevated: rgba(39, 39, 42, 0.96);
+    --tf-bg-surface-hover: rgba(63, 63, 70, 0.6);
+    --tf-nav-bg: rgba(18, 18, 20, 0.96);
+    --tf-footer-bg: rgba(18, 18, 20, 0.96);
+    --tf-border: rgba(63, 63, 70, 0.55);
+    --tf-border-glow: rgba(113, 113, 122, 0.45);
+    --tf-purple-deep: #27272a;
+    --tf-purple-primary: #52525b;
+    --tf-purple-gradient: linear-gradient(135deg, #27272a 0%, #3f3f46 50%, #52525b 100%);
+    --tf-purple-accent: #a1a1aa;
+    --tf-purple-glow: rgba(161, 161, 170, 0.15);
+    --tf-purple-subtle: rgba(161, 161, 170, 0.1);
+    --tf-text-primary: #fafafa;
+    --tf-text-secondary: #d4d4d8;
+    --tf-text-muted: #a1a1aa;
+    --tf-heading-color: #ffffff;
+    --tf-heading-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    --tf-label-color: #ffffff;
+    --tf-input-bg: rgba(24, 24, 27, 0.9);
+    --tf-input-border: rgba(63, 63, 70, 0.6);
+    --tf-input-focus-bg: rgba(39, 39, 42, 0.98);
+    --tf-table-header-bg: rgba(39, 39, 42, 0.96);
+    --tf-table-header-color: #e4e4e7;
+    --tf-table-border: rgba(63, 63, 70, 0.25);
+    --tf-table-hover-bg: rgba(63, 63, 70, 0.6);
+    --tf-card-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    --tf-nav-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+    --tf-footer-shadow: 0 -4px 30px rgba(0, 0, 0, 0.6);
+    --tf-nav-link-color: #e4e4e7;
+    --tf-nav-link-hover-color: #ffffff;
+    --tf-nav-link-active-color: #ffffff;
+    --tf-nav-link-active-bg: rgba(63, 63, 70, 0.4);
+    --tf-nav-link-active-shadow: 0 0 12px rgba(63, 63, 70, 0.2);
+    --tf-bg-pattern: 
+        linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+}
+
+/* 5. SLATE GRAY / TACTICAL STEEL (Matte / Non-Neon) */
+html[data-theme="slate_gray"] {
+    --tf-bg-void: #151a21;
+    --tf-bg-surface: rgba(26, 33, 43, 0.94);
+    --tf-bg-surface-elevated: rgba(37, 46, 59, 0.96);
+    --tf-bg-surface-hover: rgba(51, 65, 85, 0.7);
+    --tf-nav-bg: rgba(21, 26, 33, 0.96);
+    --tf-footer-bg: rgba(21, 26, 33, 0.96);
+    --tf-border: rgba(148, 163, 184, 0.25);
+    --tf-border-glow: rgba(56, 189, 248, 0.4);
+    --tf-purple-deep: #1e293b;
+    --tf-purple-primary: #475569;
+    --tf-purple-gradient: linear-gradient(135deg, #334155 0%, #475569 50%, #64748b 100%);
+    --tf-purple-accent: #38bdf8;
+    --tf-purple-glow: rgba(56, 189, 248, 0.25);
+    --tf-purple-subtle: rgba(56, 189, 248, 0.12);
+    --tf-text-primary: #f8fafc;
+    --tf-text-secondary: #e2e8f0;
+    --tf-text-muted: #94a3b8;
+    --tf-heading-color: #ffffff;
+    --tf-heading-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+    --tf-label-color: #ffffff;
+    --tf-input-bg: rgba(26, 33, 43, 0.9);
+    --tf-input-border: rgba(148, 163, 184, 0.35);
+    --tf-input-focus-bg: rgba(37, 46, 59, 0.98);
+    --tf-table-header-bg: rgba(37, 46, 59, 0.96);
+    --tf-table-header-color: #38bdf8;
+    --tf-table-border: rgba(148, 163, 184, 0.15);
+    --tf-table-hover-bg: rgba(51, 65, 85, 0.7);
+    --tf-card-shadow: 0 16px 45px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --tf-nav-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    --tf-footer-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5);
+    --tf-nav-link-color: #e2e8f0;
+    --tf-nav-link-hover-color: #ffffff;
+    --tf-nav-link-active-color: #38bdf8;
+    --tf-nav-link-active-bg: rgba(56, 189, 248, 0.15);
+    --tf-nav-link-active-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    --tf-bg-pattern: 
+        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.1) 0px, transparent 50%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* 6. NEON CYAN / CYBERPUNK GRID (Neon & Cyber) */
+html[data-theme="neon_cyan"] {
+    --tf-bg-void: #040e14;
+    --tf-bg-surface: rgba(6, 20, 30, 0.94);
+    --tf-bg-surface-elevated: rgba(8, 28, 42, 0.96);
+    --tf-bg-surface-hover: rgba(14, 45, 66, 0.7);
+    --tf-nav-bg: rgba(5, 18, 28, 0.94);
+    --tf-footer-bg: rgba(5, 18, 28, 0.94);
+    --tf-border: rgba(34, 211, 238, 0.3);
+    --tf-border-glow: rgba(34, 211, 238, 0.65);
+    --tf-purple-deep: #083344;
+    --tf-purple-primary: #0891b2;
+    --tf-purple-gradient: linear-gradient(135deg, #0e7490 0%, #06b6d4 50%, #22d3ee 100%);
+    --tf-purple-accent: #22d3ee;
+    --tf-purple-glow: rgba(34, 211, 238, 0.35);
+    --tf-purple-subtle: rgba(34, 211, 238, 0.15);
+    --tf-text-primary: #ffffff;
+    --tf-text-secondary: #e0f2fe;
+    --tf-text-muted: #7dd3fc;
+    --tf-heading-color: #ffffff;
+    --tf-heading-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    --tf-label-color: #ffffff;
+    --tf-input-bg: rgba(6, 20, 30, 0.9);
+    --tf-input-border: rgba(34, 211, 238, 0.35);
+    --tf-input-focus-bg: rgba(8, 28, 42, 0.98);
+    --tf-table-header-bg: rgba(8, 28, 42, 0.96);
+    --tf-table-header-color: #22d3ee;
+    --tf-table-border: rgba(34, 211, 238, 0.15);
+    --tf-table-hover-bg: rgba(14, 45, 66, 0.65);
+    --tf-card-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --tf-nav-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+    --tf-footer-shadow: 0 -4px 30px rgba(0, 0, 0, 0.6);
+    --tf-nav-link-color: #e0f2fe;
+    --tf-nav-link-hover-color: #ffffff;
+    --tf-nav-link-active-color: #ffffff;
+    --tf-nav-link-active-bg: rgba(34, 211, 238, 0.35);
+    --tf-nav-link-active-shadow: 0 0 14px rgba(34, 211, 238, 0.4);
+    --tf-bg-pattern: 
+        radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.22) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(14, 116, 144, 0.18) 0px, transparent 50%),
+        linear-gradient(rgba(34, 211, 238, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 211, 238, 0.035) 1px, transparent 1px);
+}
+
+/* 7. CRIMSON / COMBAT OPS CRIMSON (Neon & Cyber) */
+html[data-theme="crimson"] {
+    --tf-bg-void: #120708;
+    --tf-bg-surface: rgba(26, 10, 14, 0.94);
+    --tf-bg-surface-elevated: rgba(36, 14, 20, 0.96);
+    --tf-bg-surface-hover: rgba(60, 20, 30, 0.7);
+    --tf-nav-bg: rgba(22, 8, 11, 0.94);
+    --tf-footer-bg: rgba(22, 8, 11, 0.94);
+    --tf-border: rgba(244, 63, 94, 0.3);
+    --tf-border-glow: rgba(244, 63, 94, 0.65);
+    --tf-purple-deep: #4c0519;
+    --tf-purple-primary: #e11d48;
+    --tf-purple-gradient: linear-gradient(135deg, #be123c 0%, #e11d48 50%, #f43f5e 100%);
+    --tf-purple-accent: #f43f5e;
+    --tf-purple-glow: rgba(244, 63, 94, 0.35);
+    --tf-purple-subtle: rgba(244, 63, 94, 0.15);
+    --tf-text-primary: #ffffff;
+    --tf-text-secondary: #ffe4e6;
+    --tf-text-muted: #fca5a5;
+    --tf-heading-color: #ffffff;
+    --tf-heading-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    --tf-label-color: #ffffff;
+    --tf-input-bg: rgba(26, 10, 14, 0.9);
+    --tf-input-border: rgba(244, 63, 94, 0.35);
+    --tf-input-focus-bg: rgba(36, 14, 20, 0.98);
+    --tf-table-header-bg: rgba(36, 14, 20, 0.96);
+    --tf-table-header-color: #f43f5e;
+    --tf-table-border: rgba(244, 63, 94, 0.15);
+    --tf-table-hover-bg: rgba(60, 20, 30, 0.65);
+    --tf-card-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --tf-nav-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+    --tf-footer-shadow: 0 -4px 30px rgba(0, 0, 0, 0.6);
+    --tf-nav-link-color: #ffe4e6;
+    --tf-nav-link-hover-color: #ffffff;
+    --tf-nav-link-active-color: #ffffff;
+    --tf-nav-link-active-bg: rgba(244, 63, 94, 0.35);
+    --tf-nav-link-active-shadow: 0 0 14px rgba(244, 63, 94, 0.4);
+    --tf-bg-pattern: 
+        radial-gradient(at 0% 0%, rgba(225, 29, 72, 0.22) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(244, 63, 94, 0.15) 0px, transparent 50%),
+        linear-gradient(rgba(244, 63, 94, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(244, 63, 94, 0.035) 1px, transparent 1px);
+}
+
+/* 8. EMERALD / SPECOPS EMERALD (Neon & Cyber) */
+html[data-theme="emerald"] {
+    --tf-bg-void: #05120a;
+    --tf-bg-surface: rgba(8, 24, 15, 0.94);
+    --tf-bg-surface-elevated: rgba(11, 34, 21, 0.96);
+    --tf-bg-surface-hover: rgba(16, 52, 32, 0.7);
+    --tf-nav-bg: rgba(6, 20, 12, 0.94);
+    --tf-footer-bg: rgba(6, 20, 12, 0.94);
+    --tf-border: rgba(52, 211, 153, 0.3);
+    --tf-border-glow: rgba(52, 211, 153, 0.65);
+    --tf-purple-deep: #022c22;
+    --tf-purple-primary: #059669;
+    --tf-purple-gradient: linear-gradient(135deg, #047857 0%, #059669 50%, #10b981 100%);
+    --tf-purple-accent: #34d399;
+    --tf-purple-glow: rgba(52, 211, 153, 0.35);
+    --tf-purple-subtle: rgba(52, 211, 153, 0.15);
+    --tf-text-primary: #ffffff;
+    --tf-text-secondary: #d1fae5;
+    --tf-text-muted: #6ee7b7;
+    --tf-heading-color: #ffffff;
+    --tf-heading-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    --tf-label-color: #ffffff;
+    --tf-input-bg: rgba(8, 24, 15, 0.9);
+    --tf-input-border: rgba(52, 211, 153, 0.35);
+    --tf-input-focus-bg: rgba(11, 34, 21, 0.98);
+    --tf-table-header-bg: rgba(11, 34, 21, 0.96);
+    --tf-table-header-color: #34d399;
+    --tf-table-border: rgba(52, 211, 153, 0.15);
+    --tf-table-hover-bg: rgba(16, 52, 32, 0.65);
+    --tf-card-shadow: 0 16px 45px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --tf-nav-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+    --tf-footer-shadow: 0 -4px 30px rgba(0, 0, 0, 0.6);
+    --tf-nav-link-color: #d1fae5;
+    --tf-nav-link-hover-color: #ffffff;
+    --tf-nav-link-active-color: #ffffff;
+    --tf-nav-link-active-bg: rgba(52, 211, 153, 0.35);
+    --tf-nav-link-active-shadow: 0 0 14px rgba(52, 211, 153, 0.4);
+    --tf-bg-pattern: 
+        radial-gradient(at 0% 0%, rgba(5, 150, 105, 0.22) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
+        linear-gradient(rgba(52, 211, 153, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(52, 211, 153, 0.035) 1px, transparent 1px);
+}
+
+/* ==========================================================================
+   DYNAMIC COMPONENT BINDINGS
+   ========================================================================== */
 
 body {
     font-family: var(--tf-font-main);
     color: var(--tf-text-primary);
     background-color: var(--tf-bg-void);
+    transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 h1, h2, h3, h4, h5, h6 {
-    color: #ffffff !important;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    color: var(--tf-heading-color) !important;
+    text-shadow: var(--tf-heading-shadow) !important;
 }
 
 label {
-    color: #ffffff !important;
+    color: var(--tf-label-color) !important;
 }
 
 .bg-custom-purple {
@@ -41,14 +382,15 @@ label {
     color: var(--tf-purple-accent) !important;
 }
 
-/* Frosted Glass Navbar & Brand Logo */
+/* Dynamic Frosted Glass Navbar & Brand Logo */
 .navbar.bg-custom-purple {
-    background: rgba(14, 9, 24, 0.92) !important;
+    background: var(--tf-nav-bg) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid var(--tf-border);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    border-bottom: 1px solid var(--tf-border) !important;
+    box-shadow: var(--tf-nav-shadow) !important;
     padding: 0.5rem 1rem !important;
+    transition: background 0.25s ease, border-color 0.25s ease;
 }
 
 .navbar-brand {
@@ -56,7 +398,7 @@ label {
     align-items: center;
     font-weight: 700;
     font-size: 1.15rem;
-    color: #ffffff !important;
+    color: var(--tf-text-primary) !important;
     letter-spacing: -0.01em;
     padding: 0 !important;
 }
@@ -67,8 +409,8 @@ label {
     border-radius: 9px;
     object-fit: cover;
     margin-right: 12px;
-    border: 1px solid rgba(168, 85, 247, 0.4);
-    box-shadow: 0 0 12px rgba(168, 85, 247, 0.35);
+    border: 1px solid var(--tf-border);
+    box-shadow: 0 0 12px var(--tf-purple-glow);
 }
 
 .navbar .navbar-nav {
@@ -78,7 +420,7 @@ label {
 }
 
 .navbar .nav-link {
-    color: #f1f5f9 !important;
+    color: var(--tf-nav-link-color) !important;
     font-weight: 600;
     font-size: 0.92rem;
     padding: 0.4rem 0.85rem !important;
@@ -87,30 +429,31 @@ label {
 }
 
 .navbar .nav-link:hover {
-    color: #ffffff !important;
-    background: rgba(168, 85, 247, 0.2);
+    color: var(--tf-nav-link-hover-color) !important;
+    background: var(--tf-purple-subtle) !important;
 }
 
 .navbar .nav-link.active {
-    color: #ffffff !important;
-    background: rgba(168, 85, 247, 0.35);
-    box-shadow: 0 0 12px rgba(168, 85, 247, 0.3);
+    color: var(--tf-nav-link-active-color) !important;
+    background: var(--tf-nav-link-active-bg) !important;
+    box-shadow: var(--tf-nav-link-active-shadow) !important;
 }
 
-/* Frosted Glass Sticky Footer */
+/* Dynamic Frosted Glass Sticky Footer */
 footer.bg-custom-purple {
-    background: rgba(14, 9, 24, 0.94) !important;
+    background: var(--tf-footer-bg) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--tf-border);
-    color: #ffffff !important;
+    border-top: 1px solid var(--tf-border) !important;
+    color: var(--tf-text-muted) !important;
     padding: 0.85rem 0 !important;
-    box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--tf-footer-shadow) !important;
     margin-top: auto;
+    transition: background 0.25s ease, border-color 0.25s ease;
 }
 
 footer.bg-custom-purple small {
-    color: rgba(255, 255, 255, 0.85) !important;
+    color: var(--tf-text-muted) !important;
     font-size: 0.85rem;
     letter-spacing: 0.02em;
 }
@@ -175,26 +518,26 @@ footer.bg-custom-purple small {
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--tf-border) !important;
     border-radius: 16px !important;
-    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-    color: #ffffff !important;
+    box-shadow: var(--tf-card-shadow) !important;
+    color: var(--tf-text-primary) !important;
     overflow: hidden;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
 .card:hover, .tf-card:hover {
     border-color: var(--tf-border-glow) !important;
-    box-shadow: 0 14px 45px rgba(0, 0, 0, 0.6), 0 0 25px rgba(168, 85, 247, 0.15) !important;
+    box-shadow: var(--tf-card-shadow) !important;
 }
 
 .card-header, .tf-card-header {
-    background: linear-gradient(135deg, rgba(37, 13, 56, 0.95) 0%, rgba(53, 7, 63, 0.9) 100%) !important;
+    background: var(--tf-purple-subtle, rgba(37, 13, 56, 0.95)) !important;
     border-bottom: 1px solid var(--tf-border) !important;
     padding: 1.1rem 1.5rem !important;
-    color: #ffffff !important;
+    color: var(--tf-heading-color, #ffffff) !important;
 }
 
 .card-body {
-    color: #ffffff !important;
+    color: var(--tf-text-primary) !important;
 }
 
 /* Universal Nav Tabs */
@@ -204,26 +547,26 @@ footer.bg-custom-purple small {
 }
 
 .nav-tabs .nav-link, .tf-tabs .nav-link, ul#configTabs .nav-link {
-    background: rgba(26, 17, 43, 0.8) !important;
+    background: var(--tf-purple-subtle, rgba(26, 17, 43, 0.8)) !important;
     border: 1px solid var(--tf-border) !important;
     border-radius: 12px 12px 0 0 !important;
-    color: #ffffff !important;
+    color: var(--tf-text-primary) !important;
     font-weight: 600;
     padding: 0.75rem 1.5rem;
     transition: all 0.25s ease;
 }
 
 .nav-tabs .nav-link:hover, .tf-tabs .nav-link:hover, ul#configTabs .nav-link:hover {
-    background: rgba(55, 30, 90, 0.9) !important;
-    color: #ffffff !important;
-    border-color: rgba(168, 85, 247, 0.6) !important;
+    background: var(--tf-bg-surface-hover, rgba(55, 30, 90, 0.9)) !important;
+    color: var(--tf-text-primary) !important;
+    border-color: var(--tf-border-glow) !important;
 }
 
 .nav-tabs .nav-link.active, .tf-tabs .nav-link.active, ul#configTabs .nav-link.active {
     background: var(--tf-purple-gradient) !important;
-    border-color: rgba(168, 85, 247, 0.6) !important;
+    border-color: var(--tf-border-glow) !important;
     color: #ffffff !important;
-    box-shadow: 0 -2px 20px rgba(168, 85, 247, 0.5) !important;
+    box-shadow: 0 -2px 20px var(--tf-purple-glow) !important;
 }
 
 /* Universal Glass Table with Bootstrap Box-Shadow Fix */
@@ -231,13 +574,13 @@ footer.bg-custom-purple small {
     --bs-table-bg: transparent !important;
     --bs-table-accent-bg: transparent !important;
     --bs-table-striped-bg: transparent !important;
-    --bs-table-hover-bg: rgba(45, 27, 75, 0.65) !important;
-    --bs-table-hover-color: #ffffff !important;
-    --bs-table-color: #ffffff !important;
+    --bs-table-hover-bg: var(--tf-table-hover-bg) !important;
+    --bs-table-hover-color: var(--tf-text-primary) !important;
+    --bs-table-color: var(--tf-text-primary) !important;
     margin-bottom: 0 !important;
-    color: #ffffff !important;
+    color: var(--tf-text-primary) !important;
     background-color: transparent !important;
-    border-color: rgba(168, 85, 247, 0.15) !important;
+    border-color: var(--tf-table-border) !important;
 }
 
 .table > :not(caption) > * > *,
@@ -247,12 +590,12 @@ footer.bg-custom-purple small {
 .tf-table th {
     box-shadow: none !important;
     background-color: transparent !important;
-    color: #ffffff !important;
+    color: var(--tf-text-primary) !important;
 }
 
 .table thead th, .tf-table thead th, .table-secondary, thead.table-secondary th, thead.table-dark th {
-    background: rgba(30, 16, 50, 0.95) !important;
-    color: #d8b4fe !important;
+    background: var(--tf-table-header-bg) !important;
+    color: var(--tf-table-header-color) !important;
     font-size: 0.82rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -264,44 +607,44 @@ footer.bg-custom-purple small {
 
 .table tbody tr, .tf-table tbody tr {
     background-color: transparent !important;
-    border-bottom: 1px solid rgba(168, 85, 247, 0.12) !important;
+    border-bottom: 1px solid var(--tf-table-border) !important;
     transition: all 0.2s ease;
 }
 
 .table tbody tr:hover, .tf-table tbody tr:hover, .table-hover tbody tr:hover {
-    background: rgba(45, 27, 75, 0.65) !important;
-    color: #ffffff !important;
+    background: var(--tf-table-hover-bg) !important;
+    color: var(--tf-text-primary) !important;
 }
 
 .table td, .tf-table td {
     padding: 1rem 1.25rem;
     vertical-align: middle;
-    border-bottom: 1px solid rgba(168, 85, 247, 0.12) !important;
-    color: #ffffff !important;
+    border-bottom: 1px solid var(--tf-table-border) !important;
+    color: var(--tf-text-primary) !important;
 }
 
 /* Universal Inputs & Selects */
 .form-control, input.form-control, textarea.form-control, select.form-select, .tf-input, .input-group > .form-control {
-    background: rgba(14, 8, 24, 0.88) !important;
-    background-color: rgba(14, 8, 24, 0.88) !important;
-    border: 1px solid rgba(168, 85, 247, 0.35) !important;
-    color: #ffffff !important;
+    background: var(--tf-input-bg) !important;
+    background-color: var(--tf-input-bg) !important;
+    border: 1px solid var(--tf-input-border) !important;
+    color: var(--tf-text-primary) !important;
     border-radius: 10px !important;
     padding: 0.65rem 0.9rem !important;
     transition: all 0.2s ease;
 }
 
 .form-control:focus, input.form-control:focus, textarea.form-control:focus, select.form-select:focus, .tf-input:focus, .input-group > .form-control:focus {
-    background: rgba(22, 12, 38, 0.96) !important;
-    background-color: rgba(22, 12, 38, 0.96) !important;
+    background: var(--tf-input-focus-bg) !important;
+    background-color: var(--tf-input-focus-bg) !important;
     border-color: var(--tf-purple-accent) !important;
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35) !important;
-    color: #ffffff !important;
+    box-shadow: 0 0 0 3px var(--tf-purple-subtle) !important;
+    color: var(--tf-text-primary) !important;
     outline: none !important;
 }
 
 .form-control::placeholder, .tf-input::placeholder, input::placeholder {
-    color: rgba(255, 255, 255, 0.55) !important;
+    color: var(--tf-text-muted) !important;
 }
 
 .input-group-text {
@@ -608,11 +951,67 @@ body::before {
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: url('../img/RobloxScreenShot20251129_132653842.png');
-    background-size: cover;
-    background-position: center;
-    filter: blur(4px) brightness(0.28);
+    background-color: var(--tf-bg-void, #0b0713);
+    background-image: var(--tf-bg-pattern);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
     z-index: -1;
+    transition: background-color 0.25s ease;
+}
+
+/* ==========================================================================
+   CLEAN LIGHT MODE SPECIAL OVERRIDES (Light Surface & Contrast Controls)
+   ========================================================================== */
+html[data-theme="clean_light"] .text-white {
+    color: #0f172a !important;
+}
+
+html[data-theme="clean_light"] .text-white-50 {
+    color: #64748b !important;
+    text-shadow: none !important;
+}
+
+html[data-theme="clean_light"] .text-muted,
+html[data-theme="clean_light"] small.text-muted,
+html[data-theme="clean_light"] p.text-muted,
+html[data-theme="clean_light"] span.text-muted {
+    color: #64748b !important;
+    text-shadow: none !important;
+}
+
+html[data-theme="clean_light"] .navbar-brand {
+    color: #0f172a !important;
+}
+
+html[data-theme="clean_light"] .navbar-logo {
+    border: 1px solid rgba(37, 99, 235, 0.3) !important;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.15) !important;
+}
+
+html[data-theme="clean_light"] .theme-option-card {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+html[data-theme="clean_light"] .theme-option-card .text-white {
+    color: #0f172a !important;
+}
+
+html[data-theme="clean_light"] .theme-option-card .text-white-50 {
+    color: #64748b !important;
+}
+
+html[data-theme="clean_light"] .card-header {
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+
+html[data-theme="clean_light"] .card-body {
+    color: #0f172a !important;
+}
+
+html[data-theme="clean_light"] .badge.bg-dark {
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
 }
 
 /* Responsive Design Improvements */

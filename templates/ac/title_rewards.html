@@ -1,164 +1,215 @@
 {% extends "base.html" %}
 
-{% block title %}Title Rewards - Taskforce Management{% endblock %}
+{% block title %}Title Rewards & Accolades - Taskforce Management{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-8">
-        <h1 class="mb-0">
-            <i class="fas fa-trophy me-2" style="color: white;"></i>
-            <p style="color: white;">Title Rewards</p>
-        </h1>
-        <p style="color: white;">{{ current_period.period_name }}</p>
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <i class="fas fa-trophy fa-2x" style="color: #fbbf24;"></i>
+            <h2 class="mb-0 text-white fw-bold">Sector Accolades &amp; Title Rewards</h2>
+        </div>
+        <p class="text-white-50 mb-0">
+            Live standings for <span class="text-white fw-medium">{{ current_period.period_name }}</span> &bull; 
+            <span class="badge" style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.35); color: #e9d5ff;">
+                Database Tracked
+            </span>
+        </p>
     </div>
-    <div class="col-md-4 text-end">
-        <a href="{{ url_for('ac_dashboard') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <form action="{{ url_for('clear_monthly_entries') }}" method="post" class="d-inline"
+              onsubmit="return confirm('⚠️ Are you sure you want to delete ALL accumulated monthly entries for this group?\n\nThis will reset accumulated monthly title counts to 0 so they don\'t keep accumulating. This cannot be undone!');">
+            <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5 !important;">
+                <i class="fas fa-trash-can me-1"></i> Delete All Monthly Entries
+            </button>
+        </form>
+        <a href="{{ url_for('ac_config') }}#titles-tab" class="btn btn-sm btn-tf-outline">
+            <i class="fas fa-sliders me-1"></i> Configure Titles
+        </a>
+        <a href="{{ url_for('ac_dashboard') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
         </a>
     </div>
 </div>
 
-<!-- Title Winners Display -->
-<div class="row mb-4">
+<!-- Title Winners & Leaderboards -->
+<div class="row g-4 mb-4">
     {% if titles %}
-    {% for title, info in titles.items() %}
-    <div class="col-md-6 mb-3">
-        <div class="card border-warning">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0">
-                    <i class="fas fa-medal me-2"></i>@{{ title }}
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="text-center mb-3">
+        {% for title, info in titles.items() %}
+        <div class="col-lg-6">
+            <div class="tf-card h-100 position-relative" style="{% if info.qualified %}border: 1px solid rgba(251, 191, 36, 0.45); box-shadow: 0 0 25px rgba(251, 191, 36, 0.08);{% else %}border: 1px solid rgba(255, 255, 255, 0.09);{% endif %}">
+                <div class="tf-card-header d-flex justify-content-between align-items-center py-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas {% if info.qualified %}fa-crown{% elif info.has_participants %}fa-medal{% else %}fa-trophy{% endif %}" style="color: {% if info.qualified %}#fbbf24{% elif info.has_participants %}#94a3b8{% else %}#475569{% endif %};"></i>
+                        <h5 class="mb-0 text-white fw-bold">@{{ title }}</h5>
+                    </div>
                     {% if info.qualified %}
-                    <i class="fas fa-crown fa-3x text-warning"></i>
+                    <span class="badge" style="background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.45); font-size: 0.75rem;">
+                        <i class="fas fa-crown me-1"></i>Qualified Winner
+                    </span>
+                    {% elif info.has_participants %}
+                    <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25); font-size: 0.75rem;">
+                        <i class="fas fa-hourglass-half me-1"></i>In Progress &bull; Leading
+                    </span>
                     {% else %}
-                    <i class="fas fa-trophy fa-3x text-muted"></i>
+                    <span class="badge bg-secondary text-white-50" style="font-size: 0.75rem;">
+                        Uncontested
+                    </span>
                     {% endif %}
                 </div>
-                <h4 class="text-center mb-3">
-                    <strong>{{ info.winner }}</strong>
-                </h4>
-                <div class="d-flex justify-content-between">
-                    <span class="text-muted">Achievement:</span>
-                    <strong>{{ info.count }} ({{ info.requirement }})</strong>
+
+                <div class="p-4">
+                    <div class="text-center my-2">
+                        {% if info.qualified %}
+                        <div class="d-inline-flex p-3 rounded-circle mb-3" style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.25);">
+                            <i class="fas fa-crown fa-3x" style="color: #fbbf24;"></i>
+                        </div>
+                        {% elif info.has_participants %}
+                        <div class="d-inline-flex p-3 rounded-circle mb-3" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);">
+                            <i class="fas fa-medal fa-3x text-white-50"></i>
+                        </div>
+                        {% else %}
+                        <div class="d-inline-flex p-3 rounded-circle mb-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);">
+                            <i class="fas fa-trophy fa-3x" style="color: #334155;"></i>
+                        </div>
+                        {% endif %}
+
+                        <h3 class="fw-bold text-white mb-1">
+                            {% if info.has_participants %}
+                            {{ info.winner }}
+                            {% else %}
+                            <span class="text-muted fs-4">No participants yet</span>
+                            {% endif %}
+                        </h3>
+                        <p class="text-white-50 small mb-3">
+                            {% if info.description %}{{ info.description }}{% else %}{{ info.requirement }}{% endif %}
+                        </p>
+                    </div>
+
+                    <!-- Progress / Achievement Bar -->
+                    <div class="mt-3 p-3 rounded" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-white-50 small">Current Progress:</span>
+                            <span class="text-white fw-bold">
+                                {{ info.count }} <span class="text-white-50 small">/ {{ info.quantity_required }}+ required</span>
+                            </span>
+                        </div>
+                        {% set pct = [(info.count / info.quantity_required * 100)|round|int, 100]|min if info.quantity_required > 0 else 0 %}
+                        <div class="progress" style="height: 8px; background: rgba(255, 255, 255, 0.06);">
+                            <div class="progress-bar" role="progressbar" 
+                                style="width: {{ pct }}%; background: {% if info.qualified %}linear-gradient(90deg, #f59e0b, #fbbf24){% else %}linear-gradient(90deg, #64748b, #94a3b8){% endif %};" 
+                                aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-2 small">
+                            <div>
+                                {% if info.qualified %}
+                                <span class="text-success"><i class="fas fa-check-circle me-1"></i>Qualification threshold met</span>
+                                {% elif info.has_participants %}
+                                <span class="text-warning"><i class="fas fa-info-circle me-1"></i>Needs {{ info.quantity_required - info.count }} more to qualify</span>
+                                {% else %}
+                                <span class="text-muted">Awaiting activity submissions</span>
+                                {% endif %}
+                            </div>
+                            <span class="badge" style="background: rgba(255, 255, 255, 0.06); color: #94a3b8;">
+                                {% if info.is_monthly %}Monthly Accumulated{% else %}Single Cycle{% endif %}
+                            </span>
+                        </div>
+                    </div>
                 </div>
-                {% if not info.qualified and info.count > 0 %}
-                <div class="alert alert-warning mt-2 mb-0 py-2">
-                    <small><i class="fas fa-exclamation-triangle me-1"></i>Minimum requirement not met</small>
-                </div>
-                {% elif info.count == 0 %}
-                <div class="alert alert-info mt-2 mb-0 py-2">
-                    <small><i class="fas fa-info-circle me-1"></i>No activities logged yet</small>
-                </div>
-                {% endif %}
             </div>
         </div>
-    </div>
-    {% endfor %}
+        {% endfor %}
     {% else %}
-    <div class="col-12">
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>No activity data available for this period.
+        <div class="col-12">
+            <div class="tf-card text-center p-5">
+                <i class="fas fa-trophy fa-3x mb-3 text-muted"></i>
+                <h4 class="text-white fw-bold">No Titles Configured for This Sector</h4>
+                <p class="text-white-50 mb-4">
+                    Your sector can configure custom accolades, required activity types, and quantity thresholds.
+                </p>
+                <a href="{{ url_for('ac_config') }}#titles-tab" class="btn btn-tf-primary">
+                    <i class="fas fa-plus me-2"></i>Configure Sector Titles
+                </a>
+            </div>
         </div>
-    </div>
     {% endif %}
 </div>
 
-{% set qualified_count = titles.values()|selectattr('qualified')|list|length if titles else 0 %}
-{% if qualified_count > 0 %}
-<!-- Discord Message Preview -->
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="fab fa-discord me-2"></i>Discord Message Preview
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="bg-light p-3 rounded mb-3" style="white-space: pre-wrap; font-family: monospace;">{{
-                    discord_message }}</div>
-
-                <form method="POST" action="{{ url_for('send_title_webhook') }}">
-                    <div class="mb-3">
-                        <label for="webhook_url" class="form-label">Discord Webhook URL</label>
-                        <input type="url" class="form-control" id="webhook_url" name="webhook_url"
-                            placeholder="https://discord.com/api/webhooks/..." required>
-                        <div class="form-text">Paste your Discord webhook URL to post title rewards automatically</div>
-                    </div>
-
-                    <input type="hidden" name="message" value="{{ discord_message }}">
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <button type="button" class="btn btn-outline-secondary" onclick="copyToClipboard()">
-                            <i class="fas fa-copy me-2"></i>Copy Message
-                        </button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fab fa-discord me-2"></i>Send to Discord
-                        </button>
-                    </div>
-                </form>
-            </div>
+<!-- Configured Titles Reference & Rules -->
+<div class="tf-card">
+    <div class="tf-card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-info-circle me-2" style="color: var(--tf-purple-accent);"></i>
+            <h5 class="mb-0 text-white fw-bold">Sector Accolade Rules &amp; Cadence</h5>
         </div>
+        <a href="{{ url_for('ac_config') }}#titles-tab" class="btn btn-sm btn-tf-outline">
+            <i class="fas fa-edit me-1"></i> Edit Rules
+        </a>
     </div>
-</div>
-{% elif qualified_count == 0 and titles %}
-<!-- No Qualified Winners Message -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle me-2"></i>
-            <strong>No Qualified Winners:</strong> Some members are leading but haven't met the minimum requirements
-            yet.
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<!-- Title Requirements Reference -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-info-circle me-2"></i>Title Reward System
-                </h5>
+    <div class="p-4">
+        <div class="row g-4">
+            <div class="col-md-7">
+                <h6 class="text-white fw-bold mb-3">Active Accolades for this Sector:</h6>
+                <div class="table-responsive">
+                    <table class="table tf-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Title Name</th>
+                                <th>Required Activity</th>
+                                <th>Threshold</th>
+                                <th>Cadence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for title, info in titles.items() %}
+                            <tr>
+                                <td>
+                                    <strong class="text-white">@{{ title }}</strong>
+                                    {% if info.description %}
+                                    <div class="text-white-50 small">{{ info.description }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.3);">
+                                        {{ info.activity_required }}
+                                    </span>
+                                </td>
+                                <td class="text-white font-monospace">{{ info.quantity_required }}+ entries</td>
+                                <td>
+                                    <span class="badge {% if info.is_monthly %}bg-secondary{% else %}bg-info text-dark{% endif %}">
+                                        {% if info.is_monthly %}Monthly{% else %}Cycle{% endif %}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6><strong>Available Titles (Updated Monthly):</strong></h6>
-                        <ul>
-                            <li><strong>@Host with the Most:</strong> Most events hosted (Training + Raid + Patrol, min 5)</li>
-                            <li><strong>@Taskmaster:</strong> Most missions posted (min 5)</li>
-                            <li><strong>@Legionnaire:</strong> Most raids and patrols hosted (min 5)</li>
-                            <li><strong>@Scout:</strong> Most tryouts hosted (min 5)</li>
-                        </ul>
-                        <small class="text-muted"><i class="fas fa-calendar me-1"></i>Stats accumulate throughout the month and update in real-time.</small>
+            <div class="col-md-5">
+                <div class="p-3 rounded h-100 d-flex flex-column justify-content-between" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);">
+                    <div>
+                        <h6 class="text-white fw-bold mb-2"><i class="fas fa-shield-halved me-2 text-warning"></i>Persistent Tracking &amp; Reset</h6>
+                        <p class="text-white-50 small mb-2">
+                            Monthly titles accumulate across all AC cycles within the month using replicated entries (<code style="color: #d8b4fe;">MonthlyActivityEntry</code>).
+                        </p>
+                        <p class="text-white-50 small mb-3">
+                            When a cycle's activities are cleared, monthly progress is preserved. To start fresh so entries don't accumulate indefinitely, you can purge them below.
+                        </p>
                     </div>
-                    <div class="col-md-6">
-                        <h6><strong>Excluded:</strong></h6>
-                        <ul>
-                            <li><strong>@Executor:</strong> Most missions completed (excluded - requires mission completion tracking)</li>
-                        </ul>
-                        <small class="text-muted">Executor title is excluded as it requires tracking mission completions separately from mission postings.</small>
+                    <div>
+                        <form action="{{ url_for('clear_monthly_entries') }}" method="post" class="d-inline"
+                              onsubmit="return confirm('⚠️ Are you sure you want to delete ALL accumulated monthly entries for this group?\n\nThis will reset accumulated monthly title counts to 0 so they don\'t keep accumulating. This cannot be undone!');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger w-100" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5 !important;">
+                                <i class="fas fa-trash-can me-1"></i> Purge All Monthly Entries
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
-<script>
-    function copyToClipboard() {
-        const message = `{{ discord_message }}`;
-        navigator.clipboard.writeText(message).then(function () {
-            alert('✅ Message copied to clipboard!');
-        }, function (err) {
-            alert('❌ Failed to copy message');
-        });
-    }
-</script>
 {% endblock %}

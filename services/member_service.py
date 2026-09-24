@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 from sqlmodel import select
 from database.models import Member, PromotionLog, RankMapping, ActivityLog
+from utils.tenant_context import get_tenant_id
 from utils.roblox_sync import add_member_to_roblox, remove_member_from_roblox, sync_member_to_roblox
 
 DEFAULT_RANKS = [
@@ -41,9 +42,14 @@ def find_by_discord_username(discord_username):
     return db_session().exec(select(Member).filter_by(discord_username=discord_username)).first()
 
 
-def search_members(search='', *, active_only=True, limit=None, rank_filter=None):
-    """Search members by username or rank, with optional rank and limit filters."""
-    query = db_session().query(Member).filter_by(is_active=True) if active_only else db_session().query(Member)
+def search_members(search='', *, active_only=True, limit=None, rank_filter=None, tenant_id=None):
+    """Search members by username or rank, scoped to tenant."""
+    t_id = tenant_id or get_tenant_id()
+    query = db_session().query(Member)
+    if t_id is not None:
+        query = query.filter(Member.tenant_id == t_id)
+    if active_only:
+        query = query.filter(Member.is_active == True)
     if search:
         pattern = f'%{search}%'
         query = query.filter(
@@ -312,14 +318,29 @@ def get_all_rank_mappings():
     return db_session().query(RankMapping).order_by(RankMapping.system_rank).all()
 
 
-def add_or_update_rank_mapping(system_rank, roblox_role_id, roblox_role_name=None):
+def add_or_update_rank_mapping(system_rank, roblox_role_id, roblox_role_name=None, tenant_id=None):
     """Add a new mapping or update an existing one."""
     system_rank = (system_rank or '').strip()
     if not system_rank or not roblox_role_id:
         return {'success': False, 'message': 'System rank and Roblox role ID are required'}
 
-    existing = db_session().exec(select(RankMapping).filter_by(system_rank=system_rank)).first()
+    t_id = tenant_id or get_tenant_id() or 1
+    existing = db_session().exec(
+        select(RankMapping).where(
+            RankMapping.tenant_id == t_id,
+            RankMapping.roblox_role_id == roblox_role_id
+        )
+    ).first()
+    if not existing:
+        existing = db_session().exec(
+            select(RankMapping).where(
+                RankMapping.tenant_id == t_id,
+                RankMapping.system_rank == system_rank
+            )
+        ).first()
+
     if existing:
+        existing.system_rank = system_rank
         existing.roblox_role_id = roblox_role_id
         existing.roblox_role_name = roblox_role_name
         existing.is_active = True
@@ -327,6 +348,7 @@ def add_or_update_rank_mapping(system_rank, roblox_role_id, roblox_role_name=Non
         message = f'Updated mapping for {system_rank}'
     else:
         mapping = RankMapping(
+            tenant_id=t_id,
             system_rank=system_rank,
             roblox_role_id=roblox_role_id,
             roblox_role_name=roblox_role_name,

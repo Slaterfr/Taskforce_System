@@ -4,15 +4,18 @@ Handles synchronization between the system and Roblox group
 """
 
 import os
-from typing import Optional, Dict
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from config import settings
 import logging
 
 logger = logging.getLogger(__name__)
-from database.engine import db_session
-from sqlmodel import select
+from database.engine import db_session, engine
+from sqlmodel import select, Session
 from database.models import Member, RankMapping, PromotionLog
+from database.tenant_models import Group, GroupCookie, GroupPermissionRule
+from services.roblox_oauth_service import DEFAULT_ROLE_PERMISSIONS
+from utils.tenant_context import set_tenant_context, get_tenant_id
 from api.roblox_api import RobloxAPI
 
 # Global flag to prevent sync loops
@@ -27,28 +30,46 @@ def set_syncing_flag(value: bool):
     global _syncing_from_roblox
     _syncing_from_roblox = value
 
-def get_roblox_api() -> Optional[RobloxAPI]:
-    """Get configured RobloxAPI instance"""
-    group_id = getattr(settings, 'ROBLOX_GROUP_ID', None)
-    cookie = getattr(settings, 'ROBLOX_COOKIE', None)
-    
-    # Debug logging
-    if not group_id:
-        logger.warning("Roblox API not configured: ROBLOX_GROUP_ID is missing or empty")
-        return None
-    
-    # Check if group_id is just whitespace
-    if isinstance(group_id, str) and not group_id.strip():
-        logger.warning("Roblox API not configured: ROBLOX_GROUP_ID is empty string")
-        return None
-    
+def get_roblox_api(group_id: Optional[int] = None, roblox_group_id: Optional[str] = None) -> Optional[RobloxAPI]:
+    """Get configured RobloxAPI instance for a specific group/tenant using its dedicated cookie."""
+    target_roblox_group_id = roblox_group_id
+    cookie = None
+
+    effective_group_id = group_id or get_tenant_id() or 1
+
     try:
-        group_id_int = int(group_id)
-    except (ValueError, TypeError) as e:
-        logger.error(f"Roblox API not configured: ROBLOX_GROUP_ID '{group_id}' is not a valid integer: {e}")
+        with Session(engine) as session:
+            # 1. Lookup dedicated cookie for this tenant
+            g_cookie = session.exec(select(GroupCookie).where(GroupCookie.group_id == effective_group_id)).first()
+            if g_cookie and g_cookie.cookie:
+                cookie = g_cookie.cookie
+
+            # 2. Lookup Roblox Group ID if not explicitly passed
+            if not target_roblox_group_id:
+                grp = session.exec(select(Group).where(Group.id == effective_group_id)).first()
+                if grp:
+                    target_roblox_group_id = grp.roblox_group_id
+    except Exception as e:
+        logger.warning(f"Error fetching group/cookie for tenant {effective_group_id}: {e}")
+
+    # Fallback to .env settings if not set in database
+    if not cookie:
+        cookie = getattr(settings, 'ROBLOX_COOKIE', None)
+    if not target_roblox_group_id:
+        target_roblox_group_id = getattr(settings, 'ROBLOX_GROUP_ID', None)
+
+    if not target_roblox_group_id:
+        logger.warning("Roblox API not configured: missing Roblox Group ID")
         return None
-    
+
+    try:
+        group_id_int = int(target_roblox_group_id)
+    except (ValueError, TypeError) as e:
+        logger.error(f"Roblox API not configured: Group ID '{target_roblox_group_id}' is not a valid integer: {e}")
+        return None
+
     return RobloxAPI(group_id_int, cookie=cookie)
+
 
 def get_role_id_for_rank(system_rank: str) -> Optional[int]:
     """Get Roblox role ID for a system rank"""
@@ -190,120 +211,148 @@ def remove_member_from_roblox(member: Member, skip_if_syncing: bool = True) -> D
     except (ValueError, TypeError):
         return {'success': False, 'message': f'Invalid Roblox ID: {member.roblox_id}'}
 
-def sync_from_roblox():
+def sync_from_roblox(tenant_id: int = 1, roblox_group_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Sync members from Roblox group to system
-    This is called by the background polling task
+    Sync members from Roblox group to system with automatic role and rank mapping.
+    Scoped to tenant_id to guarantee multi-tenant data isolation.
     """
     set_syncing_flag(True)
-    
+    set_tenant_context(tenant_id)
+
     try:
-        roblox_api = get_roblox_api()
+        roblox_api = get_roblox_api(group_id=tenant_id, roblox_group_id=roblox_group_id)
         if not roblox_api:
-            return {'success': False, 'message': 'Roblox API not configured'}
-        
-        # Get all members from Roblox
+            return {'success': False, 'message': f'Roblox API not configured for tenant {tenant_id}'}
+
+        # Step 1: Automatic Rank Mapping from Roblox Roles
+        roblox_roles = roblox_api.get_group_roles()
+        if not roblox_roles:
+            logger.warning(f"No roles returned from Roblox for tenant {tenant_id}")
+        else:
+            logger.info(f"[Tenant {tenant_id}] Auto-mapping {len(roblox_roles)} roles from Roblox...")
+            seen_rank_names = set()
+            for role in roblox_roles:
+                if not isinstance(role, dict):
+                    continue
+                role_name = role.get('name', '').strip()
+                role_id = role.get('id')
+                rank_val = role.get('rank', 1)
+
+                if not role_name or not role_id or rank_val == 0:
+                    continue  # Skip Guest / rank 0
+
+                # Disambiguate if group has duplicate role names
+                sys_rank = role_name
+                if sys_rank in seen_rank_names:
+                    sys_rank = f"{role_name} ({rank_val})"
+                seen_rank_names.add(sys_rank)
+
+                # Auto-upsert RankMapping for this tenant
+                mapping = db_session().exec(
+                    select(RankMapping).where(
+                        RankMapping.tenant_id == tenant_id,
+                        RankMapping.roblox_role_id == role_id
+                    )
+                ).first()
+
+                if not mapping:
+                    mapping = RankMapping(
+                        tenant_id=tenant_id,
+                        system_rank=sys_rank,
+                        roblox_role_id=role_id,
+                        roblox_role_name=role_name,
+                        is_active=True
+                    )
+                    db_session().add(mapping)
+                else:
+                    mapping.roblox_role_name = role_name
+                    mapping.is_active = True
+
+                # Auto-ensure default GroupPermissionRule exists for this group
+                existing_rule = db_session().exec(
+                    select(GroupPermissionRule).where(
+                        GroupPermissionRule.group_id == tenant_id,
+                        GroupPermissionRule.specific_role_id == role_id
+                    )
+                ).first()
+
+                if not existing_rule:
+                    if rank_val >= 250:
+                        s_role = "hct"
+                        perms = DEFAULT_ROLE_PERMISSIONS.get("hct", [])
+                    elif rank_val >= 150:
+                        s_role = "staff"
+                        perms = DEFAULT_ROLE_PERMISSIONS.get("staff", [])
+                    else:
+                        s_role = "member"
+                        perms = DEFAULT_ROLE_PERMISSIONS.get("member", [])
+
+                    rule = GroupPermissionRule(
+                        group_id=tenant_id,
+                        min_roblox_rank=rank_val,
+                        specific_role_id=role_id,
+                        system_role=s_role,
+                        permissions=perms
+                    )
+                    db_session().add(rule)
+
+            db_session().commit()
+
+        # Build reverse role-to-system-rank map for this tenant
+        rank_mappings = db_session().exec(
+            select(RankMapping).where(RankMapping.tenant_id == tenant_id, RankMapping.is_active == True)
+        ).all()
+        roblox_role_to_system_rank = {m.roblox_role_name: m.system_rank for m in rank_mappings if m.roblox_role_name}
+
+        # Step 2: Fetch Members from Roblox
         roblox_members = roblox_api.get_group_members()
         if not roblox_members:
-            return {'success': False, 'message': 'Failed to fetch members from Roblox'}
-        
-        # Get all roles to create mapping
-        roblox_roles = roblox_api.get_group_roles()
-        role_name_to_id = {}
-        for role in roblox_roles:
-            if isinstance(role, dict):
-                role_name = role.get('name', '')
-                role_id = role.get('id')
-                if role_name and role_id:
-                    role_name_to_id[str(role_name)] = role_id
-        
-        # Get rank mappings (reverse: roblox role name -> system rank)
-        # Also use the RANK_MAPPING from roblox_api as fallback
-        from api.roblox_api import RANK_MAPPING
-        rank_mappings = db_session().exec(select(RankMapping).filter_by(is_active=True)).all()
-        roblox_role_to_system_rank = {}
-        for mapping in rank_mappings:
-            if mapping.roblox_role_name:
-                roblox_role_to_system_rank[mapping.roblox_role_name] = mapping.system_rank
-        
-        # Also add reverse mapping from RANK_MAPPING (system rank -> roblox rank)
-        # We need to match by role name from Roblox
-        for roblox_role in roblox_roles:
-            if not isinstance(roblox_role, dict):
-                continue
-            role_name = roblox_role.get('name', '')
-            if not isinstance(role_name, str):
-                role_name = str(role_name) if role_name else ''
-            # Check if this role name maps to a system rank
-            if role_name and role_name in RANK_MAPPING:
-                system_rank = RANK_MAPPING[role_name]
-                if isinstance(system_rank, str):
-                    roblox_role_to_system_rank[role_name] = system_rank
-        
+            return {'success': False, 'message': f'Failed to fetch members from Roblox for tenant {tenant_id}'}
+
         stats = {
             'added': 0,
             'updated': 0,
             'rank_changes': 0,
+            'roles_mapped': len(roblox_roles) if roblox_roles else 0,
             'errors': 0
         }
-        
-        # Process each Roblox member
+
+        # Process members
         for roblox_member in roblox_members:
             try:
-                # Ensure role_name is a string
                 role_name = roblox_member.role_name
                 if isinstance(role_name, dict):
-                    role_name = role_name.get('name', '') if isinstance(role_name, dict) else str(role_name)
+                    role_name = role_name.get('name', '')
                 if not isinstance(role_name, str):
                     role_name = str(role_name) if role_name else ''
-                
-                # Find member by Roblox ID, Roblox Username, or Discord Username (fallback)
-                # We check these sequentially to prioritize ID match
-                member = db_session().exec(select(Member).filter_by(roblox_id=str(roblox_member.user_id))).first()
-                
-                if not member:
-                    member = db_session().exec(select(Member).filter_by(roblox_username=roblox_member.username)).first()
-                
-                if not member:
-                    member = db_session().exec(select(Member).filter_by(discord_username=roblox_member.username)).first()
-                
-                system_rank = roblox_role_to_system_rank.get(role_name)
-                if not system_rank:
-                    # Try to use role name directly if no mapping
-                    system_rank = role_name
-                
-                # Ensure system_rank is a string
-                if not isinstance(system_rank, str):
-                    system_rank = str(system_rank) if system_rank else 'Aspirant'
-                
-                if member:
-                    # Check for ID mismatch (collision protection)
-                    if member.roblox_id and member.roblox_id != str(roblox_member.user_id):
-                        # We found a member (likely by username), but they have a DIFFERENT Roblox ID.
-                        # This implies a name collision (different person) or they changed accounts.
-                        # We cannot safely sync this user without manual intervention.
-                        logger.warning(
-                            f"Sync collision: Roblox user {roblox_member.username} ({roblox_member.user_id}) "
-                            f"matches Member {member.discord_username} ({member.id}) but Roblox IDs differ "
-                            f"({member.roblox_id} vs {roblox_member.user_id}). Skipping."
-                        )
-                        continue
 
-                    # Update existing member
-                    rank_changed = False
-                    # Ensure member.current_rank is a string for comparison
+                # Resolve system rank
+                system_rank = roblox_role_to_system_rank.get(role_name) or role_name
+                if not system_rank or system_rank == 'Guest':
+                    continue
+
+                member = db_session().exec(
+                    select(Member).where(
+                        Member.tenant_id == tenant_id,
+                        Member.roblox_id == str(roblox_member.user_id)
+                    )
+                ).first()
+
+                if not member:
+                    member = db_session().exec(
+                        select(Member).where(
+                            Member.tenant_id == tenant_id,
+                            Member.roblox_username == roblox_member.username
+                        )
+                    ).first()
+
+                if member:
                     current_rank = member.current_rank
-                    if not isinstance(current_rank, str):
-                        current_rank = str(current_rank) if current_rank else 'Aspirant'
-                        member.current_rank = current_rank
-                    
                     if current_rank != system_rank:
                         old_rank = current_rank
                         member.current_rank = system_rank
-                        rank_changed = True
-                        
-                        # Log promotion
                         promotion = PromotionLog(
+                            tenant_id=tenant_id,
                             member_id=member.id,
                             from_rank=old_rank,
                             to_rank=system_rank,
@@ -312,67 +361,56 @@ def sync_from_roblox():
                         )
                         db_session().add(promotion)
                         stats['rank_changes'] += 1
-                    
-                    # Update Roblox info
+
                     if not member.roblox_id:
                         member.roblox_id = str(roblox_member.user_id)
                     if member.roblox_username != roblox_member.username:
                         member.roblox_username = roblox_member.username
-                    
                     member.last_updated = datetime.utcnow()
+                    member.is_active = True
                     stats['updated'] += 1
                 else:
-                    # New member - add to system
-                    # Only add if they have a mapped rank (Aspirant+)
-                    eligible_ranks = ['Aspirant', 'Novice', 'Adept', 'Crusader', 'Paladin', 
-                                     'Exemplar', 'Prospect', 'Commander', 'Marshal', 'General', 'Chief General']
-                    # Ensure system_rank is a string for comparison
-                    if isinstance(system_rank, str) and system_rank in eligible_ranks:
-                        new_member = Member(
-                            discord_username=roblox_member.username,  # Will be updated when Discord is linked
-                            roblox_username=roblox_member.username,
-                            roblox_id=str(roblox_member.user_id),
-                            current_rank=system_rank,
-                            join_date=datetime.utcnow(),
-                            last_updated=datetime.utcnow()
-                        )
-                        db_session().add(new_member)
-                        stats['added'] += 1
-                
+                    new_member = Member(
+                        tenant_id=tenant_id,
+                        discord_username=roblox_member.username,
+                        roblox_username=roblox_member.username,
+                        roblox_id=str(roblox_member.user_id),
+                        current_rank=system_rank,
+                        join_date=datetime.utcnow(),
+                        last_updated=datetime.utcnow(),
+                        is_active=True
+                    )
+                    db_session().add(new_member)
+                    stats['added'] += 1
+
             except Exception as e:
-                import traceback
-                error_details = traceback.format_exc()
-                logger.error(f"Error syncing member {getattr(roblox_member, 'username', 'unknown')}: {e}\n{error_details}")
-                print(f"❌ Error syncing member: {e}")
+                logger.error(f"Error syncing member {getattr(roblox_member, 'username', 'unknown')}: {e}")
                 stats['errors'] += 1
-        
-        # Check for members in system but not in Roblox (they may have left)
+
+        # Check for inactive members
         roblox_user_ids = {str(m.user_id) for m in roblox_members}
-        system_members = db_session().exec(select(Member).filter_by(is_active=True)).all()
-        
+        system_members = db_session().exec(
+            select(Member).where(Member.tenant_id == tenant_id, Member.is_active == True)
+        ).all()
         for member in system_members:
             if member.roblox_id and member.roblox_id not in roblox_user_ids:
-                # Member is in system but not in Roblox - mark as inactive
-                # (Don't auto-delete, just mark inactive for manual review)
-                if member.is_active:
-                    member.is_active = False
-                    member.last_updated = datetime.utcnow()
-        
+                member.is_active = False
+                member.last_updated = datetime.utcnow()
+
         db_session().commit()
-        
+
         return {
             'success': True,
-            'message': f'Synced from Roblox: {stats["added"]} added, {stats["updated"]} updated, {stats["rank_changes"]} rank changes',
+            'message': f'Synced from Roblox (Tenant {tenant_id}): {stats["added"]} added, {stats["updated"]} updated, {stats["rank_changes"]} rank changes, {stats["roles_mapped"]} roles mapped',
             'stats': stats
         }
-        
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        logger.error(f"Error in sync_from_roblox: {e}\n{error_trace}")
-        print(f"❌ Full error trace:\n{error_trace}")
+        logger.error(f"Error in sync_from_roblox for tenant {tenant_id}: {e}\n{error_trace}")
         db_session().rollback()
         return {'success': False, 'message': f'Error: {str(e)}'}
     finally:
         set_syncing_flag(False)
+
 

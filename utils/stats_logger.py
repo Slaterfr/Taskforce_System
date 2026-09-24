@@ -7,34 +7,42 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def capture_member_stats():
+from utils.tenant_context import set_tenant_context, get_tenant_id
+
+def capture_member_stats(tenant_id: Optional[int] = None):
     """
-    Captures a snapshot of current member counts and rank distribution.
+    Captures a snapshot of current member counts and rank distribution for a tenant.
     Saves to the MemberStats table.
     """
+    effective_tenant_id = tenant_id or get_tenant_id() or 1
+    set_tenant_context(effective_tenant_id)
     try:
-        # Get all active members
-        members = db_session().exec(select(Member).filter_by(is_active=True)).all()
+        # Get all active members for this tenant
+        members = db_session().exec(
+            select(Member).where(Member.tenant_id == effective_tenant_id, Member.is_active == True)
+        ).all()
         total_members = len(members)
-        
+
         # Calculate rank distribution
         rank_counts = {}
         for member in members:
             rank = member.current_rank
             rank_counts[rank] = rank_counts.get(rank, 0) + 1
-            
+
         # Create snapshot
         stats = MemberStats(
+            tenant_id=effective_tenant_id,
             timestamp=datetime.utcnow(),
             total_members=total_members,
             rank_counts=rank_counts
         )
-        
+
         db_session().add(stats)
         db_session().commit()
-        
-        logger.info(f"✅ Captured member stats: {total_members} members")
+
+        logger.info(f"✅ [Tenant {effective_tenant_id}] Captured member stats: {total_members} members")
         return True
+
         
     except Exception as e:
         logger.error(f"❌ Error capturing member stats: {e}")

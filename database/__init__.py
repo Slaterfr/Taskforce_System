@@ -17,9 +17,26 @@ from database.ac_models import (
     PeriodStatistics,
     ActivityType,
     RankQuota,
+    Title,
+)
+from database.tenant_models import (
+    User,
+    Group,
+    GroupMember,
+    GroupPermissionRule,
+    GroupCookie,
+)
+from database.permission_models import (
+    RankPermission,
 )
 
 __all__ = [
+    "RankPermission",
+    "User",
+    "Group",
+    "GroupMember",
+    "GroupPermissionRule",
+    "GroupCookie",
     "Member",
     "ActivityLog",
     "PromotionLog",
@@ -36,4 +53,6 @@ __all__ = [
     "PeriodStatistics",
     "ActivityType",
     "RankQuota",
+    "Title",
 ]
+

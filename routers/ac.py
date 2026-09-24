@@ -12,6 +12,7 @@ from database.ac_models import (
 )
 from services import ac_service
 from utils.auth import hct_required
+from utils.tenant_context import get_tenant_id
 from utils.ac_reports import send_discord_webhook
 from utils.excel_reports import generate_ac_workbook_bytes, merge_into_uploaded_workbook_bytes
 from datetime import datetime, timedelta
@@ -47,7 +48,8 @@ async def create_ac_period(request: Request):
         period_name = (await request.form()).get('period_name', '').strip()
         start_date = datetime.strptime((await request.form()).get('start_date'), '%Y-%m-%d')
         end_date = datetime.strptime((await request.form()).get('end_date'), '%Y-%m-%d') if (await request.form()).get('end_date') else (start_date + timedelta(weeks=2) - timedelta(days=1))
-        ac_service.create_period(period_name, start_date, end_date)
+        tenant_id = request.session.get("tenant_id") or get_tenant_id() or 1
+        ac_service.create_period(period_name, start_date, end_date, tenant_id=tenant_id)
         flash(request, 'AC period created', 'success')
         return RedirectResponse(url_for(request, 'ac_dashboard'), status_code=303)
     return templates.TemplateResponse('ac/create_period.html', {"request": request})
@@ -103,19 +105,28 @@ async def clear_all_activities(request: Request):
     return RedirectResponse(url_for(request, 'ac_dashboard'), status_code=303)
 
 
+@router.api_route('/clear_monthly_entries', methods=['POST'])
+@hct_required
+async def clear_monthly_entries(request: Request):
+    """Delete all monthly activity entries for this tenant so they do not accumulate indefinitely."""
+    tenant_id = request.session.get("tenant_id") or get_tenant_id() or 1
+    deleted_count = ac_service.clear_all_monthly_entries(tenant_id=tenant_id)
+    
+    flash(request, f'Successfully deleted {deleted_count} accumulated monthly entries. Monthly title standings have been reset.', 'success')
+    referer = request.headers.get("referer") or url_for(request, 'title_rewards')
+    return RedirectResponse(referer, status_code=303)
+
+
 @router.api_route('/clear_titles', methods=['POST'])
 @hct_required
 async def clear_titles(request: Request):
     """Clear all title tracking data - manual action to reset title history"""
-    current_period = ac_service.get_active_period()
-    if not current_period:
-        flash(request, 'No active AC period', 'error')
-        return RedirectResponse(url_for(request, 'ac_dashboard'), status_code=303)
-    
-    deleted_count = ac_service.clear_titles(current_period.id)
+    tenant_id = request.session.get("tenant_id") or get_tenant_id() or 1
+    deleted_count = ac_service.clear_all_monthly_entries(tenant_id=tenant_id)
     
     flash(request, f'Cleared {deleted_count} title tracking entries. Monthly activity history reset.', 'success')
-    return RedirectResponse(url_for(request, 'ac_dashboard'), status_code=303)
+    referer = request.headers.get("referer") or url_for(request, 'title_rewards')
+    return RedirectResponse(referer, status_code=303)
 
 
 @router.get('/title_rewards')
@@ -130,16 +141,14 @@ async def title_rewards(request: Request):
     # Get all activities for the current period
     all_activities = ac_service.get_period_activities(current_period.id)
     
-    # Calculate title rewards (includes Executor title with mission stats)
+    # Calculate title rewards purely from database
     titles = ac_service.calculate_title_rewards(all_activities, current_period)
     
-    # Generate Discord message
-    discord_message = ac_service.generate_title_discord_message(titles, current_period)
-    
-    return templates.TemplateResponse('ac/title_rewards.html', {"request": request,
-                         "current_period":current_period,
-                         "titles":titles,
-                         "discord_message":discord_message})
+    return templates.TemplateResponse('ac/title_rewards.html', {
+        "request": request,
+        "current_period": current_period,
+        "titles": titles,
+    })
 
 
 @router.api_route('/send_title_webhook', methods=['POST'])
@@ -432,13 +441,16 @@ async def clear_member_activities(request: Request, member_id):
 @router.get('/config', name='ac_config')
 @hct_required
 async def ac_config(request: Request):
-    """Configuration management panel for activities and rank quotas."""
-    activity_types = ac_service.get_all_activity_types()
-    rank_quotas = ac_service.get_all_rank_quotas()
+    """Configuration management panel for activities, rank quotas, and titles."""
+    tenant_id = request.session.get("tenant_id") or get_tenant_id() or 1
+    activity_types = ac_service.get_all_activity_types(tenant_id)
+    rank_quotas = ac_service.get_all_rank_quotas(tenant_id)
+    titles = ac_service.get_all_titles(tenant_id)
     return templates.TemplateResponse('ac/ac_config.html', {
         "request": request,
         "activity_types": activity_types,
         "rank_quotas": rank_quotas,
+        "titles": titles,
     })
 
 
@@ -451,11 +463,13 @@ async def create_activity_type_route(request: Request):
     is_limited = form.get('is_limited') == 'on'
     description = form.get('description', '').strip()
 
+    tenant_id = request.session.get("tenant_id") or get_tenant_id() or 1
     result = ac_service.create_activity_type(
         name=name,
         points=points,
         is_limited=is_limited,
         description=description,
+        tenant_id=tenant_id,
     )
     if result['success']:
         flash(request, f'Activity "{name}" created successfully ({points} pts).', 'success')
@@ -510,9 +524,11 @@ async def create_rank_quota_route(request: Request):
     rank_name = form.get('rank_name', '').strip()
     required_points = float(form.get('required_points', 0.0))
 
+    tenant_id = request.session.get("tenant_id") or get_tenant_id() or 1
     result = ac_service.create_rank_quota(
         rank_name=rank_name,
         required_points=required_points,
+        tenant_id=tenant_id,
     )
     if result['success']:
         flash(request, f'Quota for "{rank_name}" set to {required_points} points.', 'success')
@@ -552,4 +568,76 @@ async def delete_rank_quota_route(request: Request, quota_id: int):
         flash(request, result.get('error', 'Failed to delete rank quota.'), 'error')
 
     return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+
+
+# ============================================================================
+# TITLE REWARDS MANAGEMENT
+# ============================================================================
+
+@router.post('/config/title/create', name='create_title')
+@hct_required
+async def create_title_route(request: Request):
+    tenant_id = request.session.get("tenant_id") or get_tenant_id() or 1
+    form = await request.form()
+    name = form.get('name', '').strip()
+    activity_required = form.get('activity_required', '').strip()
+    quantity_required = form.get('quantity_required', 5)
+    description = form.get('description', '').strip()
+    period_type = form.get('period_type', 'monthly').strip()
+
+    result = ac_service.create_title(
+        name=name,
+        activity_required=activity_required,
+        quantity_required=quantity_required,
+        description=description,
+        period_type=period_type,
+        tenant_id=tenant_id,
+    )
+    if result['success']:
+        flash(request, f'Title "{name}" configured successfully.', 'success')
+    else:
+        flash(request, result.get('error', 'Failed to create title.'), 'error')
+
+    return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+
+
+@router.post('/config/title/{title_id}/edit', name='edit_title')
+@hct_required
+async def edit_title_route(request: Request, title_id: int):
+    form = await request.form()
+    name = form.get('name', '').strip()
+    activity_required = form.get('activity_required', '').strip()
+    quantity_required = form.get('quantity_required', 5)
+    description = form.get('description', '').strip()
+    period_type = form.get('period_type', 'monthly').strip()
+    is_active = form.get('is_active') == 'on'
+
+    result = ac_service.update_title(
+        title_id=title_id,
+        name=name,
+        activity_required=activity_required,
+        quantity_required=quantity_required,
+        description=description,
+        period_type=period_type,
+        is_active=is_active,
+    )
+    if result['success']:
+        flash(request, f'Title "{name}" updated successfully.', 'success')
+    else:
+        flash(request, result.get('error', 'Failed to update title.'), 'error')
+
+    return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+
+
+@router.post('/config/title/{title_id}/delete', name='delete_title')
+@hct_required
+async def delete_title_route(request: Request, title_id: int):
+    result = ac_service.delete_title(title_id)
+    if result['success']:
+        flash(request, 'Title accolade deleted.', 'success')
+    else:
+        flash(request, result.get('error', 'Failed to delete title.'), 'error')
+
+    return RedirectResponse(url_for(request, 'ac_config'), status_code=303)
+
 

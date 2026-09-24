@@ -134,7 +134,7 @@ class ACReportGenerator:
         
         return ", ".join([f"{k}: {v}" for k, v in activity_counts.items()])
     
-    def calculate_title_rewards(self, all_activities) -> Dict[str, Dict]:
+    def calculate_title_rewards(self, all_activities=None) -> Dict[str, Dict]:
         """
         Calculate title reward winners based on activity counts
         
@@ -149,61 +149,105 @@ class ACReportGenerator:
         - Scout: Most tryouts hosted across month (min 5)
         """
         from database.ac_models import (
-            get_hwtm_winner, get_leggionary_winner, 
-            get_scout_winner, get_taskmaster_winner, 
+            Title,
+            ActivityEntry,
+            MonthlyActivityEntry,
+            _get_periods_in_group,
             is_last_period_of_month
         )
         from database.models import Member
+        from services.ac_service import ensure_default_titles_for_tenant
+        from sqlmodel import select, func
         
         titles = {}
-        
-        # ALWAYS calculate HWTM for this period
-        hwtm_winner_id, hwtm_count = get_hwtm_winner(self.ac_period)
-        if hwtm_winner_id and hwtm_count >= 5:
-            winner = db_session().get(Member, hwtm_winner_id)
-            titles['Host with the Most'] = {
-                'winner': winner.discord_username if winner else 'Unknown',
-                'count': hwtm_count,
-                'requirement': '5+ events hosted (Training + Raid + Patrol)',
-                'awarded_at_period': self.ac_period.period_name,
-                'is_monthly': False
-            }
-        
-        # Only calculate other titles if this is the last period of the month
-        if is_last_period_of_month(self.ac_period):
-            # Leggionary (most raid + patrol events accumulated, min 5)
-            leg_winner_id, leg_count = get_leggionary_winner(self.ac_period)
-            if leg_winner_id and leg_count >= 5:
-                winner = db_session().get(Member, leg_winner_id)
-                titles['Legionnaire'] = {
-                    'winner': winner.discord_username if winner else 'Unknown',
-                    'count': leg_count,
-                    'requirement': '5+ events hosted (Raids + Patrols across month)',
-                    'is_monthly': True
-                }
-            
-            # Scout (most tryouts accumulated, min 5)
-            scout_winner_id, scout_count = get_scout_winner(self.ac_period)
-            if scout_winner_id and scout_count >= 5:
-                winner = db_session().get(Member, scout_winner_id)
-                titles['Scout'] = {
-                    'winner': winner.discord_username if winner else 'Unknown',
-                    'count': scout_count,
-                    'requirement': '5+ tryouts hosted (accumulated across month)',
-                    'is_monthly': True
-                }
-            
-            # Taskmaster (most missions accumulated, min 5)
-            tm_winner_id, tm_count = get_taskmaster_winner(self.ac_period)
-            if tm_winner_id and tm_count >= 5:
-                winner = db_session().get(Member, tm_winner_id)
-                titles['Taskmaster'] = {
-                    'winner': winner.discord_username if winner else 'Unknown',
-                    'count': tm_count,
-                    'requirement': '5+ missions posted (accumulated across month)',
-                    'is_monthly': True
-                }
-        
+        tenant_id = getattr(self.ac_period, "tenant_id", 1) or 1
+        db = db_session()
+
+        # Ensure default titles exist in DB for Taskforce (Tenant 1)
+        ensure_default_titles_for_tenant(tenant_id, db)
+
+        # Check for tenant-configured dynamic titles strictly from database
+        custom_titles = db.exec(
+            select(Title).where(Title.tenant_id == tenant_id, Title.is_active == True)
+        ).all()
+
+        if custom_titles:
+            periods_in_month = _get_periods_in_group(self.ac_period, db)
+            month_period_ids = [p.id for p in periods_in_month]
+            is_end_of_month = is_last_period_of_month(self.ac_period)
+
+            for title_def in custom_titles:
+                # If monthly title, only award at the end of the month
+                if title_def.period_type == "monthly" and not is_end_of_month:
+                    continue
+
+                act_req = (title_def.activity_required or "").strip().lower()
+                target_counts = {}
+
+                if title_def.period_type == "monthly":
+                    # Evaluate accumulated monthly stats using persistent MonthlyActivityEntry across month
+                    stmt = select(MonthlyActivityEntry).where(MonthlyActivityEntry.ac_period_id.in_(month_period_ids))
+                    entries = db.exec(stmt).all()
+                    for entry in entries:
+                        m_type = (entry.activity_type or "").lower()
+                        match = False
+                        if act_req in ["any", "all", "all activities", "all activities (combined)"]:
+                            match = True
+                        elif act_req in ["events", "all events", "training + raid + patrol"]:
+                            match = m_type in ["training", "raid", "patrol"]
+                        elif act_req in ["raids + patrols", "raid + patrol"]:
+                            match = m_type in ["raid", "patrol"]
+                        else:
+                            match = (m_type == act_req)
+                        
+                        if match:
+                            target_counts[entry.member_id] = target_counts.get(entry.member_id, 0) + 1
+                else:
+                    # Evaluate single cycle period stats
+                    stmt = select(ActivityEntry).where(ActivityEntry.ac_period_id == self.ac_period.id)
+                    entries = db.exec(stmt).all()
+                    if not entries:
+                        # Fallback to MonthlyActivityEntry for this period if cycle ActivityEntry was cleared
+                        entries = db.exec(
+                            select(MonthlyActivityEntry).where(MonthlyActivityEntry.ac_period_id == self.ac_period.id)
+                        ).all()
+                    for entry in entries:
+                        e_type = (entry.activity_type or "").lower()
+                        match = False
+                        if act_req in ["any", "all", "all activities", "all activities (combined)"]:
+                            match = True
+                        elif act_req in ["events", "all events", "training + raid + patrol"]:
+                            match = e_type in ["training", "raid", "patrol"]
+                        elif act_req in ["raids + patrols", "raid + patrol"]:
+                            match = e_type in ["raid", "patrol"]
+                        else:
+                            match = (e_type == act_req)
+
+                        if match:
+                            target_counts[entry.member_id] = target_counts.get(entry.member_id, 0) + 1
+
+                # Determine top performer who meets minimum quantity
+                top_member_id = None
+                top_count = 0
+                for m_id, count in target_counts.items():
+                    if count >= title_def.quantity_required and count > top_count:
+                        top_count = count
+                        top_member_id = m_id
+
+                if top_member_id:
+                    winner = db.get(Member, top_member_id)
+                    req_text = f"{title_def.quantity_required}+ {title_def.activity_required}"
+                    if title_def.description:
+                        req_text += f" ({title_def.description})"
+                    titles[title_def.name] = {
+                        'winner': winner.discord_username or winner.roblox_username if winner else 'Unknown',
+                        'count': top_count,
+                        'requirement': req_text,
+                        'awarded_at_period': self.ac_period.period_name,
+                        'is_monthly': title_def.period_type == 'monthly',
+                        'qualified': True,
+                    }
+
         self.title_winners = titles
         return titles
     

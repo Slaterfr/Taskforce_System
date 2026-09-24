@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+
+{% block title %}Sector Settings & Governance — {{ current_group_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-lg-5">
+  <!-- Page Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+    <div>
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="badge px-2.5 py-1 text-uppercase" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 0.72rem; letter-spacing: 0.08em; font-weight: 700;">
+          <i class="fa-solid fa-sliders me-1"></i> Sector Governance Console
+        </span>
+        <span class="badge px-2 py-0.5 text-white-50" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); font-size: 0.7rem;">
+          ID #{{ group.id }}
+        </span>
+      </div>
+      <h2 class="text-white fw-bold mb-0" style="letter-spacing: -0.02em;">{{ group.name }} Settings</h2>
+      <p class="text-white-50 small mb-0">Configure sector identity, Discord server integration, visual theme, automation bot security, and granular rank permissions.</p>
+    </div>
+
+    <!-- Quick Action / Switcher -->
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="/portal/switch-group" class="btn btn-outline-secondary btn-sm px-3 py-2 text-white-50 d-inline-flex align-items-center gap-1.5" style="border-color: rgba(255,255,255,0.15); font-size: 0.82rem;">
+        <i class="fa-solid fa-arrow-right-arrow-left"></i> Switch Sector
+      </a>
+      <a href="/ac/config" class="btn btn-outline-info btn-sm px-3 py-2 d-inline-flex align-items-center gap-1.5" style="border-color: rgba(56, 189, 248, 0.3); color: #38bdf8; font-size: 0.82rem;">
+        <i class="fa-solid fa-award"></i> Sector Titles &amp; Accolades
+      </a>
+      <form method="POST" action="{{ url_for('sync_group_ranks') }}" class="d-inline">
+        <button type="submit" class="btn btn-primary btn-sm px-3 py-2 d-inline-flex align-items-center gap-1.5" style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; font-size: 0.82rem; font-weight: 600; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);">
+          <i class="fa-solid fa-arrows-rotate"></i> Sync Ranks from Roblox
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- LEFT COLUMN: Identity, Bot Cookie, Visual Theme -->
+    <div class="col-lg-5 d-flex flex-column gap-4">
+
+      <!-- 1. Sector Identity Card -->
+      <div class="card bg-dark border-0 shadow-lg rounded-4 overflow-hidden" style="background: rgba(15, 23, 42, 0.75) !important; backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+        <div class="card-header bg-transparent py-3 px-4 d-flex align-items-center justify-content-between" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+          <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center justify-content-center rounded-3" style="width: 32px; height: 32px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3);">
+              <i class="fa-solid fa-signature text-info" style="font-size: 0.85rem;"></i>
+            </div>
+            <h6 class="text-white fw-bold mb-0">Sector Identity &amp; Header</h6>
+          </div>
+          <span class="badge px-2 py-0.5 text-uppercase" style="background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.25); font-size: 0.65rem;">
+            Header Display
+          </span>
+        </div>
+
+        <div class="card-body p-4">
+          <!-- Live Preview Pill -->
+          <div class="p-3 rounded-3 mb-3" style="background: rgba(0, 0, 0, 0.3); border: 1px dashed rgba(168, 85, 247, 0.3);">
+            <div class="small text-white-50 mb-1.5" style="font-size: 0.75rem;">LIVE NAVBAR HEADER PREVIEW:</div>
+            <div class="d-flex align-items-center gap-2">
+              <img src="{{ url_for('static', path='img/Nexus.png') }}" alt="Logo" style="width: 26px; height: 26px; border-radius: 6px; object-fit: cover;">
+              <span class="fw-bold text-white fs-6" id="preview-group-name">{{ group.name }}</span>
+              <span class="badge rounded-pill px-2.5 py-1 ms-2" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 0.75rem;">
+                <i class="fa-solid fa-layer-group me-1"></i> <span id="preview-group-pill">{{ group.name }}</span>
+              </span>
+            </div>
+          </div>
+
+          <form method="POST" action="{{ url_for('update_group_identity') }}">
+            <div class="mb-3">
+              <label class="form-label text-white-50 small fw-semibold">Sector Display Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" id="input-group-name" class="form-control bg-black text-white border-secondary" value="{{ group.name }}" required style="background: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important;" placeholder="e.g. Delta Sector">
+              <div class="form-text text-white-50" style="font-size: 0.75rem;">Modifies the active sector name shown across the navigation header, roster, and reports.</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label text-white-50 small fw-semibold">Roblox Group ID</label>
+              <div class="input-group">
+                <input type="text" class="form-control bg-black text-white-50 border-secondary" value="{{ group.roblox_group_id }}" readonly style="background: rgba(0, 0, 0, 0.3) !important; border-color: rgba(255, 255, 255, 0.1) !important; font-family: 'JetBrains Mono', monospace;">
+                <a href="https://www.roblox.com/groups/{{ group.roblox_group_id }}" target="_blank" class="btn btn-outline-secondary" style="border-color: rgba(255, 255, 255, 0.15);" title="Open Roblox Group in new tab">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                </a>
+              </div>
+            </div>
+
+            <!-- Discord Server / Guild ID Setting -->
+            <div class="mb-3">
+              <label class="form-label text-white-50 small fw-semibold">Discord Server / Guild ID (Bot Resolution)</label>
+              <div class="input-group">
+                <span class="input-group-text bg-black text-white-50 border-secondary" style="background: rgba(0, 0, 0, 0.4) !important; border-color: rgba(255, 255, 255, 0.15) !important;">
+                  <i class="fa-brands fa-discord text-primary"></i>
+                </span>
+                <input type="text" name="discord_group_id" class="form-control bg-black text-white border-secondary" value="{{ group.discord_group_id or '' }}" style="background: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important; font-family: 'JetBrains Mono', monospace;" placeholder="e.g. 112233445566778899">
+              </div>
+              <div class="form-text text-white-50" style="font-size: 0.75rem;">Discord Guild ID where this sector's bot commands and mentions are automatically routed.</div>
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label text-white-50 small fw-semibold">Description / Sector Purpose</label>
+              <textarea name="description" rows="2" class="form-control bg-black text-white border-secondary" style="background: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important;" placeholder="Optional mission statement or unit mandate...">{{ group.description or '' }}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-info w-100 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-2" style="background: linear-gradient(135deg, #0284c7, #38bdf8); border: none; color: #fff; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);">
+              <i class="fa-solid fa-floppy-disk"></i> Save Sector Profile
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- 2. Sector Bot Automation Cookie Card -->
+      <div class="card bg-dark border-0 shadow-lg rounded-4 overflow-hidden" style="background: rgba(15, 23, 42, 0.75) !important; backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+        <div class="card-header bg-transparent py-3 px-4 d-flex align-items-center justify-content-between" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+          <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center justify-content-center rounded-3" style="width: 32px; height: 32px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3);">
+              <i class="fa-solid fa-robot text-purple" style="font-size: 0.85rem;"></i>
+            </div>
+            <h6 class="text-white fw-bold mb-0">Sector Automation Bot</h6>
+          </div>
+          {% if cookie_record and cookie_record.is_valid %}
+          <span class="badge px-2 py-0.5 text-uppercase" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.65rem;">
+            <i class="fa-solid fa-circle-check me-1"></i> Connected
+          </span>
+          {% else %}
+          <span class="badge px-2 py-0.5 text-uppercase" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.65rem;">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i> Fallback Mode
+          </span>
+          {% endif %}
+        </div>
+
+        <div class="card-body p-4">
+          <!-- Active Bot Status -->
+          {% if cookie_record and cookie_record.is_valid %}
+          <div class="d-flex align-items-center gap-3 p-3 rounded-3 mb-3" style="background: rgba(34, 197, 94, 0.05); border: 1px solid rgba(34, 197, 94, 0.2);">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 44px; height: 44px; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; font-size: 1.2rem;">
+              <i class="fa-solid fa-robot"></i>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2">
+                <span class="text-white fw-bold">@{{ cookie_record.bot_username }}</span>
+                <span class="badge px-1.5 py-0.5" style="background: rgba(255,255,255,0.08); font-size: 0.65rem; font-family: 'JetBrains Mono', monospace;">ID: {{ cookie_record.bot_id }}</span>
+              </div>
+              <div class="text-white-50 small" style="font-size: 0.72rem;">
+                Last Verified: {{ cookie_record.last_validated.strftime('%Y-%m-%d %H:%M UTC') if cookie_record.last_validated else 'Recently' }}
+              </div>
+            </div>
+            <form method="POST" action="{{ url_for('update_group_cookie') }}" class="m-0" onsubmit="return confirm('Are you sure you want to disconnect this sector bot? System will fall back to server default.');">
+              <input type="hidden" name="action" value="clear">
+              <button type="submit" class="btn btn-outline-danger btn-sm px-2.5 py-1" style="font-size: 0.75rem;" title="Disconnect Bot Cookie">
+                <i class="fa-solid fa-plug-circle-xmark"></i>
+              </button>
+            </form>
+          </div>
+          {% else %}
+          <div class="p-3 rounded-3 mb-3 text-white-50 small" style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(255, 255, 255, 0.15); font-size: 0.78rem;">
+            <i class="fa-solid fa-info-circle text-info me-1"></i> No dedicated bot cookie is set for this sector. Automated in-game promotions will fall back to the central server bot account.
+          </div>
+          {% endif %}
+
+          <form method="POST" action="{{ url_for('update_group_cookie') }}">
+            <input type="hidden" name="action" value="set">
+            <div class="mb-3">
+              <label class="form-label text-white-50 small fw-semibold">Sector Bot Cookie <span class="text-white-50 font-monospace" style="font-size: 0.7rem;">(.ROBLOSECURITY)</span></label>
+              <div class="input-group">
+                <input type="password" name="cookie" id="bot-cookie-input" class="form-control bg-black text-white border-secondary font-monospace" style="background: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important; font-size: 0.8rem;" placeholder="_|WARNING:-DO-NOT-SHARE-THIS..." required>
+                <button type="button" class="btn btn-outline-secondary" onclick="toggleCookieVisibility()" style="border-color: rgba(255, 255, 255, 0.15);">
+                  <i class="fa-solid fa-eye" id="cookie-eye-icon"></i>
+                </button>
+              </div>
+              <div class="form-text text-white-50" style="font-size: 0.75rem;">
+                <i class="fa-solid fa-shield-halved text-purple me-1"></i> Token is tested live with Roblox's API before saving. Stored securely and scoped exclusively to this sector.
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-2" style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);">
+              <i class="fa-solid fa-circle-check"></i> Test &amp; Connect Bot
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- 3. Sector Appearance & Visual Theme Card -->
+      <div class="card bg-dark border-0 shadow-lg rounded-4 overflow-hidden" style="background: rgba(15, 23, 42, 0.75) !important; backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+        <div class="card-header bg-transparent py-3 px-4 d-flex align-items-center justify-content-between" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+          <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center justify-content-center rounded-3" style="width: 32px; height: 32px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);">
+              <i class="fa-solid fa-palette text-warning" style="font-size: 0.85rem;"></i>
+            </div>
+            <h6 class="text-white fw-bold mb-0">Sector Visual Theme</h6>
+          </div>
+          <span class="badge px-2 py-0.5 text-uppercase" style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.25); font-size: 0.65rem;">
+            {{ active_theme|replace('_', ' ')|upper }}
+          </span>
+        </div>
+
+        <div class="card-body p-4">
+          <p class="text-white-50 small mb-3">
+            Choose a visual theme for this sector. All operatives accessing this sector will experience the selected palette and styling.
+          </p>
+
+          <form method="POST" action="{{ url_for('update_group_theme') }}">
+            <div class="d-flex flex-column gap-2 mb-3">
+              {% for t in available_themes %}
+              <label class="theme-option-card d-flex align-items-center justify-content-between p-2.5 rounded-3 position-relative" 
+                     style="background: rgba(0, 0, 0, 0.35); border: 1px solid {% if active_theme == t.id %}var(--tf-accent, #a855f7){% else %}rgba(255, 255, 255, 0.1){% endif %}; cursor: pointer; transition: all 0.2s ease;">
+                <div class="d-flex align-items-center gap-2.5">
+                  <input type="radio" name="theme" value="{{ t.id }}" {% if active_theme == t.id %}checked{% endif %} class="form-check-input m-0" style="cursor: pointer;">
+                  
+                  <!-- Color Swatches Preview Pill -->
+                  <div class="d-flex align-items-center gap-1 p-1 rounded-2" style="background: {{ t.bg }}; border: 1px solid rgba(255, 255, 255, 0.15);">
+                    <span class="d-inline-block rounded-circle" style="width: 12px; height: 12px; background: {{ t.primary }};"></span>
+                    <span class="d-inline-block rounded-circle" style="width: 12px; height: 12px; background: {{ t.bg }}; border: 1px solid rgba(255, 255, 255, 0.3);"></span>
+                  </div>
+
+                  <div>
+                    <div class="d-flex align-items-center gap-1.5">
+                      <span class="text-white fw-bold small">{{ t.name }}</span>
+                      {% if active_theme == t.id %}
+                      <span class="badge px-1.5 py-0.2" style="background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); font-size: 0.6rem;">ACTIVE</span>
+                      {% endif %}
+                    </div>
+                    <div class="text-white-50" style="font-size: 0.7rem;">{{ t.desc }}</div>
+                  </div>
+                </div>
+
+                <span class="badge px-2 py-0.5 text-uppercase text-white-50" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.6rem;">
+                  {{ t.type }}
+                </span>
+              </label>
+              {% endfor %}
+            </div>
+
+            <button type="submit" class="btn btn-warning w-100 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-2" style="background: linear-gradient(135deg, #d97706, #f59e0b); border: none; color: #000; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3);">
+              <i class="fa-solid fa-paintbrush"></i> Apply Sector Theme
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN: Granular Rank Permissions Matrix -->
+    <div class="col-lg-7" id="permissions-section">
+      <div class="card bg-dark border-0 shadow-lg rounded-4 overflow-hidden" style="background: rgba(15, 23, 42, 0.75) !important; backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+        <form method="POST" action="{{ url_for('update_rank_permissions') }}">
+          <div class="card-header bg-transparent py-3 px-4 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2" style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center justify-content-center rounded-3" style="width: 32px; height: 32px; background: rgba(234, 179, 8, 0.15); border: 1px solid rgba(234, 179, 8, 0.3);">
+                <i class="fa-solid fa-shield-halved text-warning" style="font-size: 0.85rem;"></i>
+              </div>
+              <div>
+                <h6 class="text-white fw-bold mb-0">Rank Permissions Matrix &amp; Governance</h6>
+                <div class="text-white-50 small" style="font-size: 0.72rem;">Granular action authorizations per rank enforced across Web and Discord Bot</div>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-warning btn-sm px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow" style="background: linear-gradient(135deg, #d97706, #f59e0b); border: none; color: #000; font-size: 0.8rem;">
+              <i class="fa-solid fa-floppy-disk"></i> Save Permissions
+            </button>
+          </div>
+
+          <div class="card-body p-4">
+            <!-- Permissions Legend Banner -->
+            <div class="p-2.5 rounded-3 mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.06);">
+              <span class="text-white-50 small" style="font-size: 0.75rem;">
+                <i class="fa-solid fa-circle-info text-info me-1"></i> Permissions configured here dynamically govern commands in Discord and portal access.
+              </span>
+              <span class="badge px-2 py-0.5 text-uppercase" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #cbd5e1; font-size: 0.68rem;">
+                {{ roles|length }} Ranks Configured
+              </span>
+            </div>
+
+            <!-- Granular Matrix Table -->
+            <div class="table-responsive rounded-3" style="border: 1px solid rgba(255, 255, 255, 0.08); max-height: 520px; overflow-y: auto;">
+              <table class="table table-dark table-hover mb-0 align-middle text-center" style="background: transparent; font-size: 0.82rem;">
+                <thead class="sticky-top" style="background: #090d16; border-bottom: 1px solid rgba(255, 255, 255, 0.15); z-index: 10;">
+                  <tr>
+                    <th class="py-2.5 px-3 text-start text-white-50 fw-semibold" style="width: 170px;">RANK</th>
+                    <th class="py-2.5 px-2 text-white-50 fw-semibold" title="Can promote or demote members">PROMOTE</th>
+                    <th class="py-2.5 px-2 text-white-50 fw-semibold" title="Can log events, patrols, trainings">LOG ACT</th>
+                    <th class="py-2.5 px-2 text-white-50 fw-semibold" title="Can delete or void activities">DEL ACT</th>
+                    <th class="py-2.5 px-2 text-white-50 fw-semibold" title="Can consult rosters and stats">CONSULT</th>
+                    <th class="py-2.5 px-2 text-white-50 fw-semibold" title="Can manage AC periods and quotas">AC MGMT</th>
+                    <th class="py-2.5 px-2 text-white-50 fw-semibold" title="Full High Command &amp; Admin rights">HCT ADMIN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in roles %}
+                  <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                    <input type="hidden" name="role_ids" value="{{ r.role_id }}">
+                    <input type="hidden" name="role_name_{{ r.role_id }}" value="{{ r.role_name }}">
+                    <input type="hidden" name="rank_number_{{ r.role_id }}" value="{{ r.rank_num }}">
+
+                    <!-- Rank Details -->
+                    <td class="py-2.5 px-3 text-start">
+                      <div class="d-flex align-items-center gap-1.5">
+                        <span class="badge px-1.5 py-0.5" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12); color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;">
+                          #{{ r.rank_num }}
+                        </span>
+                        <div class="fw-bold text-white text-truncate" style="max-width: 120px;" title="{{ r.role_name }}">
+                          {{ r.role_name }}
+                        </div>
+                      </div>
+                      <div class="text-white-50 font-monospace" style="font-size: 0.68rem;">ID: {{ r.role_id }}</div>
+                    </td>
+
+                    <!-- Promote Checkbox -->
+                    <td class="py-2.5 px-2">
+                      <input type="checkbox" name="perm_promote_{{ r.role_id }}" class="form-check-input" style="cursor: pointer;" {% if r.can_promote %}checked{% endif %}>
+                    </td>
+
+                    <!-- Log Activity Checkbox -->
+                    <td class="py-2.5 px-2">
+                      <input type="checkbox" name="perm_log_{{ r.role_id }}" class="form-check-input" style="cursor: pointer;" {% if r.can_log_activity %}checked{% endif %}>
+                    </td>
+
+                    <!-- Delete Activity Checkbox -->
+                    <td class="py-2.5 px-2">
+                      <input type="checkbox" name="perm_delete_{{ r.role_id }}" class="form-check-input" style="cursor: pointer;" {% if r.can_delete_activity %}checked{% endif %}>
+                    </td>
+
+                    <!-- Consult Data Checkbox -->
+                    <td class="py-2.5 px-2">
+                      <input type="checkbox" name="perm_view_{{ r.role_id }}" class="form-check-input" style="cursor: pointer;" {% if r.can_view_data %}checked{% endif %}>
+                    </td>
+
+                    <!-- Manage AC Checkbox -->
+                    <td class="py-2.5 px-2">
+                      <input type="checkbox" name="perm_ac_{{ r.role_id }}" class="form-check-input" style="cursor: pointer;" {% if r.can_manage_ac %}checked{% endif %}>
+                    </td>
+
+                    <!-- Full HCT Checkbox -->
+                    <td class="py-2.5 px-2">
+                      <input type="checkbox" name="perm_hct_{{ r.role_id }}" class="form-check-input" style="cursor: pointer;" {% if r.is_hct %}checked{% endif %}>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mt-3 d-flex justify-content-between align-items-center">
+              <span class="text-white-50 small" style="font-size: 0.72rem;">
+                <i class="fa-solid fa-crown text-warning me-1"></i> <strong>HCT Admin</strong> grants all permissions automatically.
+              </span>
+              <button type="submit" class="btn btn-warning btn-sm px-4 py-2 fw-bold d-inline-flex align-items-center gap-1.5 shadow" style="background: linear-gradient(135deg, #d97706, #f59e0b); border: none; color: #000;">
+                <i class="fa-solid fa-check"></i> Save All Permissions
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Live Header Preview sync
+  const nameInput = document.getElementById('input-group-name');
+  const previewName = document.getElementById('preview-group-name');
+  const previewPill = document.getElementById('preview-group-pill');
+
+  if (nameInput) {
+    nameInput.addEventListener('input', function() {
+      const val = this.value.trim() || 'Sector Name';
+      if (previewName) previewName.textContent = val;
+      if (previewPill) previewPill.textContent = val;
+    });
+  }
+
+  // Toggle Bot Cookie visibility
+  function toggleCookieVisibility() {
+    const input = document.getElementById('bot-cookie-input');
+    const icon = document.getElementById('cookie-eye-icon');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.classList.remove('fa-eye');
+      icon.classList.add('fa-eye-slash');
+    } else {
+      input.type = 'password';
+      icon.classList.remove('fa-eye-slash');
+      icon.classList.add('fa-eye');
+    }
+  }
+</script>
+{% endblock %}

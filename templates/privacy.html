@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Policy - Cortex System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-9 col-xl-8">
+    <div class="card shadow-lg rounded-4 overflow-hidden border-0 mb-5">
+      <div class="card-header py-4 px-4 px-md-5 d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-3">
+          <div class="d-flex align-items-center justify-content-center rounded-3 p-2" style="background: rgba(37, 99, 235, 0.15); border: 1px solid rgba(37, 99, 235, 0.3);">
+            <i class="fa-solid fa-shield-halved fs-5" style="color: var(--tf-purple-accent, #3b82f6);"></i>
+          </div>
+          <div>
+            <h4 class="fw-bold mb-0">Privacy Policy</h4>
+            <span class="text-muted small">Cortex / Nexus Management Network</span>
+          </div>
+        </div>
+        <span class="badge px-3 py-1.5 text-uppercase" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.75rem;">
+          Effective: September 2026
+        </span>
+      </div>
+
+      <div class="card-body p-4 p-md-5">
+        <div class="alert alert-info d-flex align-items-center gap-3 mb-4" style="background: rgba(37, 99, 235, 0.1); border: 1px solid rgba(37, 99, 235, 0.25); color: var(--tf-text-primary);">
+          <i class="fa-solid fa-circle-info fs-5" style="color: var(--tf-purple-accent, #3b82f6);"></i>
+          <div class="small">
+            <strong>Summary:</strong> We only access your public Roblox User ID and Username via OAuth 2.0 to authenticate your membership. We never collect passwords, private messages, or billing details.
+          </div>
+        </div>
+
+        <section class="mb-4">
+          <h5 class="fw-bold mb-2">1. Overview</h5>
+          <p class="text-muted">
+            This Privacy Policy explains how the <strong>Cortex / Nexus Management System</strong> ("Nexus501", "we", "us") collects, uses, and safeguards information when users authenticate and interact with our operational management platform.
+          </p>
+        </section>
+
+        <section class="mb-4">
+          <h5 class="fw-bold mb-2">2. Information We Collect via Roblox OAuth 2.0</h5>
+          <p class="text-muted">
+            When you sign in using <em>Log In with Roblox</em>, we request access exclusively to standard identity scopes (<code>openid</code> and <code>profile</code>). Through these scopes, we retrieve:
+          </p>
+          <ul class="text-muted">
+            <li><strong>Roblox User ID:</strong> To verify your identity and group membership.</li>
+            <li><strong>Roblox Username & Display Name:</strong> To display your callsign and link activity logs to your profile.</li>
+            <li><strong>Avatar Thumbnail URL:</strong> To display your operative card within the roster.</li>
+          </ul>
+          <p class="text-muted small">
+            <strong>What we DO NOT collect:</strong> We cannot and do not collect your Roblox password, email address, payment information, personal location, or private communication.
+          </p>
+        </section>
+
+        <section class="mb-4">
+          <h5 class="fw-bold mb-2">3. How We Use Your Information</h5>
+          <p class="text-muted">The collected information is used solely to:</p>
+          <ul class="text-muted">
+            <li>Verify your authorization tier (Operative, Staff, or High Command).</li>
+            <li>Maintain group activity records, training points, and mission completion logs.</li>
+            <li>Enable self-service access to your personal quota and progress dashboards.</li>
+          </ul>
+        </section>
+
+        <section class="mb-4">
+          <h5 class="fw-bold mb-2">4. Data Sharing & Third Parties</h5>
+          <p class="text-muted">
+            We do <strong>not</strong> sell, rent, monetize, or distribute your information to any third parties or commercial entities. All data remains strictly within the operational sector database.
+          </p>
+        </section>
+
+        <section class="mb-4">
+          <h5 class="fw-bold mb-2">5. Data Retention & Revocation</h5>
+          <p class="text-muted">
+            You may revoke access to the Nexus501 application at any time directly through your <a href="https://www.roblox.com/my/account#!/security" target="_blank" class="text-decoration-none" style="color: var(--tf-purple-accent, #3b82f6);">Roblox Account Settings &rarr; Authorized Applications</a>. Upon revocation, your access token is immediately invalidated.
+          </p>
+        </section>
+
+        <section class="mb-0">
+          <h5 class="fw-bold mb-2">6. Contact & Inquiries</h5>
+          <p class="text-muted mb-0">
+            For data inquiries, access questions, or deletion requests, please contact Sector Command via the official Taskforce Discord communications server.
+          </p>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

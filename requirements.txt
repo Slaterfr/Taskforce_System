@@ -12,3 +12,4 @@ apscheduler==3.10.4
 psycopg2-binary
 aiohttp
 alembic
+pyjwt

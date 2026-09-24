@@ -3,6 +3,23 @@
 {% block title %}AC Configuration — Activities & Quotas{% endblock %}
 
 {% block content %}
+<style>
+/* Ensure Bootstrap modals always stack above backdrops and remain fully interactive */
+.modal {
+    z-index: 1060 !important;
+}
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+.modal-dialog {
+    z-index: 1065 !important;
+    pointer-events: auto !important;
+}
+.modal-content {
+    pointer-events: auto !important;
+}
+</style>
+
 <!-- Page Header -->
 <div class="row mb-4 align-items-center">
     <div class="col-md-8">
@@ -35,6 +52,12 @@
         <button class="nav-link" id="quotas-tab" data-bs-toggle="tab" data-bs-target="#quotas-pane" type="button" role="tab" aria-controls="quotas-pane" aria-selected="false">
             <i class="fas fa-medal me-2"></i>Rank Quotas
             <span class="badge ms-2" style="background: rgba(255, 255, 255, 0.2); font-size: 0.75rem;">{{ rank_quotas|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="titles-tab" data-bs-toggle="tab" data-bs-target="#titles-pane" type="button" role="tab" aria-controls="titles-pane" aria-selected="false">
+            <i class="fas fa-trophy me-2 text-warning"></i>Titles & Accolades
+            <span class="badge ms-2" style="background: rgba(255, 255, 255, 0.2); font-size: 0.75rem;">{{ titles|length }}</span>
         </button>
     </li>
 </ul>
@@ -105,76 +128,12 @@
                                     </button>
                                 </td>
                             </tr>
-
-                            <!-- EDIT ACTIVITY MODAL -->
-                            <div class="modal fade tf-modal" id="editActivityModal{{ act.id }}" tabindex="-1" aria-labelledby="editActivityModalLabel{{ act.id }}" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content">
-                                        <form action="{{ url_for('edit_activity_type', activity_id=act.id) }}" method="post">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title text-white fw-bold" id="editActivityModalLabel{{ act.id }}">
-                                                    <i class="fas fa-edit me-2" style="color: var(--tf-purple-accent);"></i>Edit Activity: {{ act.name }}
-                                                </h5>
-                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                            </div>
-                                            <div class="modal-body p-4">
-                                                <div class="mb-3">
-                                                    <label class="form-label text-secondary small fw-bold text-uppercase">Activity Name</label>
-                                                    <input type="text" name="name" class="form-control tf-input" value="{{ act.name }}" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label text-secondary small fw-bold text-uppercase">Points Awarded</label>
-                                                    <input type="number" step="0.1" name="points" class="form-control tf-input" value="{{ act.points }}" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label text-secondary small fw-bold text-uppercase">Description</label>
-                                                    <textarea name="description" class="form-control tf-input" rows="2">{{ act.description or '' }}</textarea>
-                                                </div>
-                                                <div class="form-check form-switch mb-3 p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);">
-                                                    <input class="form-check-input ms-0 me-3" type="checkbox" name="is_limited" id="limitedCheck{{ act.id }}" {% if act.is_limited %}checked{% endif %}>
-                                                    <label class="form-check-label text-white" for="limitedCheck{{ act.id }}">
-                                                        <strong>Limited Activity</strong>
-                                                        <div class="text-white-50 small">Max 1 point-awarded entry per cycle per member.</div>
-                                                    </label>
-                                                </div>
-                                                <div class="form-check form-switch mb-2 p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);">
-                                                    <input class="form-check-input ms-0 me-3" type="checkbox" name="is_active" id="activeCheck{{ act.id }}" {% if act.is_active %}checked{% endif %}>
-                                                    <label class="form-check-label text-white" for="activeCheck{{ act.id }}">
-                                                        <strong>Active Status</strong>
-                                                        <div class="text-white-50 small">Visible in selection menus and active for Discord bot logging.</div>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
-                                                <button type="submit" class="btn btn-tf-primary">Save Changes</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- DELETE ACTIVITY MODAL -->
-                            <div class="modal fade tf-modal" id="deleteActivityModal{{ act.id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content" style="border-color: rgba(239, 68, 68, 0.5);">
-                                        <form action="{{ url_for('delete_activity_type', activity_id=act.id) }}" method="post">
-                                            <div class="modal-header" style="border-bottom-color: rgba(239, 68, 68, 0.2);">
-                                                <h5 class="modal-title text-danger fw-bold"><i class="fas fa-triangle-exclamation me-2"></i>Delete Activity</h5>
-                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body p-4 text-white">
-                                                Are you sure you want to delete the activity <strong class="text-danger">{{ act.name }}</strong>?
-                                                <p class="text-white-50 small mt-2 mb-0">Past logs will remain in database records, but this activity will no longer appear in active dropdowns or bot parsing.</p>
-                                            </div>
-                                            <div class="modal-footer" style="border-top-color: rgba(239, 68, 68, 0.2);">
-                                                <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
-                                                <button type="submit" class="btn btn-danger" style="border-radius: 10px; font-weight: 600;">Confirm Delete</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">
+                                    No activity types configured yet. Click "Add New Activity" above to create one.
+                                </td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -191,10 +150,10 @@
             <div class="tf-card-header d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center">
                     <i class="fas fa-medal me-2" style="color: var(--tf-purple-accent);"></i>
-                    <h5 class="mb-0 text-white fw-bold">Configured Rank Quotas</h5>
+                    <h5 class="mb-0 text-white fw-bold">Rank Quota Requirements</h5>
                 </div>
                 <button class="btn btn-tf-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addQuotaModal">
-                    <i class="fas fa-plus me-1"></i>Add Rank Quota
+                    <i class="fas fa-plus me-1"></i>Add New Quota
                 </button>
             </div>
             <div class="p-0">
@@ -202,8 +161,8 @@
                     <table class="table tf-table align-middle">
                         <thead>
                             <tr>
-                                <th style="width: 45%;">Rank Name</th>
-                                <th style="width: 35%;">Required Quota Points</th>
+                                <th style="width: 40%;">Rank Name</th>
+                                <th style="width: 40%;">Required Points / AC Cycle</th>
                                 <th style="width: 20%;" class="text-end">Actions</th>
                             </tr>
                         </thead>
@@ -212,12 +171,12 @@
                             <tr>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <div class="me-3 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; border-radius: 10px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border);">
-                                            <i class="fas fa-shield-halved" style="color: var(--tf-purple-accent);"></i>
+                                        <div class="me-3 d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; border-radius: 10px; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2);">
+                                            <i class="fas fa-shield-alt" style="color: var(--tf-purple-accent);"></i>
                                         </div>
                                         <div>
-                                            <div class="fw-bold text-white fs-5">{{ quota.rank_name }}</div>
-                                            <div class="text-white-50 small">Standard bi-weekly cycle</div>
+                                            <div class="fw-bold text-white fs-6">{{ quota.rank_name }}</div>
+                                            <div class="text-muted small">Automatic AC Evaluation Target</div>
                                         </div>
                                     </div>
                                 </td>
@@ -233,58 +192,103 @@
                                     </button>
                                 </td>
                             </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4 text-muted">
+                                    No rank quotas configured yet. Click "Add New Quota" above to create one.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                            <!-- EDIT QUOTA MODAL -->
-                            <div class="modal fade tf-modal" id="editQuotaModal{{ quota.id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content">
-                                        <form action="{{ url_for('edit_rank_quota', quota_id=quota.id) }}" method="post">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title text-white fw-bold">
-                                                    <i class="fas fa-edit me-2" style="color: var(--tf-purple-accent);"></i>Edit Quota: {{ quota.rank_name }}
-                                                </h5>
-                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body p-4">
-                                                <div class="mb-3">
-                                                    <label class="form-label text-secondary small fw-bold text-uppercase">Rank Name</label>
-                                                    <input type="text" name="rank_name" class="form-control tf-input" value="{{ quota.rank_name }}" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label text-secondary small fw-bold text-uppercase">Required Points</label>
-                                                    <input type="number" step="0.5" min="0" name="required_points" class="form-control tf-input" value="{{ quota.required_points }}" required>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
-                                                <button type="submit" class="btn btn-tf-primary">Save Changes</button>
-                                            </div>
-                                        </form>
+    <!-- ================================================================= -->
+    <!-- TAB 3: TITLES & ACCOLADES -->
+    <!-- ================================================================= -->
+    <div class="tab-pane fade" id="titles-pane" role="tabpanel" aria-labelledby="titles-tab">
+        <div class="tf-card">
+            <div class="tf-card-header d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-trophy me-2 text-warning"></i>
+                    <h5 class="mb-0 text-white fw-bold">Configured Sector Titles & Awards</h5>
+                </div>
+                <button class="btn btn-tf-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTitleModal">
+                    <i class="fas fa-plus me-1"></i>Add New Title
+                </button>
+            </div>
+            <div class="p-0">
+                <div class="table-responsive">
+                    <table class="table tf-table align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 25%;">Title Name & Purpose</th>
+                                <th style="width: 20%;">Activity Required</th>
+                                <th style="width: 15%;">Min Quantity</th>
+                                <th style="width: 15%;">Award Cadence</th>
+                                <th style="width: 10%;">Status</th>
+                                <th style="width: 15%; text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for title in titles %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-white fs-6 d-flex align-items-center gap-2">
+                                        <i class="fas fa-award text-warning"></i>
+                                        {{ title.name }}
                                     </div>
-                                </div>
-                            </div>
-
-                            <!-- DELETE QUOTA MODAL -->
-                            <div class="modal fade tf-modal" id="deleteQuotaModal{{ quota.id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content" style="border-color: rgba(239, 68, 68, 0.5);">
-                                        <form action="{{ url_for('delete_rank_quota', quota_id=quota.id) }}" method="post">
-                                            <div class="modal-header" style="border-bottom-color: rgba(239, 68, 68, 0.2);">
-                                                <h5 class="modal-title text-danger fw-bold"><i class="fas fa-triangle-exclamation me-2"></i>Delete Quota</h5>
-                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body p-4 text-white">
-                                                Are you sure you want to remove the quota requirement for <strong class="text-danger">{{ quota.rank_name }}</strong>?
-                                                <p class="text-white-50 small mt-2 mb-0">Members with this rank will no longer be tracked as having an active quota.</p>
-                                            </div>
-                                            <div class="modal-footer" style="border-top-color: rgba(239, 68, 68, 0.2);">
-                                                <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
-                                                <button type="submit" class="btn btn-danger" style="border-radius: 10px; font-weight: 600;">Confirm Delete</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
+                                    {% if title.description %}
+                                    <div class="text-white-50 small mt-0.5">{{ title.description }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge px-2.5 py-1 text-uppercase" style="background: rgba(168, 85, 247, 0.18); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-family: var(--tf-font-mono);">
+                                        <i class="fas fa-bullseye me-1"></i>{{ title.activity_required }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge px-2 py-1 fs-6" style="background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; font-family: var(--tf-font-mono);">
+                                        {{ title.quantity_required }}+
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if title.period_type == 'monthly' %}
+                                    <span class="badge px-2 py-0.5" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35); color: #f59e0b;">
+                                        <i class="fas fa-calendar-alt me-1"></i>End of Month
+                                    </span>
+                                    {% else %}
+                                    <span class="badge px-2 py-0.5" style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.35); color: #10b981;">
+                                        <i class="fas fa-clock-rotate-left me-1"></i>Every AC Cycle
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if title.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: right;">
+                                    <button class="btn btn-tf-outline btn-sm me-1" data-bs-toggle="modal" data-bs-target="#editTitleModal{{ title.id }}" title="Edit Title">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteTitleModal{{ title.id }}" title="Delete Title">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center py-5 text-white-50">
+                                    <i class="fas fa-trophy fs-4 d-block mb-2 text-warning opacity-50"></i>
+                                    No custom titles configured for this sector yet. Click "Add New Title" above to configure custom accolades.
+                                </td>
+                            </tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -295,8 +299,10 @@
 </div>
 
 <!-- ================================================================= -->
-<!-- MODAL: ADD ACTIVITY TYPE -->
+<!-- MODALS SECTION: ROOT-LEVEL TO GUARANTEE INTERACTIVITY & Z-INDEX   -->
 <!-- ================================================================= -->
+
+<!-- MODAL: ADD ACTIVITY TYPE -->
 <div class="modal fade tf-modal" id="addActivityModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -335,9 +341,7 @@
     </div>
 </div>
 
-<!-- ================================================================= -->
 <!-- MODAL: ADD RANK QUOTA -->
-<!-- ================================================================= -->
 <div class="modal fade tf-modal" id="addQuotaModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -364,4 +368,296 @@
         </div>
     </div>
 </div>
+
+<!-- MODAL: ADD TITLE -->
+<div class="modal fade tf-modal" id="addTitleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ url_for('create_title') }}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title text-white fw-bold"><i class="fas fa-plus me-2" style="color: var(--tf-purple-accent);"></i>Configure New Sector Title</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Title Name <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control tf-input" placeholder="e.g. Master Operative or Scout" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Activity Required <span class="text-danger">*</span></label>
+                        <select name="activity_required" class="form-select tf-input" required>
+                            <optgroup label="Preset Combinations">
+                                <option value="All Activities">All Activities (Combined)</option>
+                                <option value="Events (Training + Raid + Patrol)">Events (Training + Raid + Patrol)</option>
+                                <option value="Raids + Patrols">Raids + Patrols</option>
+                            </optgroup>
+                            <optgroup label="Sector Available Activities">
+                                {% for act in activity_types %}
+                                <option value="{{ act.name }}">{{ act.name }} ({{ act.points }} pts)</option>
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                        <div class="form-text text-white-50 small">Live activity types dynamically retrieved for this active sector.</div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label text-secondary small fw-bold text-uppercase">Quantity Required</label>
+                            <input type="number" min="1" name="quantity_required" class="form-control tf-input" value="5" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-secondary small fw-bold text-uppercase">Award Cadence</label>
+                            <select name="period_type" class="form-select tf-input">
+                                <option value="monthly" selected>End of Month</option>
+                                <option value="cycle">Every AC Cycle</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Description / Purpose</label>
+                        <textarea name="description" class="form-control tf-input" rows="2" placeholder="e.g. Awarded to the operative hosting the highest count of tryouts"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-tf-primary">Create Title</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- LOOP MODALS: EDIT & DELETE ACTIVITY TYPES                         -->
+<!-- ================================================================= -->
+{% for act in activity_types %}
+<!-- EDIT ACTIVITY MODAL -->
+<div class="modal fade tf-modal" id="editActivityModal{{ act.id }}" tabindex="-1" aria-labelledby="editActivityModalLabel{{ act.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ url_for('edit_activity_type', activity_id=act.id) }}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title text-white fw-bold" id="editActivityModalLabel{{ act.id }}">
+                        <i class="fas fa-edit me-2" style="color: var(--tf-purple-accent);"></i>Edit Activity: {{ act.name }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Activity Name</label>
+                        <input type="text" name="name" class="form-control tf-input" value="{{ act.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Points Awarded</label>
+                        <input type="number" step="0.1" name="points" class="form-control tf-input" value="{{ act.points }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Description</label>
+                        <textarea name="description" class="form-control tf-input" rows="2">{{ act.description or '' }}</textarea>
+                    </div>
+                    <div class="form-check form-switch mb-3 p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);">
+                        <input class="form-check-input ms-0 me-3" type="checkbox" name="is_limited" id="limitedCheck{{ act.id }}" {% if act.is_limited %}checked{% endif %}>
+                        <label class="form-check-label text-white" for="limitedCheck{{ act.id }}">
+                            <strong>Limited Activity</strong>
+                            <div class="text-white-50 small">Max 1 point-awarded entry per cycle per member.</div>
+                        </label>
+                    </div>
+                    <div class="form-check form-switch mb-2 p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);">
+                        <input class="form-check-input ms-0 me-3" type="checkbox" name="is_active" id="activeCheck{{ act.id }}" {% if act.is_active %}checked{% endif %}>
+                        <label class="form-check-label text-white" for="activeCheck{{ act.id }}">
+                            <strong>Active Status</strong>
+                            <div class="text-white-50 small">Visible in selection menus and active for Discord bot logging.</div>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-tf-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE ACTIVITY MODAL -->
+<div class="modal fade tf-modal" id="deleteActivityModal{{ act.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-color: rgba(239, 68, 68, 0.5);">
+            <form action="{{ url_for('delete_activity_type', activity_id=act.id) }}" method="post">
+                <div class="modal-header" style="border-bottom-color: rgba(239, 68, 68, 0.2);">
+                    <h5 class="modal-title text-danger fw-bold"><i class="fas fa-triangle-exclamation me-2"></i>Delete Activity</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-white">
+                    Are you sure you want to delete the activity <strong class="text-danger">{{ act.name }}</strong>?
+                    <p class="text-white-50 small mt-2 mb-0">Past logs will remain in database records, but this activity will no longer appear in active dropdowns or bot parsing.</p>
+                </div>
+                <div class="modal-footer" style="border-top-color: rgba(239, 68, 68, 0.2);">
+                    <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger" style="border-radius: 10px; font-weight: 600;">Confirm Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- ================================================================= -->
+<!-- LOOP MODALS: EDIT & DELETE RANK QUOTAS                            -->
+<!-- ================================================================= -->
+{% for quota in rank_quotas %}
+<!-- EDIT QUOTA MODAL -->
+<div class="modal fade tf-modal" id="editQuotaModal{{ quota.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ url_for('edit_rank_quota', quota_id=quota.id) }}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title text-white fw-bold">
+                        <i class="fas fa-edit me-2" style="color: var(--tf-purple-accent);"></i>Edit Quota: {{ quota.rank_name }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Rank Name</label>
+                        <input type="text" name="rank_name" class="form-control tf-input" value="{{ quota.rank_name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Required Points</label>
+                        <input type="number" step="0.5" min="0" name="required_points" class="form-control tf-input" value="{{ quota.required_points }}" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-tf-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE QUOTA MODAL -->
+<div class="modal fade tf-modal" id="deleteQuotaModal{{ quota.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-color: rgba(239, 68, 68, 0.5);">
+            <form action="{{ url_for('delete_rank_quota', quota_id=quota.id) }}" method="post">
+                <div class="modal-header" style="border-bottom-color: rgba(239, 68, 68, 0.2);">
+                    <h5 class="modal-title text-danger fw-bold"><i class="fas fa-triangle-exclamation me-2"></i>Delete Quota</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-white">
+                    Are you sure you want to remove the quota requirement for <strong class="text-danger">{{ quota.rank_name }}</strong>?
+                    <p class="text-white-50 small mt-2 mb-0">Members with this rank will no longer be tracked as having an active quota.</p>
+                </div>
+                <div class="modal-footer" style="border-top-color: rgba(239, 68, 68, 0.2);">
+                    <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger" style="border-radius: 10px; font-weight: 600;">Confirm Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- ================================================================= -->
+<!-- LOOP MODALS: EDIT & DELETE TITLES                                 -->
+<!-- ================================================================= -->
+{% for title in titles %}
+<!-- EDIT TITLE MODAL -->
+<div class="modal fade tf-modal" id="editTitleModal{{ title.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ url_for('edit_title', title_id=title.id) }}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title text-white fw-bold"><i class="fas fa-edit me-2" style="color: var(--tf-purple-accent);"></i>Edit Title Accolade</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-start">
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Title Name</label>
+                        <input type="text" name="name" class="form-control tf-input" value="{{ title.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Activity Required</label>
+                        <select name="activity_required" class="form-select tf-input" required>
+                            <optgroup label="Preset Combinations">
+                                <option value="All Activities" {% if title.activity_required == 'All Activities' %}selected{% endif %}>All Activities (Combined)</option>
+                                <option value="Events (Training + Raid + Patrol)" {% if title.activity_required == 'Events (Training + Raid + Patrol)' %}selected{% endif %}>Events (Training + Raid + Patrol)</option>
+                                <option value="Raids + Patrols" {% if title.activity_required == 'Raids + Patrols' %}selected{% endif %}>Raids + Patrols</option>
+                            </optgroup>
+                            <optgroup label="Sector Available Activities">
+                                {% for act in activity_types %}
+                                <option value="{{ act.name }}" {% if title.activity_required == act.name %}selected{% endif %}>{{ act.name }} ({{ act.points }} pts)</option>
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label text-secondary small fw-bold text-uppercase">Min Quantity</label>
+                            <input type="number" min="1" name="quantity_required" class="form-control tf-input" value="{{ title.quantity_required }}" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-secondary small fw-bold text-uppercase">Award Cadence</label>
+                            <select name="period_type" class="form-select tf-input">
+                                <option value="monthly" {% if title.period_type == 'monthly' %}selected{% endif %}>End of Month</option>
+                                <option value="cycle" {% if title.period_type == 'cycle' %}selected{% endif %}>Every AC Cycle</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary small fw-bold text-uppercase">Description / Criteria</label>
+                        <textarea name="description" class="form-control tf-input" rows="2">{{ title.description or '' }}</textarea>
+                    </div>
+                    <div class="form-check form-switch p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);">
+                        <input class="form-check-input ms-0 me-3" type="checkbox" name="is_active" id="editTitleActive{{ title.id }}" {% if title.is_active %}checked{% endif %}>
+                        <label class="form-check-label text-white" for="editTitleActive{{ title.id }}">
+                            <strong>Active in Rewards Evaluation</strong>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-tf-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE TITLE MODAL -->
+<div class="modal fade tf-modal" id="deleteTitleModal{{ title.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-color: rgba(239, 68, 68, 0.5);">
+            <form action="{{ url_for('delete_title', title_id=title.id) }}" method="post">
+                <div class="modal-header" style="border-bottom-color: rgba(239, 68, 68, 0.2);">
+                    <h5 class="modal-title text-danger fw-bold"><i class="fas fa-triangle-exclamation me-2"></i>Delete Title</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-white text-start">
+                    Are you sure you want to remove the title <strong class="text-danger">{{ title.name }}</strong>?
+                    <p class="text-white-50 small mt-2 mb-0">Operatives will no longer be awarded this accolade in future activity check cycles.</p>
+                </div>
+                <div class="modal-footer" style="border-top-color: rgba(239, 68, 68, 0.2);">
+                    <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger" style="border-radius: 10px; font-weight: 600;">Confirm Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Preserve active tab across reloads or hash navigation
+    var hash = window.location.hash;
+    if (hash) {
+        var triggerEl = document.querySelector('button[data-bs-target="' + hash + '"]');
+        if (triggerEl) {
+            var tab = new bootstrap.Tab(triggerEl);
+            tab.show();
+        }
+    }
+});
+</script>
 {% endblock %}

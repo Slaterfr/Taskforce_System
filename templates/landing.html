@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Nexus — Multitenant Command Platform{% endblock %}
+
+{% block content %}
+<div class="landing-wrapper position-relative overflow-hidden py-5">
+  <!-- Subtle Background Glow Elements -->
+  <div class="position-absolute top-0 start-50 translate-middle-x pointer-events-none"
+    style="width: 800px; height: 400px; background: radial-gradient(circle, rgba(168, 85, 247, 0.18) 0%, rgba(56, 189, 248, 0.08) 50%, transparent 80%); filter: blur(60px); z-index: 0;">
+  </div>
+
+  <div class="container position-relative py-lg-4" style="z-index: 1;">
+
+    <!-- Hero Section -->
+    <div class="row justify-content-center text-center mb-5 pb-3">
+      <div class="col-lg-9">
+
+        <!-- Brand Logo Badge -->
+        <div class="mb-3">
+          <img src="{{ url_for('static', path='img/Nexus.png') }}" alt="Nexus Logo" class="brand-logo mb-2"
+            style="width: 76px; height: 76px; object-fit: contain; filter: drop-shadow(0 0 18px rgba(168, 85, 247, 0.65));">
+        </div>
+
+        <!-- Live System Operational Pill -->
+        <div class="d-inline-flex align-items-center gap-2 px-3 py-1.5 rounded-pill mb-4"
+          style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.35); backdrop-filter: blur(12px);">
+          <span class="d-inline-block rounded-circle"
+            style="width: 8px; height: 8px; background: #a855f7; box-shadow: 0 0 10px #a855f7;"></span>
+          <span class="text-uppercase fw-bold" style="color: #c084fc; font-size: 0.72rem; letter-spacing: 0.1em;">
+            NEXUS SECTOR COMMAND SYSTEM &bull; v2.5
+          </span>
+        </div>
+
+        <!-- Hero Headline -->
+        <h1 class="display-4 text-white fw-extrabold mb-3" style="letter-spacing: -0.03em; line-height: 1.15;">
+          Elite Personnel &amp; Activity Governance for <span
+            style="background: linear-gradient(135deg, #c084fc 0%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Roblox
+            Groups</span>
+        </h1>
+
+        <!-- Hero Subtitle -->
+        <p class="lead text-white-50 mb-4 mx-auto" style="max-width: 680px; font-size: 1.15rem; font-weight: 400;">
+          A multi-tenant command infrastructure providing isolated sector rosters, real-time activity tracking,
+          automated in-game bot promotions, and Roblox OAuth clearance synchronization.
+        </p>
+
+        <!-- Dynamic Action Buttons -->
+        <div class="d-flex flex-column flex-sm-row justify-content-center align-items-center gap-3 mb-5">
+          {% if roblox_username %}
+          <!-- Authenticated State -->
+          <div class="d-flex flex-column align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2 text-white-50 small mb-1">
+              <i class="fa-brands fa-roblox text-purple"></i> Authenticated as <strong class="text-white">@{{
+                roblox_username }}</strong>
+            </div>
+            <div class="d-flex flex-wrap justify-content-center gap-2">
+              <a href="{{ url_for('dashboard') }}"
+                class="btn btn-lg px-4 py-2.5 fw-bold d-inline-flex align-items-center gap-2 rounded-3 text-white"
+                style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4); font-size: 1rem;">
+                <i class="fa-solid fa-gauge-high"></i> Enter Command Dashboard
+              </a>
+              <a href="/portal/select-group"
+                class="btn btn-lg btn-outline-secondary px-4 py-2.5 fw-semibold d-inline-flex align-items-center gap-2 rounded-3 text-white-50"
+                style="border-color: rgba(255,255,255,0.2); font-size: 0.95rem;">
+                <i class="fa-solid fa-layer-group"></i> Switch Sector
+              </a>
+              <a href="{{ url_for('public_roster') }}"
+                class="btn btn-lg btn-outline-info px-4 py-2.5 fw-semibold d-inline-flex align-items-center gap-2 rounded-3 text-info"
+                style="border-color: rgba(56, 189, 248, 0.4); font-size: 0.95rem;">
+                <i class="fa-solid fa-users"></i> View Sector Roster
+              </a>
+            </div>
+          </div>
+          {% else %}
+          <!-- Unauthenticated State: Primary Login CTA -->
+          <a href="/auth/roblox/login"
+            class="btn btn-lg px-4 py-3 fw-bold d-inline-flex align-items-center gap-2.5 rounded-3 text-white"
+            style="background: linear-gradient(135deg, #7c3aed, #a855f7); border: none; box-shadow: 0 8px 30px rgba(124, 58, 237, 0.5); font-size: 1.05rem; transition: transform 0.2s, box-shadow 0.2s;"
+            onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+            <i class="fa-brands fa-roblox fs-5"></i> Log In with Roblox
+          </a>
+          {% endif %}
+        </div>
+
+        <!-- Global Metrics Strip -->
+        <div class="row g-3 justify-content-center">
+          <div class="col-6 col-md-3">
+            <div class="p-3 rounded-4"
+              style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(12px);">
+              <div class="fw-bold text-white fs-3" style="font-family: 'JetBrains Mono', monospace;">{{ total_sectors }}
+              </div>
+              <div class="text-white-50 small text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Command
+                Sectors</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 rounded-4"
+              style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(12px);">
+              <div class="fw-bold text-white fs-3" style="font-family: 'JetBrains Mono', monospace;">{{ total_operatives
+                }}+</div>
+              <div class="text-white-50 small text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Active
+                Operatives</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 rounded-4"
+              style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(12px);">
+              <div class="fw-bold text-info fs-3" style="font-family: 'JetBrains Mono', monospace;">100%</div>
+              <div class="text-white-50 small text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Tenant
+                Isolation</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="p-3 rounded-4"
+              style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(12px);">
+              <div class="fw-bold text-success fs-3" style="font-family: 'JetBrains Mono', monospace;">Live</div>
+              <div class="text-white-50 small text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Roblox
+                Bot Sync</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Core Pillars / Features Grid -->
+    <div class="row g-4 mt-2">
+      <!-- Feature 1 -->
+      <div class="col-md-6 col-lg-3">
+        <div class="card h-100 border-0 rounded-4 p-4 text-start"
+          style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08) !important; backdrop-filter: blur(16px); transition: transform 0.2s;"
+          onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+          <div class="d-flex align-items-center justify-content-center rounded-3 mb-3"
+            style="width: 44px; height: 44px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.35);">
+            <i class="fa-solid fa-layer-group text-purple fs-5"></i>
+          </div>
+          <h5 class="text-white fw-bold mb-2">Multi-Sector Tenancy</h5>
+          <p class="text-white-50 small mb-0">
+            Strict row-level isolation guarantees each taskforce or division operates in its own dedicated sector with
+            isolated rosters and custom rank matrices.
+          </p>
+        </div>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="col-md-6 col-lg-3">
+        <div class="card h-100 border-0 rounded-4 p-4 text-start"
+          style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08) !important; backdrop-filter: blur(16px); transition: transform 0.2s;"
+          onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+          <div class="d-flex align-items-center justify-content-center rounded-3 mb-3"
+            style="width: 44px; height: 44px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35);">
+            <i class="fa-solid fa-robot text-info fs-5"></i>
+          </div>
+          <h5 class="text-white fw-bold mb-2">Automated Bot Promotions</h5>
+          <p class="text-white-50 small mb-0">
+            Dedicated sector bot tokens execute in-game group promotions automatically without requiring manual group
+            admin intervention.
+          </p>
+        </div>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="col-md-6 col-lg-3">
+        <div class="card h-100 border-0 rounded-4 p-4 text-start"
+          style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08) !important; backdrop-filter: blur(16px); transition: transform 0.2s;"
+          onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+          <div class="d-flex align-items-center justify-content-center rounded-3 mb-3"
+            style="width: 44px; height: 44px; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.35);">
+            <i class="fa-solid fa-chart-line text-success fs-5"></i>
+          </div>
+          <h5 class="text-white fw-bold mb-2">Activity Checks &amp; Quotas</h5>
+          <p class="text-white-50 small mb-0">
+            Automated quota compliance monitoring, inactivity notice management, and comprehensive activity cycle
+            evaluations.
+          </p>
+        </div>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="col-md-6 col-lg-3">
+        <div class="card h-100 border-0 rounded-4 p-4 text-start"
+          style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08) !important; backdrop-filter: blur(16px); transition: transform 0.2s;"
+          onmouseover="this.style.transform='translateY(-4px)'" onmouseout="this.style.transform='translateY(0)'">
+          <div class="d-flex align-items-center justify-content-center rounded-3 mb-3"
+            style="width: 44px; height: 44px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.35);">
+            <i class="fa-solid fa-shield-halved text-warning fs-5"></i>
+          </div>
+          <h5 class="text-white fw-bold mb-2">Roblox Clearance Tiers</h5>
+          <p class="text-white-50 small mb-0">
+            Zero-password login via official Roblox OAuth matches in-game group ranks dynamically to Member, Staff, HCT,
+            or Admin permissions.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security & Privacy Notice -->
+    <div class="mt-5 text-center text-white-50 small">
+      <div class="d-inline-flex align-items-center gap-2 px-3 py-1.5 rounded-3"
+        style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);">
+        <i class="fa-solid fa-lock text-purple"></i>
+        <span>End-to-End Cryptographic JWT Session Authentication &bull; Operative data is isolated per command
+          sector</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

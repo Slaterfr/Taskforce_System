@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Public Roster — Taskforce{% endblock %}
+{% block title %}{{ current_group_name }} Roster — Nexus{% endblock %}
 
 {% block content %}
 <div class="row mb-4 align-items-center">
@@ -10,8 +10,8 @@
         <i class="fas fa-users fa-lg" style="color: var(--tf-purple-accent);"></i>
       </div>
       <div>
-        <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">Taskforce Roster</h2>
-        <p class="text-white-50 mb-0 small">Official personnel directory and rank registry.</p>
+        <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">{{ current_group_name }} Roster</h2>
+        <p class="text-white-50 mb-0 small">Official personnel directory and rank registry for {{ current_group_name }}.</p>
       </div>
     </div>
   </div>
