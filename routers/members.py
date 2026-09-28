@@ -163,9 +163,11 @@ async def promote_member(request: Request):
 async def stats(request: Request):
     """Member Statistics Dashboard"""
     from utils.stats_logger import get_stats_history
+    from utils.tenant_context import get_tenant_id
     import json
 
-    data = get_stats_history(days=30)
+    tenant_id = get_tenant_id() or 1
+    data = get_stats_history(days=30, tenant_id=tenant_id)
     total_members = data['totals'][-1] if data['totals'] else 0
 
     latest_ranks = data['latest_ranks']

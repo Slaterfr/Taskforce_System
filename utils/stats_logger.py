@@ -1,3 +1,4 @@
+from typing import Optional, Dict, Any, List
 from database.engine import db_session
 from sqlmodel import select
 from datetime import datetime, timedelta
@@ -43,25 +44,38 @@ def capture_member_stats(tenant_id: Optional[int] = None):
         logger.info(f"✅ [Tenant {effective_tenant_id}] Captured member stats: {total_members} members")
         return True
 
-        
     except Exception as e:
-        logger.error(f"❌ Error capturing member stats: {e}")
+        logger.error(f"❌ Error capturing member stats for tenant {effective_tenant_id}: {e}")
         db_session().rollback()
         return False
 
-def get_stats_history(days=30):
+def get_stats_history(days: int = 30, tenant_id: Optional[int] = None) -> Dict[str, Any]:
     """
-    Retrieves stats history for the last N days.
+    Retrieves stats history for the last N days for the specified or active tenant.
     Returns formatted data for charts.
     """
+    effective_tenant_id = tenant_id or get_tenant_id() or 1
     try:
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         
-        # Get stats ordered by date
-        history = db_session().query(MemberStats).filter(
-            MemberStats.timestamp >= cutoff_date
-        ).order_by(MemberStats.timestamp.asc()).all()
+        # Get stats ordered by date strictly filtered to this sector/tenant
+        history = db_session().exec(
+            select(MemberStats).where(
+                MemberStats.tenant_id == effective_tenant_id,
+                MemberStats.timestamp >= cutoff_date
+            ).order_by(MemberStats.timestamp.asc())
+        ).all()
         
+        # If no snapshots exist yet for this tenant, capture an initial snapshot immediately
+        if not history:
+            capture_member_stats(tenant_id=effective_tenant_id)
+            history = db_session().exec(
+                select(MemberStats).where(
+                    MemberStats.tenant_id == effective_tenant_id,
+                    MemberStats.timestamp >= cutoff_date
+                ).order_by(MemberStats.timestamp.asc())
+            ).all()
+
         # Format data for Chart.js
         dates = [entry.timestamp.strftime('%Y-%m-%d') for entry in history]
         totals = [entry.total_members for entry in history]
@@ -75,7 +89,7 @@ def get_stats_history(days=30):
             'latest_ranks': latest_ranks
         }
     except Exception as e:
-        logger.error(f"❌ Error retrieving stats history: {e}")
+        logger.error(f"❌ Error retrieving stats history for tenant {effective_tenant_id}: {e}")
         return {
             'dates': [],
             'totals': [],
