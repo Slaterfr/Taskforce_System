@@ -27,7 +27,6 @@ USER appuser
 # Expose port
 EXPOSE 5000
 
-# Use start script to run both services
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000", "--proxy-headers", "--forwarded-allow-ips=*"]
 
 

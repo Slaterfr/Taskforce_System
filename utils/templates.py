@@ -5,13 +5,24 @@ import urllib.parse
 templates = Jinja2Templates(directory="templates")
 
 def url_for(request, name: str, **path_params: typing.Any) -> str:
-    if "_external" in path_params:
-        del path_params["_external"]
+    external = path_params.pop("_external", False)
     try:
         url = request.url_for(name, **path_params)
-        return str(url)
+        if external:
+            url_str = str(url)
+            proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+            if proto == "https" and url_str.startswith("http://"):
+                url_str = "https://" + url_str[7:]
+            return url_str
+        path = url.path
+        if url.query:
+            path += "?" + url.query
+        return path
     except Exception:
-        return f"/{name}" + ("?" + urllib.parse.urlencode(path_params) if path_params else "")
+        path = f"/{name}"
+        if path_params:
+            path += "?" + urllib.parse.urlencode(path_params)
+        return path
 
 from utils.flash import get_flashed_messages
 from config import settings
@@ -51,21 +62,31 @@ def custom_TemplateResponse(name, context, *args, **kwargs):
         context['is_hct'] = legacy_hct or system_role in ["hct", "admin"] or "edit_config" in perms
         context['has_permission'] = lambda perm: (legacy_hct or perm in perms)
 
-        # Theme Resolution: fetch active sector theme from session or group settings
-        group_id = session.get("tenant_id") or (ctx or {}).get("group_id") or 1
-        current_theme = session.get("group_theme")
-        if not current_theme:
-            from database.engine import engine
-            from sqlmodel import Session as DbSession
-            from database.tenant_models import Group
-            try:
-                with DbSession(engine) as db:
-                    grp = db.get(Group, group_id)
-                    if grp:
-                        current_theme = grp.get_settings_dict().get("theme")
-            except Exception:
-                pass
-        context['current_theme'] = current_theme or "neon_purple"
+        # Inject request-bound safe_url_for into template context so relative URLs are used
+        def safe_url_for(route_name: str, **path_params: typing.Any) -> str:
+            return url_for(request, route_name, **path_params)
+        context['url_for'] = safe_url_for
+
+        # Theme Resolution:
+        # Platform-level landing, portal and compliance pages must ALWAYS use the default Nexus theme ('neon_purple')
+        # They should NEVER inherit a specific sector's theme.
+        if name in ['landing.html', 'privacy.html', 'terms.html', 'portal/select_group.html', 'portal/dev_login.html']:
+            context['current_theme'] = 'neon_purple'
+        else:
+            group_id = session.get("tenant_id") or (ctx or {}).get("group_id") or 1
+            current_theme = session.get("group_theme")
+            if not current_theme:
+                from database.engine import engine
+                from sqlmodel import Session as DbSession
+                from database.tenant_models import Group
+                try:
+                    with DbSession(engine) as db:
+                        grp = db.get(Group, group_id)
+                        if grp:
+                            current_theme = grp.get_settings_dict().get("theme")
+                except Exception:
+                    pass
+            context['current_theme'] = current_theme or "neon_purple"
 
     return original_TemplateResponse(name, context, *args, **kwargs)
 

@@ -78,7 +78,7 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    // Existing quick-log buttons...
+    // Quick-log activity buttons
     document.querySelectorAll('.quick-log-btn').forEach(btn => {
       btn.addEventListener('click', async function () {
         const memberId = Number(this.dataset.member);
@@ -87,15 +87,24 @@
         try {
           const res = await fetch("{{ url_for('quick_log_activity') }}", {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            },
             body: JSON.stringify({ member_id: memberId, activity_type: activityType, activity_date: "{{ today }}", logged_by: "HC Team" })
           });
-          const data = await res.json();
-          if (res.ok && data.success) window.location.reload();
-          else alert(data.message || 'Error logging activity');
+          let data = null;
+          try { data = await res.json(); } catch(e) {}
+          if (res.ok && data && data.success) {
+            window.location.reload();
+          } else {
+            const errorMsg = (data && (data.message || data.error)) || (res.status === 401 ? 'Clearance required or session expired. Please log in.' : `Error logging activity (HTTP ${res.status})`);
+            alert(errorMsg);
+          }
         } catch (err) {
           console.error(err);
-          alert('Network error');
+          alert('Request failed: ' + (err.message || 'Network error'));
         } finally { this.disabled = false; }
       });
     });
@@ -107,18 +116,22 @@
         try {
           const res = await fetch("{{ url_for('delete_ac_activity', activity_id=0) }}".replace('/0', '/' + activityId), {
             method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            headers: { 
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
           });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            // Remove the activity row smoothly
+          let data = null;
+          try { data = await res.json(); } catch(e) {}
+          if (res.ok && data && data.success) {
             this.closest('.d-flex').remove();
           } else {
-            alert(data.message || 'Error deleting activity');
+            const errorMsg = (data && (data.message || data.error)) || (res.status === 401 ? 'Clearance required or session expired.' : `Error deleting activity (HTTP ${res.status})`);
+            alert(errorMsg);
           }
         } catch (err) {
           console.error(err);
-          alert('Network error');
+          alert('Request failed: ' + (err.message || 'Network error'));
         }
       });
     });
@@ -131,15 +144,24 @@
         try {
           const res = await fetch("{{ url_for('quick_log_ia') }}", {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            },
             body: JSON.stringify({ member_id: memberId, reason: 'Quick log IA', approved_by: 'HC Team' })
           });
-          const data = await res.json();
-          if (res.ok && data.success) window.location.reload();
-          else alert(data.message || 'Error toggling IA');
+          let data = null;
+          try { data = await res.json(); } catch(e) {}
+          if (res.ok && data && data.success) {
+            window.location.reload();
+          } else {
+            const errorMsg = (data && (data.message || data.error)) || (res.status === 401 ? 'Clearance required or session expired.' : `Error toggling IA (HTTP ${res.status})`);
+            alert(errorMsg);
+          }
         } catch (err) {
           console.error(err);
-          alert('Network error');
+          alert('Request failed: ' + (err.message || 'Network error'));
         } finally { this.disabled = false; }
       });
     });
@@ -152,15 +174,24 @@
         try {
           const res = await fetch("{{ url_for('quick_log_exempt') }}", {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            },
             body: JSON.stringify({ member_id: memberId, reason: 'Quick log exemption', approved_by: 'HC Team' })
           });
-          const data = await res.json();
-          if (res.ok && data.success) window.location.reload();
-          else alert(data.message || 'Error toggling exemption');
+          let data = null;
+          try { data = await res.json(); } catch(e) {}
+          if (res.ok && data && data.success) {
+            window.location.reload();
+          } else {
+            const errorMsg = (data && (data.message || data.error)) || (res.status === 401 ? 'Clearance required or session expired.' : `Error toggling exemption (HTTP ${res.status})`);
+            alert(errorMsg);
+          }
         } catch (err) {
           console.error(err);
-          alert('Network error');
+          alert('Request failed: ' + (err.message || 'Network error'));
         } finally { this.disabled = false; }
       });
     });
