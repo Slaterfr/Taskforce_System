@@ -141,8 +141,8 @@ app = FastAPI(
     title="Taskforce Management System",
     version="2.0.0",
     lifespan=lifespan,
-    # Disable auto-generated API docs in production if desired:
-    # docs_url=None, redoc_url=None,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
 )
 
 from utils.tenant_context import TenantContextMiddleware
@@ -173,11 +173,13 @@ from routers.ac import router as ac_router
 from routers.sync import router as sync_router
 from routers.group_settings import router as group_settings_router
 from routers.missions import router as missions_router
+from routers.docs import router as docs_router
 from api.discord_bot_api import router as bot_api_router
 
 app.include_router(roblox_auth_router)
 app.include_router(auth_router)
 app.include_router(public_router)
+app.include_router(docs_router)
 app.include_router(members_router)
 app.include_router(ac_router, prefix="/ac")
 app.include_router(sync_router)
