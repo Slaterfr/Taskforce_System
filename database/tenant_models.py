@@ -51,6 +51,9 @@ class Group(SQLModel, table=True):
     owner_user_id: Optional[int] = Field(default=None, foreign_key="users.id")
     is_active: bool = Field(default=True)
     discord_group_id: Optional[str] = Field(default=None, max_length=50, index=True)
+    ranks_channel_id: Optional[str] = Field(default=None, max_length=50, index=True)
+    activity_channel_id: Optional[str] = Field(default=None, max_length=50, index=True)
+    webhook_channel_id: Optional[str] = Field(default=None, max_length=50, index=True)
     settings: dict = Field(default_factory=dict, sa_column=Column(JSON))
 
     # Relationships
@@ -84,6 +87,9 @@ class Group(SQLModel, table=True):
             "owner_user_id": self.owner_user_id,
             "is_active": self.is_active,
             "discord_group_id": self.discord_group_id,
+            "ranks_channel_id": self.ranks_channel_id,
+            "activity_channel_id": self.activity_channel_id,
+            "webhook_channel_id": self.webhook_channel_id,
             "settings": self.get_settings_dict(),
         }
 

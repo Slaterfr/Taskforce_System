@@ -11,6 +11,7 @@ _logger = logging.getLogger(__name__)
 
 from services import ac_service, member_service
 from utils.api_auth import verify_api_key, log_api_access
+from typing import Optional, List, Dict, Any
 from config import settings
 from datetime import datetime
 import requests
@@ -35,33 +36,73 @@ DISCORD_WEBHOOK_URL = None  # Will be set from config
 NOTIFICATION_CHANNEL_ID = "1446175728025735393"
 
 
-def send_discord_notification(message: str, title: str = "TF System Notification"):
-    """Send notification to Discord channel via webhook"""
+def send_discord_notification(message: str, title: str = "TF System Notification", tenant_id: Optional[int] = None, channel_id: Optional[str] = None):
+    """Send notification to Discord channel via webhook or direct bot delivery for a tenant"""
+    import os
+    from utils.tenant_context import get_tenant_id
+    from database.engine import engine
+    from sqlmodel import Session
+    from database.tenant_models import Group
+
+    t_id = tenant_id or get_tenant_id()
+    target_channel = channel_id
+
+    if not target_channel and t_id:
+        try:
+            with Session(engine) as session:
+                grp = session.get(Group, t_id)
+                if grp and grp.webhook_channel_id:
+                    target_channel = grp.webhook_channel_id
+        except Exception as e:
+            _logger.warning(f"Failed to lookup tenant webhook_channel_id for tenant {t_id}: {e}")
+
+    bot_token = os.environ.get("DISCORD_TOKEN") or os.environ.get("DISCORD_BOT_TOKEN")
     webhook_url = settings.DISCORD_NOTIFICATION_WEBHOOK_URL
-    
-    if not webhook_url:
-        _logger.warning("Discord webhook not configured, skipping notification")
-        return False
-    
-    try:
-        payload = {
-            "embeds": [{
-                "title": title,
-                "description": message,
-                "color": 5814783,  # Blue color
-                "timestamp": datetime.utcnow().isoformat(),
-                "footer": {
-                    "text": "TF System Bot Integration"
-                }
-            }]
-        }
-        
-        response = requests.post(webhook_url, json=payload, timeout=10)
-        response.raise_for_status()
-        return True
-    except Exception as e:
-        _logger.error(f"Failed to send Discord notification: {e}")
-        return False
+
+    payload = {
+        "embeds": [{
+            "title": title,
+            "description": message,
+            "color": 5814783,  # Blue color
+            "timestamp": datetime.utcnow().isoformat(),
+            "footer": {
+                "text": "TF System Bot Integration"
+            }
+        }]
+    }
+
+    # 1. Direct Bot delivery to channel ID if configured
+    if target_channel and bot_token:
+        clean_cid = str(target_channel).strip()
+        if clean_cid.startswith("http"):
+            target_url = clean_cid
+            headers = {"Content-Type": "application/json"}
+        else:
+            target_url = f"https://discord.com/api/v10/channels/{clean_cid}/messages"
+            headers = {
+                "Authorization": f"Bot {bot_token}",
+                "Content-Type": "application/json"
+            }
+        try:
+            res = requests.post(target_url, json=payload, headers=headers, timeout=10)
+            if res.status_code in (200, 204):
+                return True
+            _logger.warning(f"Direct discord notification failed: {res.status_code} - {res.text}")
+        except Exception as e:
+            _logger.error(f"Failed to send direct Discord channel notification: {e}")
+
+    # 2. Webhook URL fallback
+    if webhook_url:
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+            return True
+        except Exception as e:
+            _logger.error(f"Failed to send Discord webhook notification: {e}")
+            return False
+
+    _logger.info("No Discord webhook or channel configured for notification, skipped.")
+    return False
 
 
 # ============================================================================

@@ -181,9 +181,12 @@ async def update_group_identity(
     request: Request,
     name: str = Form(...),
     discord_group_id: Optional[str] = Form(None),
+    webhook_channel_id: Optional[str] = Form(None),
+    activity_channel_id: Optional[str] = Form(None),
+    ranks_channel_id: Optional[str] = Form(None),
     description: Optional[str] = Form(None)
 ):
-    """Update group name, discord_group_id, and description; immediately reflects across the header and bot."""
+    """Update group name, discord_group_id, discord channel IDs, and description."""
     tenant_id = request.session.get("tenant_id") or get_tenant_id() or 1
     new_name = name.strip()
 
@@ -199,6 +202,9 @@ async def update_group_identity(
 
         group.name = new_name
         group.discord_group_id = discord_group_id.strip() if (discord_group_id and discord_group_id.strip()) else None
+        group.webhook_channel_id = webhook_channel_id.strip() if (webhook_channel_id and webhook_channel_id.strip()) else None
+        group.activity_channel_id = activity_channel_id.strip() if (activity_channel_id and activity_channel_id.strip()) else None
+        group.ranks_channel_id = ranks_channel_id.strip() if (ranks_channel_id and ranks_channel_id.strip()) else None
         if description is not None:
             group.description = description.strip()
         session.add(group)

@@ -95,6 +95,51 @@
               <div class="form-text text-white-50" style="font-size: 0.75rem;">Discord Guild ID where this sector's bot commands and mentions are automatically routed.</div>
             </div>
 
+            <!-- Webhook / Notifications Channel ID -->
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label text-white-50 small fw-semibold mb-0">Webhook / Notifications Channel ID</label>
+                <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.65rem;">Broadcasts</span>
+              </div>
+              <div class="input-group">
+                <span class="input-group-text bg-black text-white-50 border-secondary" style="background: rgba(0, 0, 0, 0.4) !important; border-color: rgba(255, 255, 255, 0.15) !important;">
+                  <i class="fa-solid fa-bullhorn text-info"></i>
+                </span>
+                <input type="text" name="webhook_channel_id" class="form-control bg-black text-white border-secondary" value="{{ group.webhook_channel_id or '' }}" style="background: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important; font-family: 'JetBrains Mono', monospace;" placeholder="e.g. 1446175728025735393">
+              </div>
+              <div class="form-text text-white-50" style="font-size: 0.75rem;">Channel where automated sync logs, Aspirant announcements, and system alerts are sent.</div>
+            </div>
+
+            <!-- Activity Logging Channel ID (Optional) -->
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label text-white-50 small fw-semibold mb-0">Activity Logging Channel ID</label>
+                <span class="badge" style="background: rgba(255, 255, 255, 0.08); color: #94a3b8; font-size: 0.65rem;">Optional</span>
+              </div>
+              <div class="input-group">
+                <span class="input-group-text bg-black text-white-50 border-secondary" style="background: rgba(0, 0, 0, 0.4) !important; border-color: rgba(255, 255, 255, 0.15) !important;">
+                  <i class="fa-solid fa-clipboard-check text-warning"></i>
+                </span>
+                <input type="text" name="activity_channel_id" class="form-control bg-black text-white border-secondary" value="{{ group.activity_channel_id or '' }}" style="background: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important; font-family: 'JetBrains Mono', monospace;" placeholder="Leave empty to allow all permitted channels">
+              </div>
+              <div class="form-text text-white-50" style="font-size: 0.75rem;">Restricts <code>@cortex log ...</code> commands to this channel. Leave empty to allow any channel with bot permissions.</div>
+            </div>
+
+            <!-- Rank Changes Channel ID (Optional) -->
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label text-white-50 small fw-semibold mb-0">Rank Changes Channel ID</label>
+                <span class="badge" style="background: rgba(255, 255, 255, 0.08); color: #94a3b8; font-size: 0.65rem;">Optional</span>
+              </div>
+              <div class="input-group">
+                <span class="input-group-text bg-black text-white-50 border-secondary" style="background: rgba(0, 0, 0, 0.4) !important; border-color: rgba(255, 255, 255, 0.15) !important;">
+                  <i class="fa-solid fa-ranking-star text-success"></i>
+                </span>
+                <input type="text" name="ranks_channel_id" class="form-control bg-black text-white border-secondary" value="{{ group.ranks_channel_id or '' }}" style="background: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important; font-family: 'JetBrains Mono', monospace;" placeholder="Leave empty to allow all permitted channels">
+              </div>
+              <div class="form-text text-white-50" style="font-size: 0.75rem;">Restricts <code>@cortex promote ...</code> commands to this channel. Leave empty to allow any channel with bot permissions.</div>
+            </div>
+
             <div class="mb-4">
               <label class="form-label text-white-50 small fw-semibold">Description / Sector Purpose</label>
               <textarea name="description" rows="2" class="form-control bg-black text-white border-secondary" style="background: rgba(0, 0, 0, 0.5) !important; border-color: rgba(255, 255, 255, 0.15) !important;" placeholder="Optional mission statement or unit mandate...">{{ group.description or '' }}</textarea>
