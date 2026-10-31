@@ -61,3 +61,21 @@ def update_roblox_cookie(cookie):
         }
     except Exception as e:
         return {'success': False, 'message': f'Error updating configuration: {e}'}
+
+
+def get_group_cookie(group_id: int):
+    """
+    Fetch the bot automation cookie record for a specific sector/group from the database.
+    Returns GroupCookie record or None if no rows returned.
+    """
+    from database.engine import engine
+    from sqlmodel import Session, select
+    from database.tenant_models import GroupCookie
+    try:
+        with Session(engine) as session:
+            return session.exec(
+                select(GroupCookie).where(GroupCookie.group_id == group_id)
+            ).first()
+    except Exception as e:
+        logger.warning(f"Error fetching group cookie for group {group_id}: {e}")
+        return None

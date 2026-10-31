@@ -30,14 +30,6 @@ async def staff_logout(request: Request):
 @router.api_route('/staff/update_cookie', methods=['GET', 'POST'])
 @staff_required
 async def update_cookie(request: Request):
-    if request.method == 'POST':
-        cookie = (await request.form()).get('cookie', '').strip()
-        result = config_service.update_roblox_cookie(cookie)
-        if result['success']:
-            flash(request, result['message'], 'success')
-            return RedirectResponse(url_for(request, 'dashboard'), status_code=303)
-        else:
-            flash(request, result['message'], 'error')
-            return RedirectResponse(url_for(request, 'update_cookie'), status_code=303)
-            
-    return templates.TemplateResponse('update_cookie.html', {"request": request})
+    """Legacy route: Redirect to Sector Settings where bot cookies are managed per sector."""
+    flash(request, "Bot cookies are now configured dynamically per sector in Sector Settings.", "info")
+    return RedirectResponse(url="/group/settings", status_code=303)

@@ -12,10 +12,23 @@ router = APIRouter()
 @router.get('/dashboard')
 @staff_required
 async def dashboard(request: Request):
-    dashboard_data = member_service.get_dashboard_data()
-    return templates.TemplateResponse('dashboard.html', {"request": request,
-                           "member_count":dashboard_data['member_count'],
-                           "recent_activities":dashboard_data['recent_activities']})
+    from utils.tenant_context import extract_tenant_context, get_tenant_id
+    from services.config_service import get_group_cookie
+
+    ctx = getattr(request.state, "tenant_context", None)
+    if not ctx:
+        ctx = extract_tenant_context(request) or {}
+    tenant_id = request.session.get("tenant_id") or ctx.get("group_id") or get_tenant_id() or 1
+
+    dashboard_data = member_service.get_dashboard_data(tenant_id=tenant_id)
+    cookie_record = get_group_cookie(tenant_id)
+
+    return templates.TemplateResponse('dashboard.html', {
+        "request": request,
+        "member_count": dashboard_data['member_count'],
+        "recent_activities": dashboard_data['recent_activities'],
+        "cookie_record": cookie_record,
+    })
 
 
 @router.get('/members')

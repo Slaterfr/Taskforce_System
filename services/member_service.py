@@ -269,10 +269,18 @@ def promote_member(member_id, new_rank, *, reason='', promoted_by='Staff'):
     }
 
 
-def get_dashboard_data():
-    """Return dashboard statistics and recent activity logs."""
-    member_count = len(db_session().exec(select(Member).filter_by(is_active=True)).all())
-    recent_activities = db_session().query(ActivityLog).order_by(ActivityLog.log_date.desc()).limit(5).all()
+def get_dashboard_data(tenant_id=None):
+    """Return dashboard statistics and recent activity logs scoped to tenant."""
+    t_id = tenant_id or get_tenant_id()
+    query = select(Member).where(Member.is_active == True)
+    if t_id:
+        query = query.where(Member.tenant_id == t_id)
+    member_count = len(db_session().exec(query).all())
+
+    act_query = db_session().query(ActivityLog)
+    if t_id:
+        act_query = act_query.filter(ActivityLog.tenant_id == t_id)
+    recent_activities = act_query.order_by(ActivityLog.log_date.desc()).limit(5).all()
     return {
         'member_count': member_count,
         'recent_activities': recent_activities
