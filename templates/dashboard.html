@@ -1,132 +1,245 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_stat_card, nx_card_header, nx_badge, nx_empty_state %}
 
-{% block title %}Dashboard — Taskforce Management{% endblock %}
+{% block title %}Overview — {{ current_group_name or 'Nexus' }}{% endblock %}
 
 {% block content %}
-<div class="row mb-4 align-items-center">
-    <div class="col-12">
-        <div class="d-flex align-items-center">
-            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; border-radius: 14px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);">
-                <i class="fas fa-gauge-high fa-lg" style="color: var(--tf-purple-accent);"></i>
-            </div>
-            <div>
-                <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">Command Dashboard</h2>
-                <p class="text-white-50 mb-0 small">Overview and operational control of the Taskforce management system.</p>
-            </div>
-        </div>
-    </div>
+{% call nx_page_header(
+    title="Command Overview",
+    subtitle="Operational telemetry, integration health, and rapid command dispatch for " ~ (current_group_name or 'active sector') ~ ".",
+    eyebrow="OVERVIEW // SECTOR TELEMETRY",
+    icon="layout-dashboard"
+) %}
+  {% if is_staff or is_hct %}
+  <a href="{{ url_for('add_member') }}" class="nx-btn nx-btn-primary">
+    <i data-lucide="user-plus"></i>
+    <span>Add Operative</span>
+  </a>
+  {% if is_hct %}
+  <a href="{{ url_for('quick_log') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="zap"></i>
+    <span>Quick Log</span>
+  </a>
+  {% endif %}
+  {% endif %}
+  <a href="{{ url_for('public_roster') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="users"></i>
+    <span>View Roster</span>
+  </a>
+{% endcall %}
+
+<!-- 4-Column Operational Telemetry Strip -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(
+        label="Total Members",
+        value=member_count or 0,
+        meta="In active sector registry",
+        icon="users",
+        accent="cyan"
+    ) }}
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(
+        label="Recent Activity",
+        value=recent_activities|length,
+        meta="Latest logged records",
+        icon="activity",
+        accent="cyan"
+    ) }}
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(
+        label="AC Modules",
+        value="Active",
+        meta="Dynamic quotas & tracking",
+        icon="clipboard-check",
+        accent="success",
+        mono=False
+    ) }}
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    {% if cookie_record and cookie_record.is_valid %}
+      {% set bot_meta = ('@' ~ cookie_record.bot_username) if cookie_record.bot_username else 'Sector Bot Active' %}
+      {{ nx_stat_card(
+          label="Roblox Sync",
+          value="Connected",
+          meta=bot_meta,
+          icon="cpu",
+          accent="success",
+          mono=False
+      ) }}
+    {% else %}
+      {% if is_hct %}
+        {% set unconf_meta = '<a href="' ~ url_for('group_settings') ~ '" class="nx-text-warning">Set in Sector Settings &rarr;</a>' %}
+      {% else %}
+        {% set unconf_meta = 'No sector bot cookie found' %}
+      {% endif %}
+      {{ nx_stat_card(
+          label="Roblox Sync",
+          value="Not Configured",
+          meta=unconf_meta,
+          icon="alert-triangle",
+          accent="warning",
+          mono=False
+      ) }}
+    {% endif %}
+  </div>
 </div>
 
-<div class="row mb-4 g-4">
-    <!-- Quick Actions Panel -->
-    <div class="col-lg-4">
-        <div class="tf-card h-100">
-            <div class="tf-card-header d-flex align-items-center">
-                <i class="fas fa-bolt me-2" style="color: var(--tf-purple-accent);"></i>
-                <h5 class="mb-0 text-white fw-bold">Quick Operations</h5>
-            </div>
-            <div class="p-4 d-grid gap-3">
-                {% if is_staff %}
-                <a href="{{ url_for('add_member') }}" class="btn btn-tf-primary py-2 d-flex align-items-center justify-content-between">
-                    <span><i class="fas fa-user-plus me-2"></i>Add Member</span>
-                    <i class="fas fa-chevron-right small"></i>
-                </a>
-                <a href="{{ url_for('promote_member') }}" class="btn btn-tf-outline py-2 d-flex align-items-center justify-content-between">
-                    <span><i class="fas fa-arrow-up me-2" style="color: #38bdf8;"></i>Change Member Rank</span>
-                    <i class="fas fa-chevron-right small"></i>
-                </a>
-                <a href="{{ url_for('members') }}" class="btn btn-tf-outline py-2 d-flex align-items-center justify-content-between">
-                    <span><i class="fas fa-users-cog me-2" style="color: #cbd5e1;"></i>Manage Members</span>
-                    <i class="fas fa-chevron-right small"></i>
-                </a>
-                <a href="{{ url_for('ac_dashboard') }}" class="btn btn-tf-outline py-2 d-flex align-items-center justify-content-between">
-                    <span><i class="fas fa-check-circle me-2" style="color: #34d399;"></i>AC Dashboard</span>
-                    <i class="fas fa-chevron-right small"></i>
-                </a>
-                {% else %}
-                <a href="{{ url_for('public_roster') }}" class="btn btn-tf-primary py-2">
-                    <i class="fas fa-users me-2"></i>View Public Roster
-                </a>
-                <a href="{{ url_for('staff_login') }}" class="btn btn-tf-outline py-2">
-                    <i class="fas fa-sign-in-alt me-2"></i>Staff Login
-                </a>
-                {% endif %}
-            </div>
-        </div>
+<!-- Main Operational Grid: Quick Operations + Recent Activity Feed -->
+<div class="row g-4">
+  <!-- Left Column: Tactical Quick Operations -->
+  <div class="col-lg-4">
+    <div class="nx-card h-100">
+      {{ nx_card_header(title="Quick Operations", subtitle="Direct command shortcuts", icon="zap") }}
+      <div class="nx-card-body d-flex flex-column gap-2">
+        {% if is_staff or is_hct %}
+        <a href="{{ url_for('add_member') }}" class="nx-btn nx-btn-primary w-100 justify-content-between py-2">
+          <span class="d-inline-flex align-items-center gap-2">
+            <i data-lucide="user-plus"></i>
+            <span>Add New Operative</span>
+          </span>
+          <i data-lucide="arrow-right"></i>
+        </a>
+
+        <a href="{{ url_for('promote_member') }}" class="nx-btn nx-btn-secondary w-100 justify-content-between py-2">
+          <span class="d-inline-flex align-items-center gap-2">
+            <i data-lucide="award" class="nx-text-cyan"></i>
+            <span>Change Member Rank</span>
+          </span>
+          <i data-lucide="chevron-right" class="nx-text-muted"></i>
+        </a>
+
+        <a href="{{ url_for('members') }}" class="nx-btn nx-btn-secondary w-100 justify-content-between py-2">
+          <span class="d-inline-flex align-items-center gap-2">
+            <i data-lucide="user-cog" class="nx-text-cyan"></i>
+            <span>Manage Personnel Registry</span>
+          </span>
+          <i data-lucide="chevron-right" class="nx-text-muted"></i>
+        </a>
+
+        <a href="{{ url_for('ac_dashboard') }}" class="nx-btn nx-btn-secondary w-100 justify-content-between py-2">
+          <span class="d-inline-flex align-items-center gap-2">
+            <i data-lucide="clipboard-check" class="nx-text-success"></i>
+            <span>AC Compliance Console</span>
+          </span>
+          <i data-lucide="chevron-right" class="nx-text-muted"></i>
+        </a>
+
+        {% if is_hct %}
+        <a href="{{ url_for('quick_log') }}" class="nx-btn nx-btn-secondary w-100 justify-content-between py-2">
+          <span class="d-inline-flex align-items-center gap-2">
+            <i data-lucide="zap" class="nx-text-warning"></i>
+            <span>Quick Log Activity Matrix</span>
+          </span>
+          <i data-lucide="chevron-right" class="nx-text-muted"></i>
+        </a>
+
+        <a href="{{ url_for('group_settings') }}" class="nx-btn nx-btn-secondary w-100 justify-content-between py-2">
+          <span class="d-inline-flex align-items-center gap-2">
+            <i data-lucide="settings" class="nx-text-secondary"></i>
+            <span>Group Configuration</span>
+          </span>
+          <i data-lucide="chevron-right" class="nx-text-muted"></i>
+        </a>
+        {% endif %}
+        {% else %}
+        <a href="{{ url_for('public_roster') }}" class="nx-btn nx-btn-primary w-100 justify-content-between py-2">
+          <span class="d-inline-flex align-items-center gap-2">
+            <i data-lucide="users"></i>
+            <span>View Sector Roster</span>
+          </span>
+          <i data-lucide="arrow-right"></i>
+        </a>
+        <a href="{{ url_for('public_ac_progress') }}" class="nx-btn nx-btn-secondary w-100 justify-content-between py-2">
+          <span class="d-inline-flex align-items-center gap-2">
+            <i data-lucide="gauge"></i>
+            <span>View AC Quota Standings</span>
+          </span>
+          <i data-lucide="chevron-right"></i>
+        </a>
+        {% endif %}
+      </div>
     </div>
+  </div>
 
-    <!-- Summary Metrics -->
-    <div class="col-lg-8">
-        <div class="row g-3">
-            <div class="col-sm-6">
-                <div class="tf-card p-4 d-flex align-items-center justify-content-between" style="border-left: 4px solid var(--tf-purple-accent);">
-                    <div>
-                        <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Total Members</span>
-                        <h2 class="mb-0 fw-bold text-white mt-1">{{ member_count or 0 }}</h2>
-                        <div class="text-white-50 small mt-1">In active registry</div>
-                    </div>
-                    <div class="d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border);">
-                        <i class="fas fa-users fa-lg" style="color: var(--tf-purple-accent);"></i>
-                    </div>
-                </div>
-            </div>
+  <!-- Right Column: Recent Activity Feed & Operational Status -->
+  <div class="col-lg-8">
+    <div class="nx-card h-100">
+      {% call nx_card_header(
+          title="Recent Operational Activity",
+          subtitle="Latest logged personnel events and system actions",
+          icon="history",
+          badge_text=(recent_activities|length) ~ " RECORDS",
+          badge_variant="cyan"
+      ) %}
+        {% if is_hct %}
+        <a href="{{ url_for('log_ac_activity') }}" class="nx-btn nx-btn-secondary nx-btn-sm">
+          <i data-lucide="plus"></i>
+          <span>Log Entry</span>
+        </a>
+        {% endif %}
+      {% endcall %}
 
-            <div class="col-sm-6">
-                <div class="tf-card p-4 d-flex align-items-center justify-content-between" style="border-left: 4px solid #10b981;">
-                    <div>
-                        <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Recent Activity</span>
-                        <h2 class="mb-0 fw-bold text-white mt-1">{{ recent_activities|length }}</h2>
-                        <div class="text-white-50 small mt-1">Logged records</div>
-                    </div>
-                    <div class="d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);">
-                        <i class="fas fa-chart-line fa-lg" style="color: #34d399;"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-6">
-                <div class="tf-card p-4 d-flex align-items-center justify-content-between" style="border-left: 4px solid #38bdf8;">
-                    <div>
-                        <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">AC Modules</span>
-                        <h2 class="mb-0 fw-bold text-white mt-1">Active</h2>
-                        <div class="text-white-50 small mt-1">Dynamic quotas & tracking</div>
-                    </div>
-                    <div class="d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3);">
-                        <i class="fas fa-sliders fa-lg" style="color: #38bdf8;"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-sm-6">
-                <div class="tf-card p-4 d-flex align-items-center justify-content-between" style="border-left: 4px solid {% if cookie_record and cookie_record.is_valid %}#10b981{% else %}#f59e0b{% endif %};">
-                    <div>
-                        <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Roblox Sync</span>
-                        {% if cookie_record and cookie_record.is_valid %}
-                        <div class="text-success fw-bold fs-5 mt-1 d-flex align-items-center gap-1.5">
-                            <i class="fas fa-circle-check me-1"></i>Connected
-                        </div>
-                        <div class="text-white-50 small mt-1">
-                            {% if cookie_record.bot_username %}@{{ cookie_record.bot_username }}{% else %}Sector Bot Active{% endif %}
-                        </div>
-                        {% else %}
-                        <div class="text-warning fw-bold fs-5 mt-1 d-flex align-items-center gap-1.5">
-                            <i class="fas fa-triangle-exclamation me-1"></i>Not Configured
-                        </div>
-                        <div class="text-white-50 small mt-1">
-                            {% if is_hct %}
-                            <a href="{{ url_for('group_settings') }}" class="text-warning text-decoration-none" style="font-size: 0.75rem;">Set in Sector Settings &rarr;</a>
-                            {% else %}
-                            No sector bot cookie found
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div class="d-flex align-items-center justify-content-center" style="width: 48px; height: 48px; border-radius: 12px; background: {% if cookie_record and cookie_record.is_valid %}rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);{% else %}rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);{% endif %}">
-                        <i class="fas fa-robot fa-lg" style="color: {% if cookie_record and cookie_record.is_valid %}#34d399{% else %}#fbbf24{% endif %};"></i>
-                    </div>
-                </div>
-            </div>
+      <div class="p-0">
+        {% if recent_activities %}
+        <div class="table-responsive">
+          <table class="table nx-table align-middle">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Activity Type</th>
+                <th>Operational Details</th>
+                <th>Logged By</th>
+                <th class="text-end">Dossier</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for act in recent_activities %}
+              <tr>
+                <td class="nx-mono nx-text-secondary" style="font-size: 0.78rem;">
+                  {{ act.log_date.strftime('%Y-%m-%d %H:%M') if act.log_date else 'N/A' }}
+                </td>
+                <td>
+                  {{ nx_badge(act.activity_type, variant="cyan", mono=True) }}
+                </td>
+                <td>
+                  <span class="nx-text-primary">{{ act.description or 'Sanctioned operational activity entry' }}</span>
+                </td>
+                <td class="nx-mono nx-text-secondary" style="font-size: 0.78rem;">
+                  {{ act.logged_by or 'System' }}
+                </td>
+                <td class="text-end">
+                  {% if act.member_id %}
+                  <a href="{{ url_for('member_detail', member_id=act.member_id) }}" class="nx-btn nx-btn-secondary nx-btn-sm">
+                    <i data-lucide="user"></i>
+                    <span>Member #{{ act.member_id }}</span>
+                  </a>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
+        {% else %}
+        <div class="p-4">
+          {{ nx_empty_state(
+              icon="activity",
+              title="No Recent Activity Records",
+              description="Operational activity logs will appear here as trainings, patrols, and events are recorded.",
+              action_url=url_for('ac_dashboard') if is_hct else url_for('public_ac_progress'),
+              action_label="Open AC Console",
+              action_icon="clipboard-check"
+          ) }}
+        </div>
+        {% endif %}
+      </div>
     </div>
+  </div>
 </div>
 {% endblock %}

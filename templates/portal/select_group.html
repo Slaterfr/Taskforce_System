@@ -1,76 +1,65 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_badge, nx_empty_state %}
 
-{% block title %}Select Command Portal — Taskforce Multitenancy{% endblock %}
+{% block title %}Sector Portal — Nexus{% endblock %}
 
 {% block content %}
-<div class="row mb-4 align-items-center">
-  <div class="col-md-8">
-    <div class="d-flex align-items-center">
-      <div class="me-3 d-flex align-items-center justify-content-center" style="width: 56px; height: 56px; border-radius: 16px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);">
-        <i class="fas fa-layer-group fa-xl" style="color: var(--tf-purple-accent);"></i>
-      </div>
-      <div>
-        <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">Command Sector Selection</h2>
-        <p class="text-white-50 mb-0 small">
-          Signed in as <strong class="text-white">{{ user.display_name or user.roblox_username if user else request.session.get('roblox_username', 'Operative') }}</strong>. Select an authorized sector to enter.
-        </p>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-4 text-md-end mt-3 mt-md-0">
-    {% if can_register %}
-    <button class="btn btn-tf-primary" data-bs-toggle="modal" data-bs-target="#registerGroupModal">
-      <i class="fas fa-plus me-1"></i>Onboard New Group
-    </button>
-    {% endif %}
-  </div>
-</div>
+{% set operator_name = user.display_name or user.roblox_username if user else request.session.get('roblox_username', 'Operative') %}
+
+{% call nx_page_header(
+    title="Command Sector Selection",
+    subtitle="Authenticated as @" ~ operator_name ~ ". Select an authorized sector console or provision a new group.",
+    eyebrow="PORTAL // MULTI-TENANT DIRECTORY",
+    icon="layers"
+) %}
+  {% if can_register %}
+  <button type="button" class="nx-btn nx-btn-primary" data-bs-toggle="modal" data-bs-target="#registerGroupModal">
+    <i data-lucide="plus"></i>
+    <span>Onboard New Group</span>
+  </button>
+  {% endif %}
+{% endcall %}
 
 <!-- Registered Groups Grid -->
-<div class="row g-4 mb-5">
+<div class="row g-3 mb-4">
   {% for grp in groups %}
-  <div class="col-md-6 col-lg-4">
-    <div class="tf-card h-100 p-4 d-flex flex-column justify-content-between position-relative">
+  <div class="col-md-6 col-xl-4">
+    <div class="nx-card h-100 d-flex flex-column justify-content-between">
       <div>
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <div class="d-flex align-items-center">
-            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 12px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4);">
-              <i class="fas fa-shield-alt" style="color: var(--tf-purple-accent);"></i>
-            </div>
-            <div>
-              <h5 class="text-white mb-0 fw-bold">{{ grp.name }}</h5>
-              <span class="badge mt-1" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #cbd5e1; font-family: var(--tf-font-mono);">
-                ID: {{ grp.roblox_group_id }}
-              </span>
-            </div>
+        <div class="nx-card-header">
+          <div class="d-flex align-items-center gap-2">
+            <i data-lucide="shield" class="nx-text-cyan" style="width: 17px; height: 17px;"></i>
+            <h2 class="nx-card-title">{{ grp.name }}</h2>
           </div>
+          <span class="nx-badge nx-badge--neutral nx-mono">ID: {{ grp.roblox_group_id }}</span>
         </div>
 
-        {% if grp.description %}
-        <p class="text-white-50 small mb-3">{{ grp.description }}</p>
-        {% endif %}
+        <div class="nx-card-body">
+          {% if grp.description %}
+          <p class="nx-text-secondary mb-3" style="font-size: 0.8125rem;">{{ grp.description }}</p>
+          {% else %}
+          <p class="nx-text-muted mb-3" style="font-size: 0.8125rem;">Active operational command sector synchronized with Roblox group {{ grp.roblox_group_id }}.</p>
+          {% endif %}
 
-        <div class="p-3 rounded mb-3" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);">
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="text-white-50 small">Your Group Rank:</span>
-            <span class="badge" style="background: rgba(126, 34, 206, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-weight: 600;">
-              {{ grp.role_name }} ({{ grp.rank }})
-            </span>
-          </div>
-          <div class="d-flex justify-content-between align-items-center mt-2">
-            <span class="text-white-50 small">System Role:</span>
-            <span class="badge {% if grp.system_role in ['admin', 'hct'] %}bg-danger{% elif grp.system_role == 'staff' %}bg-primary{% else %}bg-secondary{% endif %}">
-              {{ grp.system_role|upper }}
-            </span>
+          <div class="p-2.5 rounded" style="background: var(--nx-bg); border: 1px solid var(--nx-border); padding: 0.65rem 0.85rem;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="nx-text-secondary" style="font-size: 0.75rem;">Assigned Group Rank</span>
+              <span class="nx-badge nx-badge--cyan nx-mono">{{ grp.role_name }} ({{ grp.rank }})</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="nx-text-secondary" style="font-size: 0.75rem;">Clearance Tier</span>
+              {% set role_var = 'danger' if grp.system_role in ['admin', 'hct'] else ('warning' if grp.system_role == 'staff' else 'neutral') %}
+              {{ nx_badge(grp.system_role|upper, variant=role_var, mono=True) }}
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="mt-3 pt-3 border-top border-secondary-subtle">
+      <div class="px-3 pb-3 pt-1">
         <form action="{{ url_for('enter_group', group_id=grp.group_id) }}" method="post">
-          <button type="submit" class="btn btn-tf-primary w-100 py-2 fw-bold d-flex align-items-center justify-content-center">
-            <span>Enter Sector</span>
-            <i class="fas fa-arrow-right ms-2"></i>
+          <button type="submit" class="nx-btn nx-btn-primary w-100">
+            <span>Enter Sector Console</span>
+            <i data-lucide="arrow-right"></i>
           </button>
         </form>
       </div>
@@ -78,18 +67,18 @@
   </div>
   {% else %}
   <div class="col-12">
-    <div class="tf-card p-5 text-center">
-      <i class="fas fa-shield-halved fa-3x mb-3" style="color: var(--tf-purple-accent);"></i>
-      <h4 class="text-white fw-bold">No Registered Sectors Found</h4>
-      <p class="text-white-50 max-w-md mx-auto">
-        Your Roblox account is not currently a member of any registered Taskforce command sectors.
-      </p>
+    {% call nx_empty_state(
+        icon="shield-off",
+        title="No Registered Sectors Found",
+        description="Your Roblox account is not currently associated with any registered Taskforce command sectors."
+    ) %}
       {% if can_register %}
-      <button class="btn btn-tf-primary mt-3" data-bs-toggle="modal" data-bs-target="#registerGroupModal">
-        <i class="fas fa-plus me-1"></i>Onboard Your Roblox Group
+      <button type="button" class="nx-btn nx-btn-primary" data-bs-toggle="modal" data-bs-target="#registerGroupModal">
+        <i data-lucide="plus"></i>
+        <span>Onboard Your Roblox Group</span>
       </button>
       {% endif %}
-    </div>
+    {% endcall %}
   </div>
   {% endfor %}
 </div>
@@ -100,31 +89,35 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title text-white fw-bold" id="registerGroupModalLabel">
-          <i class="fas fa-plus-circle me-2" style="color: var(--tf-purple-accent);"></i>Onboard Roblox Group
-        </h5>
+        <div class="d-flex align-items-center gap-2">
+          <i data-lucide="layers" class="nx-text-cyan" style="width: 18px; height: 18px;"></i>
+          <h5 class="modal-title fw-semibold mb-0" id="registerGroupModalLabel" style="font-size: 0.95rem;">
+            Onboard New Command Sector
+          </h5>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form action="{{ url_for('register_new_group') }}" method="post">
         <div class="modal-body p-4">
           <div class="mb-3">
-            <label class="form-label text-white small fw-bold text-uppercase">Roblox Group ID</label>
-            <input type="text" name="roblox_group_id" class="form-control tf-input" placeholder="e.g. 1234567" required>
-            <div class="form-text text-white-50">Found in the URL of your Roblox group (e.g. roblox.com/groups/<strong>1234567</strong>).</div>
+            <label class="form-label">Roblox Group ID</label>
+            <input type="text" name="roblox_group_id" class="form-control nx-input nx-mono" placeholder="e.g. 1234567" required>
+            <div class="form-text" style="font-size: 0.75rem;">Numeric ID from your Roblox group URL (<code>roblox.com/groups/1234567</code>).</div>
           </div>
           <div class="mb-3">
-            <label class="form-label text-white small fw-bold text-uppercase">Sector / Group Display Name</label>
-            <input type="text" name="group_name" class="form-control tf-input" placeholder="e.g. 501st Legion Taskforce" required>
+            <label class="form-label">Sector / Group Display Name</label>
+            <input type="text" name="group_name" class="form-control nx-input" placeholder="e.g. 501st Tactical Division" required>
           </div>
-          <div class="mb-3">
-            <label class="form-label text-white small fw-bold text-uppercase">Description (Optional)</label>
-            <textarea name="description" class="form-control tf-input" rows="3" placeholder="Brief sector overview..."></textarea>
+          <div class="mb-1">
+            <label class="form-label">Mission Brief / Description (Optional)</label>
+            <textarea name="description" class="form-control nx-input" rows="3" placeholder="Brief operational description..."></textarea>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-tf-outline" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-tf-primary">
-            <i class="fas fa-rocket me-1"></i>Provision Sector
+          <button type="button" class="nx-btn nx-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="nx-btn nx-btn-primary">
+            <i data-lucide="check"></i>
+            <span>Provision Sector</span>
           </button>
         </div>
       </form>

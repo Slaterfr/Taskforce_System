@@ -1,65 +1,202 @@
 {% extends "base.html" %}
-{% block title %}{{ member.discord_username }} — AC{% endblock %}
-{% block content %}
-<h3 class="d-flex justify-content-between align-items-center">
-  <span>{{ member.discord_username }} — AC for {{ current_period.period_name if current_period else '' }}</span>
-  <span>
-    {% if is_staff %}
-      <button id="ia-toggle" class="btn btn-sm btn-outline-info">Toggle IA</button>
-      <button id="exempt-toggle" class="btn btn-sm btn-outline-primary">Toggle Exempt</button>
-    {% endif %}
-  </span>
-</h3>
+{% from "components/_macros.html" import nx_page_header, nx_stat_card, nx_card_header, nx_badge, nx_empty_state %}
 
-<div class="mb-3">
-  {% if is_staff %}
-  <form method="post" action="{{ url_for('clear_member_activities', member_id=member.id) }}" onsubmit="return confirm('Delete all activities for this member in the current period?');" style="display:inline">
-    <input type="hidden" name="period_id" value="{{ current_period.id if current_period }}">
-    <button class="btn btn-sm btn-danger">Clear Activities (current period)</button>
+{% block title %}{{ member.discord_username }} — AC Dossier{% endblock %}
+
+{% block content %}
+{% call nx_page_header(
+    title=member.discord_username ~ " — Cycle AC Dossier",
+    subtitle="Cycle: " ~ (current_period.period_name if current_period else 'Active Period') ~ " • Rank: " ~ member.current_rank,
+    eyebrow="AC CONSOLE // OPERATIVE CYCLE BREAKDOWN",
+    icon="clipboard-check"
+) %}
+  <a href="{{ url_for('ac_dashboard') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="arrow-left"></i>
+    <span>Back to AC Console</span>
+  </a>
+  {% if is_staff or is_hct %}
+  <button type="button" id="ia-toggle" class="nx-btn nx-btn-secondary" data-member="{{ member.id }}">
+    <i data-lucide="shield"></i>
+    <span>Toggle IA</span>
+  </button>
+  <button type="button" id="exempt-toggle" class="nx-btn nx-btn-secondary" data-member="{{ member.id }}">
+    <i data-lucide="shield-check"></i>
+    <span>Toggle Exempt</span>
+  </button>
+  <form method="post" action="{{ url_for('clear_member_activities', member_id=member.id) }}"
+        onsubmit="return confirm('Delete all activities for this member in the current period?');" class="d-inline">
+    <input type="hidden" name="period_id" value="{{ current_period.id if current_period else '' }}">
+    <button class="nx-btn nx-btn-danger" type="submit">
+      <i data-lucide="trash-2"></i>
+      <span>Clear Cycle Entries</span>
+    </button>
   </form>
   {% endif %}
+{% endcall %}
+
+<!-- Quota & Points Telemetry Strip -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    {{ nx_stat_card(label="Assigned Rank", value=member.current_rank, meta="Current sector grade", icon="shield", accent="cyan", mono=False) }}
+  </div>
+  <div class="col-sm-4">
+    {{ nx_stat_card(label="Cycle Points Earned", value=(total_points|default(0)|round(1)), meta="Credited in active period", icon="award", accent="success") }}
+  </div>
+  <div class="col-sm-4">
+    {{ nx_stat_card(label="Rank Quota Target", value=(quota|default(0)) ~ " pts", meta="Required for compliance", icon="gauge", accent="cyan") }}
+  </div>
 </div>
 
-<h4 class="mt-4">Recent (summary)</h4>
-{% if aggregated_activities %}
-  <ul class="list-group mb-3">
-    {% for a in aggregated_activities %}
-      <li class="list-group-item">
-        {{ a.activity_date.strftime('%Y-%m-%d') if a.activity_date else '' }} — {{ a.count }} {{ a.activity_type }} ({{ a.points }})
-      </li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p class="text-muted">No recent activity.</p>
-{% endif %}
-
-{% if activities %}
-  <p>
-    <a class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" href="#detailedActivities" role="button" aria-expanded="false" aria-controls="detailedActivities">
-      Show detailed activities
-    </a>
-  </p>
-
-  <div class="collapse" id="detailedActivities">
-    <div class="card card-body">
-      <ul class="list-group">
-        {% for a in activities %}
-          <li class="list-group-item d-flex justify-content-between align-items-start">
-            <div>
-              <div><strong>{{ a.activity_date.strftime('%Y-%m-%d') if a.activity_date else '' }}</strong> — {{ a.activity_type }} — {{ a.points }}</div>
-              {% if a.description %}<div class="text-muted small">{{ a.description }}</div>{% endif %}
-            </div>
-            {% if is_staff %}
-            <div class="btn-group btn-group-sm">
-              <form method="post" action="{{ url_for('delete_ac_activity', activity_id=a.id) }}" onsubmit="return confirm('Delete this activity?');">
-                <button type="submit" class="btn btn-outline-danger">Delete</button>
-              </form>
-            </div>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
+<div class="row g-4">
+  <!-- Left Column: Aggregated Summary -->
+  <div class="col-lg-5">
+    <div class="nx-card h-100">
+      {{ nx_card_header(
+          title="Aggregated Activity Summary",
+          subtitle="Grouped by date and activity type",
+          icon="layers",
+          badge_text=(aggregated_activities|length) ~ " GROUPS",
+          badge_variant="cyan"
+      ) }}
+      <div class="p-0">
+        {% if aggregated_activities %}
+        <div class="table-responsive">
+          <table class="table nx-table align-middle">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Activity</th>
+                <th class="text-end">Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in aggregated_activities %}
+              <tr>
+                <td class="nx-mono nx-text-secondary">
+                  {{ a.activity_date.strftime('%Y-%m-%d') if a.activity_date else 'N/A' }}
+                </td>
+                <td>
+                  <span class="nx-badge nx-badge--cyan nx-mono">{{ a.count }}x {{ a.activity_type }}</span>
+                </td>
+                <td class="text-end nx-mono nx-text-primary">
+                  {{ a.points }} pts
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="p-4">
+          {{ nx_empty_state(icon="inbox", title="No Activity Summary", description="No activities logged in this period.") }}
+        </div>
+        {% endif %}
+      </div>
     </div>
   </div>
-{% endif %}
+
+  <!-- Right Column: Detailed Activity Ledger with Delete Controls -->
+  <div class="col-lg-7">
+    <div class="nx-card h-100">
+      {{ nx_card_header(
+          title="Detailed Activity Entries",
+          subtitle="Individual records with redaction controls",
+          icon="list",
+          badge_text=(activities|length) ~ " ENTRIES",
+          badge_variant="neutral"
+      ) }}
+      <div class="p-0">
+        {% if activities %}
+        <div class="table-responsive">
+          <table class="table nx-table align-middle">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Points</th>
+                <th>Notes</th>
+                {% if is_staff or is_hct %}
+                <th class="text-end">Action</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in activities %}
+              <tr>
+                <td class="nx-mono nx-text-secondary">
+                  {{ a.activity_date.strftime('%Y-%m-%d') if a.activity_date else 'N/A' }}
+                </td>
+                <td>
+                  {{ nx_badge(a.activity_type, variant="cyan", mono=True) }}
+                </td>
+                <td class="nx-mono nx-text-primary">{{ a.points }}</td>
+                <td class="nx-text-secondary">{{ a.description or '—' }}</td>
+                {% if is_staff or is_hct %}
+                <td class="text-end">
+                  <form method="post" action="{{ url_for('delete_ac_activity', activity_id=a.id) }}"
+                        onsubmit="return confirm('Delete this activity entry?');" class="d-inline">
+                    <button type="submit" class="nx-btn nx-btn-danger nx-btn-sm">
+                      <i data-lucide="trash-2"></i>
+                      <span>Delete</span>
+                    </button>
+                  </form>
+                </td>
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="p-4">
+          {{ nx_empty_state(icon="clipboard-x", title="No Individual Entries", description="Log an activity for this operative to populate their cycle ledger.") }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const iaBtn = document.getElementById("ia-toggle");
+    const exemptBtn = document.getElementById("exempt-toggle");
+
+    async function toggleProtection(endpoint, memberId, reasonText, btn) {
+      btn.disabled = true;
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Requested-With": "XMLHttpRequest"
+          },
+          body: JSON.stringify({ member_id: Number(memberId), reason: reasonText, approved_by: "HC Team" })
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data && data.success) {
+          window.location.reload();
+        } else {
+          alert((data && data.message) || "Failed to update protection status.");
+        }
+      } catch (err) {
+        alert("Network error while updating status.");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    if (iaBtn) {
+      iaBtn.addEventListener("click", function () {
+        toggleProtection("{{ url_for('quick_log_ia') }}", this.dataset.member, "AC Dossier IA Toggle", this);
+      });
+    }
+    if (exemptBtn) {
+      exemptBtn.addEventListener("click", function () {
+        toggleProtection("{{ url_for('quick_log_exempt') }}", this.dataset.member, "AC Dossier Exempt Toggle", this);
+      });
+    }
+  });
+</script>
 {% endblock %}

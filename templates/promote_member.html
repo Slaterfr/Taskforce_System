@@ -1,24 +1,60 @@
 {% extends "base.html" %}
-{% block title %}Promote Member{% endblock %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header %}
+
+{% block title %}Change Operative Rank — Nexus{% endblock %}
+
 {% block content %}
-<h3 style="color: white;">Change Member's Rank</h3>
-<form method="post">
-  <div class="mb-3">
-    <label style="color: white;">Member</label>
-    <select name="member_id" class="form-select">
-      {% for m in members %}<option value="{{ m.id }}">{{ m.discord_username }} — {{ m.current_rank }}</option>{% endfor
-      %}
-    </select>
+{% call nx_page_header(
+    title="Change Operative Rank",
+    subtitle="Execute a formal rank promotion or grade reassignment with live Roblox group synchronization.",
+    eyebrow="COMMAND // RANK MANAGEMENT",
+    icon="award"
+) %}
+  <a href="{{ url_for('members') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="arrow-left"></i>
+    <span>Back to Registry</span>
+  </a>
+{% endcall %}
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="nx-card">
+      {{ nx_card_header(title="Rank Authorization Order", subtitle="Logs to promotion ledger & dispatches Roblox API update", icon="shield") }}
+      <div class="nx-card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Target Operative</label>
+            <select name="member_id" class="form-select nx-input" required>
+              {% for m in members %}
+              <option value="{{ m.id }}">{{ m.discord_username }} — Current: {{ m.current_rank }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">New Target Rank</label>
+            <select name="new_rank" class="form-select nx-input" required>
+              {% for rank in available_ranks %}
+              <option value="{{ rank }}">{{ rank }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Order Reason / Citation (Optional)</label>
+            <input name="reason" class="form-control nx-input" placeholder="e.g. Completed cycle quota & leadership evaluation">
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 pt-2 border-top" style="border-color: var(--nx-border) !important;">
+            <a href="{{ url_for('members') }}" class="nx-btn nx-btn-secondary">Cancel</a>
+            <button class="nx-btn nx-btn-primary" type="submit">
+              <i data-lucide="award"></i>
+              <span>Execute Rank Update</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
-  <div class="mb-3">
-    <label style="color: white;">New Rank</label>
-    <select name="new_rank" class="form-select">
-      {% for rank in available_ranks %}
-      <option value="{{ rank }}">{{ rank }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="mb-3"><label style="color: white;">Reason</label><input name="reason" class="form-control"></div>
-  <button class="btn btn-primary" type="submit">Promote</button>
-</form>
+</div>
 {% endblock %}

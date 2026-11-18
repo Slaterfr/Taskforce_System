@@ -1,141 +1,182 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_stat_card, nx_card_header %}
 
-{% block title %}Member Statistics{% endblock %}
+{% block title %}Staff Operations &amp; Telemetry — {{ current_group_name or 'Nexus' }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div
-        class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2" style="color: white;">Member Statistics</h1>
-        <div class="btn-toolbar mb-2 mb-md-0">
-            <div class="btn-group me-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">Export
-                    PDF</button>
-            </div>
-        </div>
-    </div>
+{% call nx_page_header(
+    title="Staff Operations & Sector Telemetry",
+    subtitle="Longitudinal personnel growth analytics, rank distribution diagnostics, and reporting for " ~ (current_group_name or 'active sector') ~ ".",
+    eyebrow="COMMAND // STAFF OPERATIONS & TELEMETRY",
+    icon="activity"
+) %}
+  <button type="button" class="nx-btn nx-btn-secondary" onclick="window.print()">
+    <i data-lucide="printer"></i>
+    <span>Export Report</span>
+  </button>
+  <a href="{{ url_for('dashboard') }}" class="nx-btn nx-btn-primary">
+    <i data-lucide="layout-dashboard"></i>
+    <span>Command Overview</span>
+  </a>
+{% endcall %}
 
-    <!-- Summary Cards -->
-    <div class="row mb-4">
-        <div class="col-md-6 col-xl-4 mb-3">
-            <div class="card bg-primary text-white h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Total Members</h5>
-                    <p class="display-4">{{ total_members }}</p>
-                    <small>Active members in system</small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-xl-4 mb-3">
-            <div class="card bg-success text-white h-100">
-                <div class="card-body">
-                    <h5 class="card-title">Largest Rank Group</h5>
-                    <p class="display-6">{{ most_populated_rank }}</p>
-                    <p class="card-text">{{ most_populated_count }} members</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Charts Row -->
-    <div class="row">
-        <!-- Growth Chart -->
-        <div class="col-lg-8 mb-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Member Growth (Last 30 Days)</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="growthChart" width="100%" height="40"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Rank Distribution Chart -->
-        <div class="col-lg-4 mb-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Rank Distribution</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="rankChart" width="100%" height="60"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
+<!-- Telemetry Summary Strip -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-4">
+    {{ nx_stat_card(
+        label="Active Sector Strength",
+        value=total_members,
+        meta="Verified operatives in active registry",
+        icon="users",
+        accent="cyan"
+    ) }}
+  </div>
+  <div class="col-sm-6 col-xl-4">
+    {{ nx_stat_card(
+        label="Primary Rank Concentration",
+        value=most_populated_rank,
+        meta=most_populated_count ~ " operatives assigned",
+        icon="shield",
+        accent="cyan",
+        mono=False
+    ) }}
+  </div>
+  <div class="col-sm-12 col-xl-4">
+    {{ nx_stat_card(
+        label="Telemetry Window",
+        value="30 DAYS",
+        meta="Automated daily snapshot intervals",
+        icon="clock",
+        accent="success"
+    ) }}
+  </div>
 </div>
 
-<!-- Chart.js CDN -->
+<!-- Telemetry Charts Grid -->
+<div class="row g-4">
+  <!-- 30-Day Personnel Growth Chart -->
+  <div class="col-lg-8">
+    <div class="nx-card h-100">
+      {{ nx_card_header(
+          title="Personnel Strength Trajectory (30 Days)",
+          subtitle="Historical headcount snapshots captured per sector",
+          icon="trending-up",
+          badge_text="TIME SERIES",
+          badge_variant="cyan"
+      ) }}
+      <div class="nx-card-body">
+        <div style="position: relative; height: 320px;">
+          <canvas id="growthChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rank Distribution Chart -->
+  <div class="col-lg-4">
+    <div class="nx-card h-100">
+      {{ nx_card_header(
+          title="Rank Distribution",
+          subtitle="Breakdown by active grade",
+          icon="pie-chart",
+          badge_text="COHORTS",
+          badge_variant="neutral"
+      ) }}
+      <div class="nx-card-body d-flex align-items-center justify-content-center">
+        <div style="position: relative; height: 300px; width: 100%;">
+          <canvas id="rankChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // Data passed from Flask
+  document.addEventListener("DOMContentLoaded", function () {
     const dates = JSON.parse('{{ dates | safe }}');
     const totals = JSON.parse('{{ totals | safe }}');
-
-    // Growth Chart (Line)
-    const ctxGrowth = document.getElementById('growthChart').getContext('2d');
-    new Chart(ctxGrowth, {
-        type: 'line',
-        data: {
-            labels: dates,
-            datasets: [{
-                label: 'Total Members',
-                data: totals,
-                backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 2,
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    beginAtZero: false,
-                    ticks: {
-                        stepSize: 1
-                    }
-                }
-            }
-        }
-    });
-
-    // Rank Distribution Chart (Bar/Pie)
     const rankLabels = JSON.parse('{{ rank_labels | safe }}');
     const rankValues = JSON.parse('{{ rank_values | safe }}');
 
-    // Generate random colors for ranks
-    const backgroundColors = rankLabels.map(() => `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`);
+    Chart.defaults.color = '#98A8B6';
+    Chart.defaults.font.family = "'Geist Mono', 'JetBrains Mono', monospace";
+    Chart.defaults.font.size = 11;
 
+    // 1. Growth Line Chart
+    const ctxGrowth = document.getElementById('growthChart').getContext('2d');
+    new Chart(ctxGrowth, {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [{
+          label: 'Active Personnel',
+          data: totals,
+          backgroundColor: 'rgba(50, 197, 232, 0.12)',
+          borderColor: '#32C5E8',
+          pointBackgroundColor: '#32C5E8',
+          pointBorderColor: '#11151B',
+          pointRadius: 3,
+          borderWidth: 2,
+          tension: 0.25,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(48, 59, 71, 0.45)' },
+            ticks: { color: '#98A8B6' }
+          },
+          y: {
+            beginAtZero: false,
+            grid: { color: 'rgba(48, 59, 71, 0.45)' },
+            ticks: { stepSize: 1, color: '#98A8B6' }
+          }
+        }
+      }
+    });
+
+    // 2. Rank Distribution Doughnut Chart (Semantic Tactical Palette)
+    const tacticalPalette = [
+      '#32C5E8', '#38C98A', '#EAB45B', '#ED6672',
+      '#5B8DEF', '#28A0B8', '#6E7F8D', '#98A8B6'
+    ];
     const ctxRank = document.getElementById('rankChart').getContext('2d');
     new Chart(ctxRank, {
-        type: 'doughnut',  // Changed to doughnut for variety
-        data: {
-            labels: rankLabels,
-            datasets: [{
-                label: 'Members',
-                data: rankValues,
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.7)',
-                    'rgba(54, 162, 235, 0.7)',
-                    'rgba(255, 206, 86, 0.7)',
-                    'rgba(75, 192, 192, 0.7)',
-                    'rgba(153, 102, 255, 0.7)',
-                    'rgba(255, 159, 64, 0.7)',
-                    'rgba(199, 199, 199, 0.7)'
-                ],
-                hoverOffset: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                }
+      type: 'doughnut',
+      data: {
+        labels: rankLabels,
+        datasets: [{
+          label: 'Operatives',
+          data: rankValues,
+          backgroundColor: rankLabels.map((_, i) => tacticalPalette[i % tacticalPalette.length]),
+          borderColor: '#1B222B',
+          borderWidth: 2,
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '64%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              color: '#EDF3F7',
+              padding: 12,
+              boxWidth: 12
             }
+          }
         }
+      }
     });
+  });
 </script>
 {% endblock %}

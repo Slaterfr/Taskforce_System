@@ -1,53 +1,64 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header %}
 
-{% block title %}Developer Portal Auth — Taskforce{% endblock %}
+{% block title %}Developer Auth Simulation — Nexus{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center py-4">
-  <div class="col-md-6 col-lg-5">
-    <div class="tf-card p-4">
-      <div class="text-center mb-4">
-        <div class="d-inline-flex align-items-center justify-content-center mb-3" style="width: 58px; height: 58px; border-radius: 16px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 25px rgba(168, 85, 247, 0.25);">
-          <i class="fas fa-terminal fa-xl" style="color: var(--tf-purple-accent);"></i>
+{{ nx_page_header(
+    title="Developer Multi-Tenant Authentication",
+    subtitle="Simulate Roblox OAuth2 operator identities and sector rank clearances in local environments.",
+    eyebrow="DEV // AUTHENTICATION SIMULATOR",
+    icon="terminal"
+) }}
+
+<div class="row justify-content-center">
+  <div class="col-md-7 col-lg-5">
+    <div class="nx-card">
+      <div class="nx-card-header">
+        <div class="d-flex align-items-center gap-2">
+          <i data-lucide="key-round" class="nx-text-cyan" style="width: 16px; height: 16px;"></i>
+          <h2 class="nx-card-title">Session Parameters</h2>
         </div>
-        <h4 class="text-white fw-bold mb-1">Developer Multi-Tenant Login</h4>
-        <p class="text-white-50 small mb-0">Simulate Roblox OAuth accounts for testing multi-tenant sectors</p>
+        <span class="nx-badge nx-badge--warning nx-mono">DEV MODE</span>
       </div>
 
-      <form method="post">
-        <div class="mb-3">
-          <label class="form-label text-white small fw-bold text-uppercase">Roblox User ID</label>
-          <input type="text" name="roblox_id" class="form-control tf-input" value="12345678" required>
-        </div>
+      <div class="nx-card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Roblox User ID</label>
+            <input type="text" name="roblox_id" class="form-control nx-input nx-mono" value="12345678" required>
+          </div>
 
-        <div class="mb-3">
-          <label class="form-label text-white small fw-bold text-uppercase">Roblox Username</label>
-          <input type="text" name="username" class="form-control tf-input" value="TestCommander" required>
-        </div>
+          <div class="mb-3">
+            <label class="form-label">Roblox Username</label>
+            <input type="text" name="username" class="form-control nx-input" value="TestCommander" required>
+          </div>
 
-        <div class="mb-3">
-          <label class="form-label text-white small fw-bold text-uppercase">Simulated Roblox Rank (1 - 255)</label>
-          <select name="rank" class="form-select tf-input">
-            <option value="255">Rank 255 (Group Owner / Admin)</option>
-            <option value="250" selected>Rank 250 (General / HCT)</option>
-            <option value="150">Rank 150 (Staff / Officer)</option>
-            <option value="50">Rank 50 (Regular Member)</option>
-          </select>
-        </div>
+          <div class="mb-3">
+            <label class="form-label">Simulated Roblox Rank (1 – 255)</label>
+            <select name="rank" class="form-select nx-input nx-mono">
+              <option value="255">Rank 255 — Group Owner / Admin</option>
+              <option value="250" selected>Rank 250 — General / HCT</option>
+              <option value="150">Rank 150 — Staff / Officer</option>
+              <option value="50">Rank 50 — Regular Operative</option>
+            </select>
+          </div>
 
-        <div class="mb-4">
-          <label class="form-label text-white small fw-bold text-uppercase">Target Sector / Group</label>
-          <select name="group_id" class="form-select tf-input">
-            {% for g in groups %}
-            <option value="{{ g.id }}">{{ g.name }} (Roblox Group ID: {{ g.roblox_group_id }})</option>
-            {% endfor %}
-          </select>
-        </div>
+          <div class="mb-4">
+            <label class="form-label">Target Command Sector</label>
+            <select name="group_id" class="form-select nx-input">
+              {% for g in groups %}
+              <option value="{{ g.id }}">{{ g.name }} (ID: {{ g.roblox_group_id }})</option>
+              {% endfor %}
+            </select>
+          </div>
 
-        <button class="btn btn-tf-primary w-100 py-2 fw-bold" type="submit">
-          <i class="fas fa-arrow-right-to-bracket me-2"></i>Authenticate in Dev Mode
-        </button>
-      </form>
+          <button class="nx-btn nx-btn-primary w-100" type="submit">
+            <i data-lucide="log-in"></i>
+            <span>Issue Simulated Session Token</span>
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 </div>

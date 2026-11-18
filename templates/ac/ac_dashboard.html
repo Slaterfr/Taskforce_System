@@ -1,252 +1,251 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_stat_card, nx_card_header, nx_badge, nx_progress_bar, nx_empty_state %}
 
-{% block title %}Activity Checks — Taskforce Management{% endblock %}
+{% block title %}AC Compliance Console — {{ current_group_name or 'Nexus' }}{% endblock %}
 
 {% block content %}
-{# Safe defaults #}
 {% set member_progress = member_progress|default([]) %}
 {% set current_period = current_period|default(None) %}
 {% set is_staff = is_staff|default(False) %}
+{% set total_members = member_progress|length %}
+{% set passed_members = member_progress|selectattr('status', 'equalto', 'Passed')|list|length %}
+{% set protected_members = member_progress|selectattr('is_protected')|list|length %}
+{% set at_risk = member_progress|rejectattr('is_protected')|selectattr('percentage', 'lt', 50)|list|length %}
 
-<div class="row mb-4 align-items-center">
-    <div class="col-lg-6">
-        <div class="d-flex align-items-center">
-            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; border-radius: 14px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);">
-                <i class="fas fa-clipboard-check fa-lg" style="color: var(--tf-purple-accent);"></i>
-            </div>
-            <div>
-                <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">Activity Check Dashboard</h2>
-                <p class="text-white-50 mb-0 small">
-                    Cycle: <strong class="text-white">{{ current_period.period_name if current_period else 'No active cycle' }}</strong>
-                </p>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6 text-lg-end mt-3 mt-lg-0">
-        {% if is_staff %}
-        <a href="{{ url_for('log_activity') }}" class="btn btn-tf-primary btn-sm me-1 mb-1">
-            <i class="fas fa-plus me-1"></i>Log Activity
-        </a>
-        <a href="{{ url_for('quick_log') }}" class="btn btn-tf-outline btn-sm me-1 mb-1">
-            <i class="fas fa-bolt me-1" style="color: #6ee7b7;"></i>Quick Log
-        </a>
-        {% if is_hct %}
-        <a href="{{ url_for('ac_config') }}" class="btn btn-tf-outline btn-sm me-1 mb-1" title="Manage Activities & Quotas">
-            <i class="fas fa-sliders-h me-1" style="color: var(--tf-purple-accent);"></i>AC Settings
-        </a>
-        {% endif %}
-        {% if current_period %}
-        <a href="{{ url_for('title_rewards') }}" class="btn btn-tf-outline btn-sm me-1 mb-1" title="View title rewards">
-            <i class="fas fa-trophy me-1" style="color: #fde68a;"></i>Titles
-        </a>
-        <a href="{{ url_for('edit_ac_period') }}" class="btn btn-tf-outline btn-sm me-1 mb-1" title="Edit period name">
-            <i class="fas fa-edit me-1"></i>Edit
-        </a>
-        <form action="{{ url_for('clear_all_activities') }}" method="post" class="d-inline-block me-1 mb-1"
-            onsubmit="return confirm('Are you sure you want to clear ALL activities for ALL members in this period? This cannot be undone!');">
-            <button class="btn btn-sm btn-tf-outline" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5 !important;" type="submit" title="Clear all AC activities">
-                <i class="fas fa-trash me-1"></i>Clear ACs
-            </button>
-        </form>
-        <form action="{{ url_for('clear_monthly_entries') }}" method="post" class="d-inline-block me-1 mb-1"
-            onsubmit="return confirm('⚠️ Are you sure you want to delete ALL accumulated monthly entries for this group?\n\nThis will reset accumulated monthly title counts to 0 so they don\'t keep accumulating. This cannot be undone!');">
-            <button class="btn btn-sm btn-tf-outline" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5 !important;" type="submit" title="Delete all accumulated monthly title entries">
-                <i class="fas fa-trash-can me-1"></i>Clear Monthly
-            </button>
-        </form>
-        {% endif %}
-        {% endif %}
-    </div>
+{% call nx_page_header(
+    title="Activity Check Compliance Console",
+    subtitle="Active Cycle: " ~ (current_period.period_name if current_period else 'No active cycle'),
+    eyebrow="ADMINISTRATION // AC & QUOTA GOVERNANCE",
+    icon="clipboard-check"
+) %}
+  {% if is_staff or is_hct %}
+  <a href="{{ url_for('log_ac_activity') }}" class="nx-btn nx-btn-primary">
+    <i data-lucide="plus"></i>
+    <span>Log Activity</span>
+  </a>
+  <a href="{{ url_for('quick_log') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="zap" class="nx-text-warning"></i>
+    <span>Quick Log</span>
+  </a>
+  {% if is_hct %}
+  <a href="{{ url_for('ac_config') }}" class="nx-btn nx-btn-secondary" title="Configure Quotas & Activity Types">
+    <i data-lucide="sliders-horizontal"></i>
+    <span>Rank Requirements</span>
+  </a>
+  {% endif %}
+  {% if current_period %}
+  <a href="{{ url_for('title_rewards') }}" class="nx-btn nx-btn-secondary" title="View Title Accolades">
+    <i data-lucide="trophy"></i>
+    <span>Titles</span>
+  </a>
+  <a href="{{ url_for('export_ac_excel') }}" class="nx-btn nx-btn-secondary" title="Export Cycle Report to Excel">
+    <i data-lucide="download"></i>
+    <span>Export .XLSX</span>
+  </a>
+  <a href="{{ url_for('edit_ac_period') }}" class="nx-btn nx-btn-secondary" title="Edit Period Name">
+    <i data-lucide="edit-3"></i>
+    <span>Edit Cycle</span>
+  </a>
+  <form action="{{ url_for('clear_all_activities') }}" method="post" class="d-inline"
+        onsubmit="return confirm('Are you sure you want to clear ALL activities for ALL members in this period? This cannot be undone!');">
+    <button class="nx-btn nx-btn-danger" type="submit" title="Clear all AC activities">
+      <i data-lucide="trash-2"></i>
+      <span>Clear ACs</span>
+    </button>
+  </form>
+  {% endif %}
+  {% endif %}
+{% endcall %}
+
+<!-- 4-Column Compliance Telemetry Strip -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(label="Total Members", value=total_members, meta="Tracked in current period", icon="users", accent="cyan") }}
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(label="Passed Quota", value=passed_members, meta="Met or exceeded benchmark", icon="check-circle-2", accent="success") }}
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(label="Protected (IA)", value=protected_members, meta="Authorized inactivity notice", icon="shield", accent="cyan") }}
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(label="At Risk (<50%)", value=at_risk, meta="Below 50% quota threshold", icon="alert-triangle", accent="warning") }}
+  </div>
 </div>
 
-<!-- AC Overview Stats -->
-<div class="row mb-4 g-3">
-    {% set total_members = member_progress|length %}
-    {% set passed_members = member_progress|selectattr('status', 'equalto', 'Passed')|list|length %}
-    {% set protected_members = member_progress|selectattr('is_protected')|list|length %}
-    {% set at_risk = member_progress|rejectattr('is_protected')|selectattr('percentage', 'lt', 50)|list|length %}
-
-    <div class="col-sm-6 col-lg-3">
-        <div class="tf-card p-3 d-flex align-items-center justify-content-between" style="border-left: 4px solid var(--tf-purple-accent);">
-            <div>
-                <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Total Members</span>
-                <h2 class="mb-0 fw-bold text-white mt-1">{{ total_members }}</h2>
-            </div>
-            <div class="d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 12px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border);">
-                <i class="fas fa-users" style="color: var(--tf-purple-accent);"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-sm-6 col-lg-3">
-        <div class="tf-card p-3 d-flex align-items-center justify-content-between" style="border-left: 4px solid #10b981;">
-            <div>
-                <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Passed Quota</span>
-                <h2 class="mb-0 fw-bold text-white mt-1">{{ passed_members }}</h2>
-            </div>
-            <div class="d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3);">
-                <i class="fas fa-check-circle" style="color: #34d399;"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-sm-6 col-lg-3">
-        <div class="tf-card p-3 d-flex align-items-center justify-content-between" style="border-left: 4px solid #38bdf8;">
-            <div>
-                <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">Protected (IA)</span>
-                <h2 class="mb-0 fw-bold text-white mt-1">{{ protected_members }}</h2>
-            </div>
-            <div class="d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 12px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3);">
-                <i class="fas fa-shield-alt" style="color: #38bdf8;"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-sm-6 col-lg-3">
-        <div class="tf-card p-3 d-flex align-items-center justify-content-between" style="border-left: 4px solid #f59e0b;">
-            <div>
-                <span class="text-white-50 small fw-bold text-uppercase" style="letter-spacing: 0.05em;">At Risk (&lt;50%)</span>
-                <h2 class="mb-0 fw-bold text-white mt-1">{{ at_risk }}</h2>
-            </div>
-            <div class="d-flex align-items-center justify-content-center" style="width: 46px; height: 46px; border-radius: 12px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);">
-                <i class="fas fa-triangle-exclamation" style="color: #fbbf24;"></i>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Title Rewards Summary -->
+<!-- Title Rewards Leaders Strip -->
 {% if title_winners and title_winners|length > 0 %}
-<div class="tf-card mb-4">
-    <div class="tf-card-header d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <i class="fas fa-trophy me-2" style="color: #fbbf24;"></i>
-            <h5 class="mb-0 text-white fw-bold">Title Rewards Leaders</h5>
+<div class="nx-card mb-4">
+  {% call nx_card_header(
+      title="Title Accolade Standings",
+      subtitle="Current leaders for cycle and monthly operational titles",
+      icon="trophy"
+  ) %}
+    <a href="{{ url_for('title_rewards') }}" class="nx-btn nx-btn-secondary nx-btn-sm">
+      <span>Manage Titles</span>
+      <i data-lucide="arrow-right"></i>
+    </a>
+  {% endcall %}
+  <div class="nx-card-body">
+    <div class="row g-3">
+      {% for title, info in title_winners.items() %}
+      <div class="col-sm-6 col-xl-3">
+        <div class="p-3 rounded h-100"
+             style="background: var(--nx-bg); border: 1px solid {{ 'var(--nx-warning-border)' if info.qualified else 'var(--nx-border)' }};">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-semibold nx-text-primary">@{{ title }}</span>
+            {% if info.qualified %}
+              {{ nx_badge("QUALIFIED", variant="warning", mono=True) }}
+            {% elif info.has_participants %}
+              {{ nx_badge("LEADING", variant="cyan", mono=True) }}
+            {% else %}
+              {{ nx_badge("OPEN", variant="neutral", mono=True) }}
+            {% endif %}
+          </div>
+          {% if info.has_participants %}
+          <div class="fw-bold nx-text-cyan">{{ info.winner }}</div>
+          <div class="nx-mono nx-text-secondary mt-1" style="font-size: 0.72rem;">
+            {{ info.count }} entries &bull; {{ 'Monthly' if info.is_monthly else 'Cycle' }}
+          </div>
+          {% else %}
+          <div class="nx-text-muted" style="font-size: 0.8125rem;">No qualifying entries</div>
+          <div class="nx-mono nx-text-muted mt-1" style="font-size: 0.72rem;">0 entries</div>
+          {% endif %}
         </div>
-        <a href="{{ url_for('title_rewards') }}" class="btn btn-sm btn-tf-outline">
-            View Details <i class="fas fa-arrow-right ms-1"></i>
-        </a>
+      </div>
+      {% endfor %}
     </div>
-    <div class="p-4">
-        <div class="row g-3">
-            {% for title, info in title_winners.items() %}
-            <div class="col-md-3">
-                <div class="p-3 rounded h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid {% if info.qualified %}rgba(251, 191, 36, 0.35){% else %}rgba(255, 255, 255, 0.08){% endif %}; transition: all 0.2s ease;">
-                    <div class="d-flex align-items-start">
-                        <i class="fas {% if info.qualified %}fa-crown{% elif info.has_participants %}fa-medal{% else %}fa-trophy{% endif %} me-2 fa-lg mt-1" style="color: {% if info.qualified %}#fbbf24{% elif info.has_participants %}#94a3b8{% else %}#475569{% endif %};"></i>
-                        <div class="flex-grow-1">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <strong class="text-white">@{{ title }}</strong>
-                                {% if info.qualified %}
-                                <span class="badge" style="background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4); font-size: 0.65rem;">Qualified</span>
-                                {% elif info.has_participants %}
-                                <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25); font-size: 0.65rem;">Leading</span>
-                                {% endif %}
-                            </div>
-                            <div class="small">
-                                {% if info.has_participants %}
-                                <div class="text-white fw-semibold">{{ info.winner }}</div>
-                                <div class="text-white-50" style="font-size: 0.75rem;">{{ info.count }} entries &bull; {% if info.is_monthly %}Monthly{% else %}Cycle{% endif %}</div>
-                                {% else %}
-                                <div class="text-white-50 fst-italic">No participants</div>
-                                <div class="text-muted" style="font-size: 0.75rem;">0 entries</div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
+  </div>
 </div>
 {% endif %}
 
-<!-- Member Progress Table -->
-<div class="tf-card">
-    <div class="tf-card-header d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <i class="fas fa-list-check me-2" style="color: var(--tf-purple-accent);"></i>
-            <h5 class="mb-0 text-white fw-bold">Member Activity Checks</h5>
+<!-- Filter Toolbar -->
+<div class="nx-card mb-3">
+  <div class="nx-card-body py-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-5">
+        <div class="input-group">
+          <span class="input-group-text"><i data-lucide="search" style="width: 15px; height: 15px;"></i></span>
+          <input type="search" id="nx-ac-admin-search" class="form-control nx-input"
+                 placeholder="Filter personnel by username or rank...">
         </div>
-        <span class="badge" style="background: rgba(168, 85, 247, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-family: var(--tf-font-mono);">
-            {{ member_progress|length }} Total
-        </span>
+      </div>
+      <div class="col-md-7 d-flex flex-wrap justify-content-md-end gap-1">
+        <button type="button" class="nx-btn nx-btn-primary nx-btn-sm nx-admin-filter" data-filter="all">All ({{ total_members }})</button>
+        <button type="button" class="nx-btn nx-btn-secondary nx-btn-sm nx-admin-filter" data-filter="passed">Passed ({{ passed_members }})</button>
+        <button type="button" class="nx-btn nx-btn-secondary nx-btn-sm nx-admin-filter" data-filter="protected">Protected ({{ protected_members }})</button>
+        <button type="button" class="nx-btn nx-btn-secondary nx-btn-sm nx-admin-filter" data-filter="at_risk">At Risk ({{ at_risk }})</button>
+      </div>
     </div>
-    <div class="p-0">
-        <div class="table-responsive">
-            <table class="table tf-table align-middle">
-                <thead>
-                    <tr>
-                        <th style="width: 15%;">Rank</th>
-                        <th style="width: 18%;">Member</th>
-                        <th style="width: 10%;">Quota</th>
-                        <th style="width: 10%;">Points</th>
-                        <th style="width: 22%;">Progress</th>
-                        <th style="width: 15%;">Activity Breakdown</th>
-                        <th style="width: 10%;" class="text-end">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if member_progress %}
-                    {% for progress in member_progress %}
-                    <tr>
-                        <td>
-                            <span class="badge" style="background: rgba(126, 34, 206, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 8px;">
-                                {{ progress.member.current_rank }}
-                            </span>
-                        </td>
-                        <td>
-                            <a href="{{ url_for('ac_member_detail', member_id=progress.member.id) }}" class="text-white fw-bold text-decoration-none">
-                                {{ progress.member.discord_username }}
-                            </a>
-                        </td>
-                        <td>
-                            <span class="text-white fw-semibold">{{ progress.quota }} pts</span>
-                        </td>
-                        <td>
-                            <span class="tf-badge-points">{{ progress.points|round(1) }}</span>
-                        </td>
-                        <td style="min-width: 160px;">
-                            <div class="progress" style="height: 22px;">
-                                {% set pct = progress.percentage|round(0) %}
-                                <div class="progress-bar {% if progress.is_exempt %}bg-warning{% elif progress.is_protected %}bg-info{% elif pct >= 100 %}bg-success{% elif pct >= 50 %}bg-primary{% else %}bg-danger{% endif %}"
-                                     role="progressbar" style="width: {{ pct }}%;"
-                                     aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
-                                    {% if progress.is_exempt %}Exempt
-                                    {% elif progress.is_protected %}IA
-                                    {% else %}{{ pct }}%{% endif %}
-                                </div>
-                            </div>
-                        </td>
-                        <td>
-                            {% for type in activity_types %}
-                            {% if progress.activity_summary.get(type) %}
-                            <span class="badge mb-1" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #ffffff;">
-                                {{ progress.activity_summary[type].count }}x {{ type }}
-                                <span style="color: #fde68a;">({{ progress.activity_summary[type].points|round(1) }})</span>
-                            </span>
-                            {% endif %}
-                            {% endfor %}
-                        </td>
-                        <td class="text-end">
-                            <span class="badge {% if progress.is_exempt %}bg-warning{% elif progress.is_protected %}bg-info{% elif progress.percentage >= 100 %}bg-success{% else %}bg-warning{% endif %}">
-                                {{ progress.status }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    {% else %}
-                    <tr>
-                        <td colspan="7" class="text-center py-4 text-white-50">
-                            <i class="fas fa-calendar-times fa-2x mb-2 d-block" style="color: var(--tf-purple-accent);"></i>
-                            No member progress data available for this cycle.
-                        </td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+  </div>
 </div>
+
+<!-- Member Activity Checks Table -->
+<div class="nx-card">
+  {{ nx_card_header(
+      title="Member Activity Checks",
+      subtitle="Click an operative to inspect or redact individual cycle entries",
+      icon="list-checks",
+      badge_text=total_members ~ " TOTAL",
+      badge_variant="cyan"
+  ) }}
+  <div class="p-0">
+    {% if member_progress %}
+    <div class="table-responsive">
+      <table class="table nx-table align-middle">
+        <thead>
+          <tr>
+            <th style="width: 15%;">Rank</th>
+            <th style="width: 18%;">Member</th>
+            <th style="width: 10%;">Quota</th>
+            <th style="width: 10%;">Points</th>
+            <th style="width: 22%;">Progress</th>
+            <th style="width: 15%;">Activity Breakdown</th>
+            <th style="width: 10%;" class="text-end">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for progress in member_progress %}
+          {% set row_state = 'protected' if (progress.is_exempt or progress.is_protected) else ('passed' if progress.percentage >= 100 else ('at_risk' if progress.percentage < 50 else 'in_progress')) %}
+          <tr class="nx-ac-admin-row" data-state="{{ row_state }}">
+            <td>
+              {{ nx_badge(progress.member.current_rank, variant="cyan", mono=True) }}
+            </td>
+            <td>
+              <a href="{{ url_for('ac_member_detail', member_id=progress.member.id) }}" class="fw-semibold nx-text-primary">
+                {{ progress.member.discord_username }}
+              </a>
+            </td>
+            <td class="nx-mono nx-text-secondary">
+              {{ progress.quota }} pts
+            </td>
+            <td>
+              <span class="nx-badge nx-badge--cyan nx-mono">{{ progress.points|round(1) }}</span>
+            </td>
+            <td style="min-width: 170px;">
+              {{ nx_progress_bar(percentage=progress.percentage, is_exempt=progress.is_exempt, is_protected=progress.is_protected) }}
+            </td>
+            <td>
+              <div class="d-flex flex-wrap gap-1">
+                {% for type in activity_types %}
+                  {% if progress.activity_summary.get(type) %}
+                  <span class="nx-badge nx-badge--neutral nx-mono">
+                    {{ progress.activity_summary[type].count }}x {{ type }} ({{ progress.activity_summary[type].points|round(1) }})
+                  </span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </td>
+            <td class="text-end">
+              {% set st_var = 'warning' if progress.is_exempt else ('cyan' if progress.is_protected else ('success' if progress.percentage >= 100 else 'warning')) %}
+              {{ nx_badge(progress.status, variant=st_var, mono=True) }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4">
+      {{ nx_empty_state(
+          icon="calendar-x",
+          title="No Cycle Progress Available",
+          description="No member progress data is available for this cycle."
+      ) }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const searchInput = document.getElementById("nx-ac-admin-search");
+    const filterBtns = document.querySelectorAll(".nx-admin-filter");
+    const rows = document.querySelectorAll(".nx-ac-admin-row");
+    let activeFilter = "all";
+
+    function applyFilters() {
+      const q = (searchInput ? searchInput.value : "").toLowerCase().trim();
+      rows.forEach(row => {
+        const matchesSearch = !q || row.innerText.toLowerCase().includes(q);
+        const matchesState = activeFilter === "all" || row.dataset.state === activeFilter;
+        row.style.display = (matchesSearch && matchesState) ? "" : "none";
+      });
+    }
+
+    if (searchInput) searchInput.addEventListener("input", applyFilters);
+    filterBtns.forEach(btn => {
+      btn.addEventListener("click", function () {
+        filterBtns.forEach(b => {
+          b.classList.remove("nx-btn-primary");
+          b.classList.add("nx-btn-secondary");
+        });
+        this.classList.remove("nx-btn-secondary");
+        this.classList.add("nx-btn-primary");
+        activeFilter = this.dataset.filter;
+        applyFilters();
+      });
+    });
+  });
+</script>
 {% endblock %}

@@ -1,215 +1,155 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header, nx_badge, nx_progress_bar, nx_empty_state %}
 
-{% block title %}Title Rewards & Accolades - Taskforce Management{% endblock %}
+{% block title %}Title Accolades &amp; Standings — Nexus{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
-    <div>
-        <div class="d-flex align-items-center gap-2 mb-1">
-            <i class="fas fa-trophy fa-2x" style="color: #fbbf24;"></i>
-            <h2 class="mb-0 text-white fw-bold">Sector Accolades &amp; Title Rewards</h2>
+{% call nx_page_header(
+    title="Sector Accolades & Title Rewards",
+    subtitle="Live leaderboard standings for cycle " ~ (current_period.period_name if current_period else 'Active Period') ~ ".",
+    eyebrow="ADMINISTRATION // ACCOLADES & COMMENDATIONS",
+    icon="trophy"
+) %}
+  <form action="{{ url_for('clear_monthly_entries') }}" method="post" class="d-inline"
+        onsubmit="return confirm('Are you sure you want to delete ALL accumulated monthly entries for this group? This will reset accumulated monthly title counts to 0.');">
+    <button type="submit" class="nx-btn nx-btn-danger">
+      <i data-lucide="trash-2"></i>
+      <span>Reset Monthly Ledger</span>
+    </button>
+  </form>
+  <a href="{{ url_for('ac_config') }}#titles-tab" class="nx-btn nx-btn-secondary">
+    <i data-lucide="sliders-horizontal"></i>
+    <span>Configure Titles</span>
+  </a>
+  <a href="{{ url_for('ac_dashboard') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="arrow-left"></i>
+    <span>AC Console</span>
+  </a>
+{% endcall %}
+
+<!-- Title Winners & Leaderboards Grid -->
+<div class="row g-3 mb-4">
+  {% if titles %}
+    {% for title, info in titles.items() %}
+    <div class="col-md-6">
+      <div class="nx-card h-100" style="{{ 'border-color: var(--nx-warning-border) !important;' if info.qualified else '' }}">
+        <div class="nx-card-header">
+          <div class="d-flex align-items-center gap-2">
+            <i data-lucide="{{ 'award' if info.qualified else 'trophy' }}"
+               class="{{ 'nx-text-warning' if info.qualified else 'nx-text-cyan' }}" style="width: 17px; height: 17px;"></i>
+            <h2 class="nx-card-title">@{{ title }}</h2>
+          </div>
+          {% if info.qualified %}
+            {{ nx_badge("QUALIFIED WINNER", variant="warning", mono=True) }}
+          {% elif info.has_participants %}
+            {{ nx_badge("LEADING", variant="cyan", mono=True) }}
+          {% else %}
+            {{ nx_badge("UNCONTESTED", variant="neutral", mono=True) }}
+          {% endif %}
         </div>
-        <p class="text-white-50 mb-0">
-            Live standings for <span class="text-white fw-medium">{{ current_period.period_name }}</span> &bull; 
-            <span class="badge" style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.35); color: #e9d5ff;">
-                Database Tracked
-            </span>
-        </p>
+
+        <div class="nx-card-body">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <div class="nx-eyebrow mb-0">{{ 'MONTHLY ACCUMULATED' if info.is_monthly else 'SINGLE CYCLE' }}</div>
+              <div class="fw-bold nx-text-primary" style="font-size: 1.15rem;">
+                {% if info.has_participants %}{{ info.winner }}{% else %}<span class="nx-text-muted">No participants yet</span>{% endif %}
+              </div>
+            </div>
+            <div class="text-end">
+              <div class="nx-mono fw-bold nx-text-cyan" style="font-size: 1.1rem;">
+                {{ info.count }} <span class="nx-text-secondary" style="font-size: 0.78rem;">/ {{ info.quantity_required }}+</span>
+              </div>
+              <div class="nx-text-secondary" style="font-size: 0.72rem;">Required: {{ info.activity_required }}</div>
+            </div>
+          </div>
+
+          <p class="nx-text-secondary mb-3" style="font-size: 0.8125rem;">
+            {{ info.description if info.description else info.requirement }}
+          </p>
+
+          {% set pct = [(info.count / info.quantity_required * 100)|round|int, 100]|min if info.quantity_required > 0 else 0 %}
+          {{ nx_progress_bar(percentage=pct) }}
+        </div>
+      </div>
     </div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-        <form action="{{ url_for('clear_monthly_entries') }}" method="post" class="d-inline"
-              onsubmit="return confirm('⚠️ Are you sure you want to delete ALL accumulated monthly entries for this group?\n\nThis will reset accumulated monthly title counts to 0 so they don\'t keep accumulating. This cannot be undone!');">
-            <button type="submit" class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5 !important;">
-                <i class="fas fa-trash-can me-1"></i> Delete All Monthly Entries
-            </button>
+    {% endfor %}
+  {% else %}
+    <div class="col-12">
+      {{ nx_empty_state(
+          icon="trophy",
+          title="No Titles Configured for This Sector",
+          description="Configure custom operational accolades, required activity types, and quantity thresholds in Rank Requirements & Quotas.",
+          action_url=url_for('ac_config') ~ '#titles-tab',
+          action_label="Configure Sector Titles",
+          action_icon="plus"
+      ) }}
+    </div>
+  {% endif %}
+</div>
+
+<!-- Accolade Rules Table & Persistence Notice -->
+{% if titles %}
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="nx-card h-100">
+      {{ nx_card_header(title="Configured Accolade Rules & Cadence", icon="list-checks") }}
+      <div class="p-0">
+        <div class="table-responsive">
+          <table class="table nx-table align-middle">
+            <thead>
+              <tr>
+                <th>Title Designation</th>
+                <th>Activity Type</th>
+                <th>Threshold</th>
+                <th class="text-end">Cadence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for title, info in titles.items() %}
+              <tr>
+                <td>
+                  <strong class="nx-text-primary">@{{ title }}</strong>
+                  {% if info.description %}
+                  <div class="nx-text-secondary" style="font-size: 0.75rem;">{{ info.description }}</div>
+                  {% endif %}
+                </td>
+                <td>{{ nx_badge(info.activity_required, variant="cyan", mono=True) }}</td>
+                <td class="nx-mono nx-text-primary">{{ info.quantity_required }}+ entries</td>
+                <td class="text-end">
+                  {{ nx_badge('MONTHLY' if info.is_monthly else 'CYCLE', variant='neutral' if info.is_monthly else 'cyan', mono=True) }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="nx-card h-100">
+      {{ nx_card_header(title="Monthly Ledger Controls", icon="database") }}
+      <div class="nx-card-body d-flex flex-column justify-content-between">
+        <div>
+          <p class="nx-text-secondary mb-2" style="font-size: 0.8125rem;">
+            Monthly titles accumulate across all AC cycles within the month using replicated ledger entries (<code>MonthlyActivityEntry</code>).
+          </p>
+          <p class="nx-text-secondary mb-4" style="font-size: 0.8125rem;">
+            When a single cycle's activities are cleared, monthly progress remains intact until explicitly purged at month end.
+          </p>
+        </div>
+        <form action="{{ url_for('clear_monthly_entries') }}" method="post"
+              onsubmit="return confirm('Delete ALL accumulated monthly entries for this sector?');">
+          <button type="submit" class="nx-btn nx-btn-danger w-100">
+            <i data-lucide="trash-2"></i>
+            <span>Purge All Monthly Entries</span>
+          </button>
         </form>
-        <a href="{{ url_for('ac_config') }}#titles-tab" class="btn btn-sm btn-tf-outline">
-            <i class="fas fa-sliders me-1"></i> Configure Titles
-        </a>
-        <a href="{{ url_for('ac_dashboard') }}" class="btn btn-sm btn-outline-secondary">
-            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
-        </a>
+      </div>
     </div>
+  </div>
 </div>
-
-<!-- Title Winners & Leaderboards -->
-<div class="row g-4 mb-4">
-    {% if titles %}
-        {% for title, info in titles.items() %}
-        <div class="col-lg-6">
-            <div class="tf-card h-100 position-relative" style="{% if info.qualified %}border: 1px solid rgba(251, 191, 36, 0.45); box-shadow: 0 0 25px rgba(251, 191, 36, 0.08);{% else %}border: 1px solid rgba(255, 255, 255, 0.09);{% endif %}">
-                <div class="tf-card-header d-flex justify-content-between align-items-center py-3">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="fas {% if info.qualified %}fa-crown{% elif info.has_participants %}fa-medal{% else %}fa-trophy{% endif %}" style="color: {% if info.qualified %}#fbbf24{% elif info.has_participants %}#94a3b8{% else %}#475569{% endif %};"></i>
-                        <h5 class="mb-0 text-white fw-bold">@{{ title }}</h5>
-                    </div>
-                    {% if info.qualified %}
-                    <span class="badge" style="background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.45); font-size: 0.75rem;">
-                        <i class="fas fa-crown me-1"></i>Qualified Winner
-                    </span>
-                    {% elif info.has_participants %}
-                    <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.25); font-size: 0.75rem;">
-                        <i class="fas fa-hourglass-half me-1"></i>In Progress &bull; Leading
-                    </span>
-                    {% else %}
-                    <span class="badge bg-secondary text-white-50" style="font-size: 0.75rem;">
-                        Uncontested
-                    </span>
-                    {% endif %}
-                </div>
-
-                <div class="p-4">
-                    <div class="text-center my-2">
-                        {% if info.qualified %}
-                        <div class="d-inline-flex p-3 rounded-circle mb-3" style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.25);">
-                            <i class="fas fa-crown fa-3x" style="color: #fbbf24;"></i>
-                        </div>
-                        {% elif info.has_participants %}
-                        <div class="d-inline-flex p-3 rounded-circle mb-3" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);">
-                            <i class="fas fa-medal fa-3x text-white-50"></i>
-                        </div>
-                        {% else %}
-                        <div class="d-inline-flex p-3 rounded-circle mb-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05);">
-                            <i class="fas fa-trophy fa-3x" style="color: #334155;"></i>
-                        </div>
-                        {% endif %}
-
-                        <h3 class="fw-bold text-white mb-1">
-                            {% if info.has_participants %}
-                            {{ info.winner }}
-                            {% else %}
-                            <span class="text-muted fs-4">No participants yet</span>
-                            {% endif %}
-                        </h3>
-                        <p class="text-white-50 small mb-3">
-                            {% if info.description %}{{ info.description }}{% else %}{{ info.requirement }}{% endif %}
-                        </p>
-                    </div>
-
-                    <!-- Progress / Achievement Bar -->
-                    <div class="mt-3 p-3 rounded" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="text-white-50 small">Current Progress:</span>
-                            <span class="text-white fw-bold">
-                                {{ info.count }} <span class="text-white-50 small">/ {{ info.quantity_required }}+ required</span>
-                            </span>
-                        </div>
-                        {% set pct = [(info.count / info.quantity_required * 100)|round|int, 100]|min if info.quantity_required > 0 else 0 %}
-                        <div class="progress" style="height: 8px; background: rgba(255, 255, 255, 0.06);">
-                            <div class="progress-bar" role="progressbar" 
-                                style="width: {{ pct }}%; background: {% if info.qualified %}linear-gradient(90deg, #f59e0b, #fbbf24){% else %}linear-gradient(90deg, #64748b, #94a3b8){% endif %};" 
-                                aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
-                            </div>
-                        </div>
-
-                        <div class="d-flex justify-content-between align-items-center mt-2 small">
-                            <div>
-                                {% if info.qualified %}
-                                <span class="text-success"><i class="fas fa-check-circle me-1"></i>Qualification threshold met</span>
-                                {% elif info.has_participants %}
-                                <span class="text-warning"><i class="fas fa-info-circle me-1"></i>Needs {{ info.quantity_required - info.count }} more to qualify</span>
-                                {% else %}
-                                <span class="text-muted">Awaiting activity submissions</span>
-                                {% endif %}
-                            </div>
-                            <span class="badge" style="background: rgba(255, 255, 255, 0.06); color: #94a3b8;">
-                                {% if info.is_monthly %}Monthly Accumulated{% else %}Single Cycle{% endif %}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    {% else %}
-        <div class="col-12">
-            <div class="tf-card text-center p-5">
-                <i class="fas fa-trophy fa-3x mb-3 text-muted"></i>
-                <h4 class="text-white fw-bold">No Titles Configured for This Sector</h4>
-                <p class="text-white-50 mb-4">
-                    Your sector can configure custom accolades, required activity types, and quantity thresholds.
-                </p>
-                <a href="{{ url_for('ac_config') }}#titles-tab" class="btn btn-tf-primary">
-                    <i class="fas fa-plus me-2"></i>Configure Sector Titles
-                </a>
-            </div>
-        </div>
-    {% endif %}
-</div>
-
-<!-- Configured Titles Reference & Rules -->
-<div class="tf-card">
-    <div class="tf-card-header d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <i class="fas fa-info-circle me-2" style="color: var(--tf-purple-accent);"></i>
-            <h5 class="mb-0 text-white fw-bold">Sector Accolade Rules &amp; Cadence</h5>
-        </div>
-        <a href="{{ url_for('ac_config') }}#titles-tab" class="btn btn-sm btn-tf-outline">
-            <i class="fas fa-edit me-1"></i> Edit Rules
-        </a>
-    </div>
-    <div class="p-4">
-        <div class="row g-4">
-            <div class="col-md-7">
-                <h6 class="text-white fw-bold mb-3">Active Accolades for this Sector:</h6>
-                <div class="table-responsive">
-                    <table class="table tf-table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Title Name</th>
-                                <th>Required Activity</th>
-                                <th>Threshold</th>
-                                <th>Cadence</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for title, info in titles.items() %}
-                            <tr>
-                                <td>
-                                    <strong class="text-white">@{{ title }}</strong>
-                                    {% if info.description %}
-                                    <div class="text-white-50 small">{{ info.description }}</div>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.3);">
-                                        {{ info.activity_required }}
-                                    </span>
-                                </td>
-                                <td class="text-white font-monospace">{{ info.quantity_required }}+ entries</td>
-                                <td>
-                                    <span class="badge {% if info.is_monthly %}bg-secondary{% else %}bg-info text-dark{% endif %}">
-                                        {% if info.is_monthly %}Monthly{% else %}Cycle{% endif %}
-                                    </span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="col-md-5">
-                <div class="p-3 rounded h-100 d-flex flex-column justify-content-between" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06);">
-                    <div>
-                        <h6 class="text-white fw-bold mb-2"><i class="fas fa-shield-halved me-2 text-warning"></i>Persistent Tracking &amp; Reset</h6>
-                        <p class="text-white-50 small mb-2">
-                            Monthly titles accumulate across all AC cycles within the month using replicated entries (<code style="color: #d8b4fe;">MonthlyActivityEntry</code>).
-                        </p>
-                        <p class="text-white-50 small mb-3">
-                            When a cycle's activities are cleared, monthly progress is preserved. To start fresh so entries don't accumulate indefinitely, you can purge them below.
-                        </p>
-                    </div>
-                    <div>
-                        <form action="{{ url_for('clear_monthly_entries') }}" method="post" class="d-inline"
-                              onsubmit="return confirm('⚠️ Are you sure you want to delete ALL accumulated monthly entries for this group?\n\nThis will reset accumulated monthly title counts to 0 so they don\'t keep accumulating. This cannot be undone!');">
-                            <button type="submit" class="btn btn-sm btn-outline-danger w-100" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5 !important;">
-                                <i class="fas fa-trash-can me-1"></i> Purge All Monthly Entries
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+{% endif %}
 {% endblock %}

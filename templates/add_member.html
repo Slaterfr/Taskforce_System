@@ -1,15 +1,54 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header %}
 
-{% block title %}Add Member{% endblock %}
+{% block title %}Add Operative — {{ current_group_name or 'Nexus' }}{% endblock %}
 
 {% block content %}
-<h3 style="color: white;">Add Member</h3>
-<form method="post">
-  <div class="mb-3"><label style="color: white;">Discord</label><input name="discord_username" class="form-control"
-      required></div>
-  <div class="mb-3"><label style="color: white;">Roblox</label><input name="roblox_username" class="form-control"></div>
-  <div class="mb-3"><label style="color: white;">Rank</label><input name="current_rank" class="form-control"
-      value="Aspirant"></div>
-  <button class="btn btn-primary" type="submit">Create</button>
-</form>
+{% call nx_page_header(
+    title="Add New Operative",
+    subtitle="Register a personnel record into the active command sector roster.",
+    eyebrow="PERSONNEL // ENLISTMENT",
+    icon="user-plus"
+) %}
+  <a href="{{ url_for('members') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="arrow-left"></i>
+    <span>Back to Registry</span>
+  </a>
+{% endcall %}
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="nx-card">
+      {{ nx_card_header(title="Operative Registration Form", subtitle="Required identity & rank fields", icon="id-card") }}
+      <div class="nx-card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Operative Handle / Discord Username <span class="nx-text-danger">*</span></label>
+            <input name="discord_username" class="form-control nx-input" placeholder="e.g. OperativeName" required>
+            <div class="form-text" style="font-size: 0.75rem;">Primary identifier used for roster lookup and Discord command matching.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Roblox Username</label>
+            <input name="roblox_username" class="form-control nx-input nx-mono" placeholder="e.g. RobloxUsername">
+            <div class="form-text" style="font-size: 0.75rem;">Used for live Roblox group synchronization and automated rank promotions.</div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Initial Assigned Rank</label>
+            <input name="current_rank" class="form-control nx-input" value="Aspirant" required>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 pt-2 border-top" style="border-color: var(--nx-border) !important;">
+            <a href="{{ url_for('members') }}" class="nx-btn nx-btn-secondary">Cancel</a>
+            <button class="nx-btn nx-btn-primary" type="submit">
+              <i data-lucide="user-plus"></i>
+              <span>Register Operative</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

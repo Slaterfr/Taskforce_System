@@ -1,43 +1,94 @@
 {% extends "base.html" %}
-{% block title %}Log AC Activity{% endblock %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header %}
+
+{% block title %}Log Activity Entry — Nexus{% endblock %}
+
 {% block content %}
-<h3 style="color: white;">Log Activity — {{ current_period.period_name if current_period else '' }}</h3>
-<form method="post">
-  <div class="mb-3">
-    <label style="color: white;">Member</label>
-    <select name="member_id" class="form-select">
-      {% for m in members %}
-      <option value="{{ m.id }}" {% if selected_member_id and selected_member_id==m.id %}selected{% endif %}>{{
-        m.discord_username }} — {{ m.current_rank }}</option>
-      {% endfor %}
-    </select>
+{% call nx_page_header(
+    title="Register Activity Entry",
+    subtitle="Credit sanctioned operational activity points to an operative in cycle " ~ (current_period.period_name if current_period else 'Active Period') ~ ".",
+    eyebrow="ACTIVITIES // MANUAL ENTRY REGISTRATION",
+    icon="plus-circle"
+) %}
+  <a href="{{ url_for('quick_log') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="zap"></i>
+    <span>Quick Log Matrix</span>
+  </a>
+  <a href="{{ url_for('ac_dashboard') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="arrow-left"></i>
+    <span>AC Console</span>
+  </a>
+{% endcall %}
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="nx-card">
+      {{ nx_card_header(
+          title="Activity Registration Form",
+          subtitle="Cycle: " ~ (current_period.period_name if current_period else 'N/A'),
+          icon="clipboard-check"
+      ) }}
+      <div class="nx-card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Operative</label>
+            <select name="member_id" class="form-select nx-input" required>
+              {% for m in members %}
+              <option value="{{ m.id }}" {% if selected_member_id and selected_member_id == m.id %}selected{% endif %}>
+                {{ m.discord_username }} — {{ m.current_rank }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Activity Type</label>
+            <select name="activity_type" id="activity_type" class="form-select nx-input" required>
+              {% for t in activity_types %}
+              <option value="{{ t }}">{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6" id="quantity_container">
+              <label class="form-label">Quantity <span class="nx-text-secondary">(Multiplier)</span></label>
+              <input type="number" name="quantity" id="quantity" class="form-control nx-input nx-mono" value="1" min="1" max="999">
+            </div>
+
+            <div class="col-sm-6">
+              <label class="form-label">Operation Date</label>
+              <input type="date" name="activity_date" class="form-control nx-input nx-mono"
+                     value="{{ current_period.start_date.strftime('%Y-%m-%d') if current_period else '' }}" required>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Operational Notes / Citation (Optional)</label>
+            <input name="description" class="form-control nx-input" placeholder="e.g. Hosted combat patrol or defensive drill">
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 pt-2 border-top" style="border-color: var(--nx-border) !important;">
+            <a href="{{ url_for('ac_dashboard') }}" class="nx-btn nx-btn-secondary">Cancel</a>
+            <button class="nx-btn nx-btn-primary" type="submit">
+              <i data-lucide="check"></i>
+              <span>Record Activity Entry</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
-  <div class="mb-3">
-    <label style="color: white;">Activity Type</label>
-    <select name="activity_type" id="activity_type" class="form-select">
-      {% for t in activity_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-    </select>
-  </div>
-  <div class="mb-3" id="quantity_container">
-    <label style="color: white;">Quantity <small class="text-muted">(How many to log)</small></label>
-    <input type="number" name="quantity" id="quantity" class="form-control" value="1" min="1" max="999" />
-  </div>
-  <div class="mb-3"><label style="color: white;">Date</label><input type="date" name="activity_date"
-      class="form-control" value="{{ current_period.start_date.strftime('%Y-%m-%d') if current_period }}" /></div>
-  <div class="mb-3"><label style="color: white;">Description</label><input name="description" class="form-control">
-  </div>
-  <button class="btn btn-primary" type="submit">Log</button>
-</form>
+</div>
 
 <script>
-  // Hide quantity field for cancelled events
   const activityTypeSelect = document.getElementById('activity_type');
   const quantityContainer = document.getElementById('quantity_container');
   const quantityInput = document.getElementById('quantity');
-
   const EXCLUDED_TYPES = ['Cancelled Tryout', 'Canceled Training'];
 
   function updateQuantityVisibility() {
+    if (!activityTypeSelect) return;
     const selectedType = activityTypeSelect.value;
     if (EXCLUDED_TYPES.includes(selectedType)) {
       quantityContainer.style.display = 'none';
@@ -49,7 +100,9 @@
     }
   }
 
-  activityTypeSelect.addEventListener('change', updateQuantityVisibility);
-  updateQuantityVisibility(); // Run on page load
+  if (activityTypeSelect) {
+    activityTypeSelect.addEventListener('change', updateQuantityVisibility);
+    updateQuantityVisibility();
+  }
 </script>
 {% endblock %}

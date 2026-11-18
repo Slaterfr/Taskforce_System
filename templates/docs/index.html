@@ -6,24 +6,24 @@
 <div class="container-fluid py-4 px-lg-4">
 
   <!-- HERO BANNER & SEARCH -->
-  <div class="p-4 p-lg-5 rounded-4 mb-4 position-relative overflow-hidden shadow-lg"
-       style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 27, 75, 0.85)); border: 1px solid rgba(168, 85, 247, 0.25); backdrop-filter: blur(16px);">
+  <div class="p-4 p-lg-5 rounded-3 mb-4 position-relative overflow-hidden"
+       style="background: var(--nx-surface); border: 1px solid var(--nx-border);">
     <div class="position-relative z-1">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
         <div class="d-flex align-items-center gap-2">
           <span class="badge px-3 py-1.5 text-uppercase fw-bold"
-                style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 0.75rem; letter-spacing: 0.08em;">
-            <i class="fa-solid fa-book-bookmark me-1.5"></i> CORTEX // Operational Knowledge Base
+                style="background: var(--nx-accent-muted); border: 1px solid var(--nx-accent-border); color: var(--nx-accent); font-size: 0.72rem; letter-spacing: 0.08em; font-family: var(--nx-font-mono);">
+            <i class="fa-solid fa-book-bookmark me-1.5"></i> NEXUS // Operational Knowledge Base
           </span>
-          <span class="badge px-2.5 py-1 text-white-50" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); font-size: 0.72rem;">
+          <span class="badge px-2.5 py-1" style="background: var(--nx-surface-elevated); border: 1px solid var(--nx-border); color: var(--nx-text-secondary); font-size: 0.72rem; font-family: var(--nx-font-mono);">
             Sector: {{ current_group_name }}
           </span>
         </div>
 
         <!-- Clearance Level Indicator -->
-        <div class="d-inline-flex align-items-center gap-2 px-3 py-1.5 rounded-pill"
-             style="background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.15);">
-          <span class="small text-white-50" style="font-size: 0.75rem;">YOUR CLEARANCE:</span>
+        <div class="d-inline-flex align-items-center gap-2 px-3 py-1.5 rounded-2"
+             style="background: var(--nx-bg); border: 1px solid var(--nx-border);">
+          <span class="small" style="font-size: 0.72rem; color: var(--nx-text-secondary); font-family: var(--nx-font-mono);">YOUR CLEARANCE:</span>
           {% if clearance_level == 3 %}
           <span class="badge bg-danger px-2.5 py-1 text-uppercase fw-bold" style="font-size: 0.7rem;">
             <i class="fa-solid fa-shield-halved me-1"></i> Level 3: High Command (HCT)
@@ -47,18 +47,18 @@
       <h1 class="display-6 text-white fw-bold mb-2" style="letter-spacing: -0.02em;">
         Tactical Command Network Documentation
       </h1>
-      <p class="text-white-50 lead fs-6 mb-4" style="max-width: 860px;">
+      <p class="lead fs-6 mb-4" style="max-width: 860px; color: var(--nx-text-secondary);">
         Comprehensive operational field manual, multi-tenant sector onboarding, Roblox bot automation cookie extraction, natural language Discord commands, and governance protocols for <strong class="text-white">{{ current_group_name }}</strong>.
       </p>
 
       <!-- Search Bar -->
       <div class="position-relative" style="max-width: 650px;">
-        <i class="fa-solid fa-magnifying-glass position-absolute top-50 start-0 translate-middle-y ms-3 text-white-50"></i>
-        <input type="text" id="docs-search-input" class="form-control form-control-lg bg-black text-white border-0 ps-5 pe-5 py-2.5 rounded-3"
-               placeholder="Search guides, cookie extraction, @Cortex commands, quotas, themes..."
-               style="background: rgba(0, 0, 0, 0.6) !important; border: 1px solid rgba(255, 255, 255, 0.18) !important; font-size: 0.95rem;">
-        <span class="position-absolute top-50 end-0 translate-middle-y me-2.5 badge bg-dark text-white-50 border border-secondary px-2 py-1"
-              style="font-size: 0.68rem; font-family: monospace;">
+        <i class="fa-solid fa-magnifying-glass position-absolute top-50 start-0 translate-middle-y ms-3" style="color: var(--nx-text-secondary);"></i>
+        <input type="text" id="docs-search-input" class="form-control form-control-lg text-white ps-5 pe-5 py-2.5 rounded-2"
+               placeholder="Search guides, cookie extraction, @Cortex commands, quotas, permissions..."
+               style="background: var(--nx-bg) !important; border: 1px solid var(--nx-border) !important; font-size: 0.92rem;">
+        <span class="position-absolute top-50 end-0 translate-middle-y me-2.5 badge px-2 py-1"
+              style="background: var(--nx-surface-elevated); color: var(--nx-text-secondary); border: 1px solid var(--nx-border); font-size: 0.68rem; font-family: var(--nx-font-mono);">
           ESC to clear
         </span>
       </div>
@@ -71,8 +71,8 @@
     <!-- LEFT SIDEBAR: Navigation Tree -->
     <div class="col-lg-3 col-xl-2">
       <div class="sticky-top" style="top: 80px; z-index: 10;">
-        <div class="card bg-dark border-0 rounded-4 shadow-sm p-3"
-             style="background: rgba(15, 23, 42, 0.85) !important; backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+        <div class="card border-0 rounded-3 p-3"
+             style="background: var(--nx-surface) !important; border: 1px solid var(--nx-border) !important;">
           <div class="text-uppercase text-white-50 fw-bold small mb-2 px-2" style="font-size: 0.7rem; letter-spacing: 0.08em;">
             Manual Navigation
           </div>
@@ -162,7 +162,7 @@
       <!-- =================================================================== -->
       <section id="sec-onboarding" class="mb-5">
         <div class="card border-0 rounded-4 overflow-hidden shadow"
-             style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(34, 197, 94, 0.25) !important;">
+             style="background: var(--nx-surface); border: 1px solid rgba(34, 197, 94, 0.25) !important;">
           <div class="card-header border-0 py-3 px-4 d-flex align-items-center justify-content-between"
                style="background: rgba(34, 197, 94, 0.1); border-bottom: 1px solid rgba(34, 197, 94, 0.2) !important;">
             <div class="d-flex align-items-center gap-2.5">
@@ -375,7 +375,7 @@
       <!-- =================================================================== -->
       <section id="tier-1-member" class="mb-5">
         <div class="card border-0 rounded-4 overflow-hidden shadow"
-             style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.2) !important;">
+             style="background: var(--nx-surface); border: 1px solid rgba(56, 189, 248, 0.2) !important;">
           <div class="card-header border-0 py-3 px-4 d-flex align-items-center justify-content-between"
                style="background: rgba(56, 189, 248, 0.08); border-bottom: 1px solid rgba(56, 189, 248, 0.15) !important;">
             <div class="d-flex align-items-center gap-2.5">
@@ -561,7 +561,7 @@
       <!-- =================================================================== -->
       <section id="tier-2-staff" class="mb-5">
         <div class="card border-0 rounded-4 overflow-hidden shadow"
-             style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(234, 179, 8, 0.25) !important;">
+             style="background: var(--nx-surface); border: 1px solid rgba(234, 179, 8, 0.25) !important;">
           <div class="card-header border-0 py-3 px-4 d-flex align-items-center justify-content-between"
                style="background: rgba(234, 179, 8, 0.08); border-bottom: 1px solid rgba(234, 179, 8, 0.15) !important;">
             <div class="d-flex align-items-center gap-2.5">
@@ -761,7 +761,7 @@
       <!-- =================================================================== -->
       <section id="tier-3-hct" class="mb-5">
         <div class="card border-0 rounded-4 overflow-hidden shadow"
-             style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(239, 68, 68, 0.25) !important;">
+             style="background: var(--nx-surface); border: 1px solid rgba(239, 68, 68, 0.25) !important;">
           <div class="card-header border-0 py-3 px-4 d-flex align-items-center justify-content-between"
                style="background: rgba(239, 68, 68, 0.08); border-bottom: 1px solid rgba(239, 68, 68, 0.15) !important;">
             <div class="d-flex align-items-center gap-2.5">
@@ -1122,12 +1122,12 @@
       <!-- INTERACTIVE @CORTEX COMMAND SIMULATOR                               -->
       <!-- =================================================================== -->
       <section id="sec-simulator" class="mb-5">
-        <div class="card border-0 rounded-4 overflow-hidden shadow-lg"
-             style="background: #020617; border: 1px solid rgba(168, 85, 247, 0.3) !important;">
+        <div class="card border-0 rounded-3 overflow-hidden"
+             style="background: var(--nx-surface); border: 1px solid var(--nx-border) !important;">
           <div class="card-header border-0 py-3.5 px-4 d-flex align-items-center justify-content-between"
-               style="background: rgba(168, 85, 247, 0.1); border-bottom: 1px solid rgba(168, 85, 247, 0.2) !important;">
+               style="background: var(--nx-surface-elevated); border-bottom: 1px solid var(--nx-border) !important;">
             <div class="d-flex align-items-center gap-2.5">
-              <div class="p-2 rounded-3 text-purple" style="background: rgba(168, 85, 247, 0.2); color: #c084fc;">
+              <div class="p-2 rounded-2" style="background: var(--nx-accent-muted); color: var(--nx-accent); border: 1px solid var(--nx-accent-border);">
                 <i class="fa-solid fa-terminal fs-5"></i>
               </div>
               <div>
@@ -1136,7 +1136,7 @@
               </div>
             </div>
             <span class="badge px-3 py-1.5 text-uppercase fw-bold"
-                  style="background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 0.7rem;">
+                  style="background: var(--nx-accent-muted); border: 1px solid var(--nx-accent-border); color: var(--nx-accent); font-size: 0.7rem; font-family: var(--nx-font-mono);">
               Live Sandbox
             </span>
           </div>

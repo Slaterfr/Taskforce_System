@@ -1,62 +1,106 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header, nx_badge, nx_empty_state %}
 
-{% block title %}Member Profile - {{ member.discord_username }}{% endblock %}
+{% block title %}Operative Profile: {{ member.discord_username }} — Nexus{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="card">
-        <div class="card-header">
-            <h2 class="mb-0">{{ member.discord_username }}</h2>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <h4>Profile</h4>
-                    <table class="table table-sm">
-                        <tr>
-                            <th>Current Rank:</th>
-                            <td><span class="badge bg-secondary">{{ member.current_rank }}</span></td>
-                        </tr>
-                        {% if member.roblox_username %}
-                        <tr>
-                            <th>Roblox Username:</th>
-                            <td>{{ member.roblox_username }}</td>
-                        </tr>
-                        {% endif %}
-                        <tr>
-                            <th>Join Date:</th>
-                            <td>{{ member.join_date.strftime('%Y-%m-%d') if member.join_date else 'N/A' }}</td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <div class="col-md-6">
-                    <h4>Recent Activities</h4>
-                    {% if recent_activities %}
-                        <div class="list-group">
-                        {% for activity in recent_activities %}
-                            <div class="list-group-item">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span>{{ activity.activity_date.strftime('%Y-%m-%d') }}</span>
-                                    <span class="badge bg-primary">{{ activity.activity_type }}</span>
-                                </div>
-                            </div>
-                        {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-muted">No recent activities to display.</p>
-                    {% endif %}
-                </div>
-            </div>
+{% call nx_page_header(
+    title=member.discord_username,
+    subtitle="Public operative profile and recent cycle participation.",
+    eyebrow="ROSTER // OPERATIVE PROFILE",
+    icon="user"
+) %}
+  <a href="{{ url_for('public_roster') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="arrow-left"></i>
+    <span>Back to Roster</span>
+  </a>
+  {% if is_staff %}
+  <a href="{{ url_for('member_detail', member_id=member.id) }}" class="nx-btn nx-btn-primary">
+    <i data-lucide="file-text"></i>
+    <span>Open Command Dossier</span>
+  </a>
+  {% endif %}
+{% endcall %}
 
-            {% if is_staff %}
-            <div class="mt-3">
-                <a href="{{ url_for('member_detail', member_id=member.id) }}" class="btn btn-primary">
-                    <i class="fas fa-edit me-1"></i>View Full Profile
-                </a>
-            </div>
-            {% endif %}
+<div class="row g-4">
+  <div class="col-md-5 col-lg-4">
+    <div class="nx-card">
+      {{ nx_card_header(title="Operative Standing", icon="shield") }}
+      <div class="nx-card-body">
+        <div class="d-flex align-items-center gap-3 pb-3 mb-3 border-bottom" style="border-color: var(--nx-border) !important;">
+          <div class="nx-user-avatar" style="width: 46px; height: 46px; font-size: 0.95rem;">
+            {{ (member.discord_username or 'OP')[:2]|upper }}
+          </div>
+          <div>
+            <div class="fw-bold nx-text-primary">{{ member.discord_username }}</div>
+            <div class="mt-1">{{ nx_badge(member.current_rank, variant="cyan", mono=True) }}</div>
+          </div>
         </div>
+
+        <div class="d-flex flex-column gap-2" style="font-size: 0.8125rem;">
+          {% if member.roblox_username %}
+          <div class="d-flex justify-content-between py-1 border-bottom" style="border-color: var(--nx-border-subtle) !important;">
+            <span class="nx-text-secondary">Roblox Handle</span>
+            <span class="nx-mono nx-text-primary">{{ member.roblox_username }}</span>
+          </div>
+          {% endif %}
+          <div class="d-flex justify-content-between py-1">
+            <span class="nx-text-secondary">Enlistment Date</span>
+            <span class="nx-mono nx-text-secondary">{{ member.join_date.strftime('%Y-%m-%d') if member.join_date else 'N/A' }}</span>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <div class="col-md-7 col-lg-8">
+    <div class="nx-card h-100">
+      {{ nx_card_header(
+          title="Recent Operational Participation",
+          subtitle="Verified cycle activity entries",
+          icon="activity",
+          badge_text=(recent_activities|length) ~ " RECENT",
+          badge_variant="cyan"
+      ) }}
+      <div class="p-0">
+        {% if recent_activities %}
+        <div class="table-responsive">
+          <table class="table nx-table align-middle">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Activity Type</th>
+                <th class="text-end">Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for activity in recent_activities %}
+              <tr>
+                <td class="nx-mono nx-text-secondary">
+                  {{ activity.activity_date.strftime('%Y-%m-%d') if activity.activity_date else 'N/A' }}
+                </td>
+                <td>
+                  {{ nx_badge(activity.activity_type, variant="cyan", mono=True) }}
+                </td>
+                <td class="text-end nx-mono nx-text-primary">
+                  +{{ activity.points }} pts
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="p-4">
+          {{ nx_empty_state(
+              icon="calendar",
+              title="No Recent Activities",
+              description="No cycle activity records are currently displayed for this operative."
+          ) }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

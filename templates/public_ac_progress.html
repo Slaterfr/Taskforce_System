@@ -1,113 +1,174 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_stat_card, nx_card_header, nx_badge, nx_progress_bar, nx_empty_state %}
 
-{% block title %}AC Progress — Taskforce{% endblock %}
+{% block title %}AC &amp; Quota Standings — {{ current_group_name or 'Nexus' }}{% endblock %}
 
 {% block content %}
-{# Safe defaults #}
 {% set member_progress = member_progress|default([]) %}
 {% set current_period = current_period|default(None) %}
+{% set total_members = member_progress|length %}
+{% set passed_members = member_progress|selectattr('status', 'equalto', 'Passed')|list|length %}
+{% set protected_members = member_progress|selectattr('is_protected')|list|length %}
+{% set at_risk = member_progress|rejectattr('is_protected')|selectattr('percentage', 'lt', 50)|list|length %}
 
-<div class="row mb-4 align-items-center">
-    <div class="col-md-8">
-        <div class="d-flex align-items-center">
-            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; border-radius: 14px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);">
-                <i class="fas fa-chart-line fa-lg" style="color: var(--tf-purple-accent);"></i>
-            </div>
-            <div>
-                <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">Activity Check Progress</h2>
-                <p class="text-white-50 mb-0 small">
-                    Tracking cycle: <strong class="text-white">{{ current_period.period_name if current_period else 'No active cycle' }}</strong>
-                </p>
-            </div>
-        </div>
-    </div>
+{% call nx_page_header(
+    title="Activity Check & Quota Standings",
+    subtitle="Active tracking cycle: " ~ (current_period.period_name if current_period else 'No active cycle'),
+    eyebrow="OPERATIONS // QUOTA COMPLIANCE",
+    icon="gauge"
+) %}
+  {% if is_hct %}
+  <a href="{{ url_for('ac_dashboard') }}" class="nx-btn nx-btn-primary">
+    <i data-lucide="clipboard-check"></i>
+    <span>Open AC Console</span>
+  </a>
+  {% endif %}
+{% endcall %}
+
+<!-- Cycle Compliance Summary Strip -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(label="Tracked Personnel", value=total_members, meta="Active cycle roster", icon="users", accent="cyan") }}
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(label="Quota Met", value=passed_members, meta="100%+ quota completed", icon="check-circle-2", accent="success") }}
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(label="Protected (IA / Exempt)", value=protected_members, meta="Authorized exemptions", icon="shield", accent="cyan") }}
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    {{ nx_stat_card(label="Below Benchmark (<50%)", value=at_risk, meta="Requires operational activity", icon="alert-triangle", accent="warning") }}
+  </div>
 </div>
 
-<!-- Member Progress Table -->
-<div class="tf-card">
-    <div class="tf-card-header d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <i class="fas fa-award me-2" style="color: var(--tf-purple-accent);"></i>
-            <h5 class="mb-0 text-white fw-bold">Roster Quota Standings</h5>
+<!-- Filter & Search Toolbar -->
+<div class="nx-card mb-3">
+  <div class="nx-card-body py-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-5">
+        <div class="input-group">
+          <span class="input-group-text"><i data-lucide="search" style="width: 15px; height: 15px;"></i></span>
+          <input type="search" id="nx-ac-search" class="form-control nx-input"
+                 placeholder="Filter standings by operative or rank...">
         </div>
-        <span class="badge" style="background: rgba(168, 85, 247, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-family: var(--tf-font-mono);">
-            {{ member_progress|length }} Members Tracked
-        </span>
+      </div>
+      <div class="col-md-7 d-flex flex-wrap justify-content-md-end gap-1">
+        <button type="button" class="nx-btn nx-btn-primary nx-btn-sm nx-status-filter" data-filter="all">All ({{ total_members }})</button>
+        <button type="button" class="nx-btn nx-btn-secondary nx-btn-sm nx-status-filter" data-filter="passed">Passed ({{ passed_members }})</button>
+        <button type="button" class="nx-btn nx-btn-secondary nx-btn-sm nx-status-filter" data-filter="protected">IA / Exempt ({{ protected_members }})</button>
+        <button type="button" class="nx-btn nx-btn-secondary nx-btn-sm nx-status-filter" data-filter="at_risk">At Risk ({{ at_risk }})</button>
+      </div>
     </div>
-    <div class="p-0">
-        <div class="table-responsive">
-            <table class="table tf-table align-middle">
-                <thead>
-                    <tr>
-                        <th style="width: 15%;">Rank</th>
-                        <th style="width: 18%;">Member</th>
-                        <th style="width: 10%;">Quota</th>
-                        <th style="width: 10%;">Points</th>
-                        <th style="width: 22%;">Progress</th>
-                        <th style="width: 15%;">Activity Breakdown</th>
-                        <th style="width: 10%;" class="text-end">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if member_progress %}
-                    {% for progress in member_progress %}
-                    <tr>
-                        <td>
-                            <span class="badge" style="background: rgba(126, 34, 206, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-weight: 600; padding: 0.3rem 0.65rem; border-radius: 8px;">
-                                {{ progress.member.current_rank }}
-                            </span>
-                        </td>
-                        <td>
-                            <a href="{{ url_for('public_member', member_id=progress.member.id) }}" class="text-white fw-bold text-decoration-none">
-                                {{ progress.member.discord_username }}
-                            </a>
-                        </td>
-                        <td>
-                            <span class="text-white fw-semibold">{{ progress.quota }} pts</span>
-                        </td>
-                        <td>
-                            <span class="tf-badge-points">{{ progress.points|round(1) }}</span>
-                        </td>
-                        <td style="min-width: 160px;">
-                            <div class="progress" style="height: 22px;">
-                                {% set pct = progress.percentage|round(0) %}
-                                <div class="progress-bar {% if progress.is_exempt %}bg-warning{% elif progress.is_protected %}bg-info{% elif pct >= 100 %}bg-success{% elif pct >= 50 %}bg-primary{% else %}bg-danger{% endif %}"
-                                     role="progressbar" style="width: {{ pct }}%;"
-                                     aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
-                                    {% if progress.is_exempt %}Exempt
-                                    {% elif progress.is_protected %}IA
-                                    {% else %}{{ pct }}%{% endif %}
-                                </div>
-                            </div>
-                        </td>
-                        <td>
-                            {% for type in activity_types %}
-                            {% if progress.activity_summary.get(type) %}
-                            <span class="badge mb-1" style="background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15); color: #ffffff;">
-                                {{ progress.activity_summary[type].count }}x {{ type }}
-                                <span style="color: #fde68a;">({{ progress.activity_summary[type].points|round(1) }})</span>
-                            </span>
-                            {% endif %}
-                            {% endfor %}
-                        </td>
-                        <td class="text-end">
-                            <span class="badge {% if progress.is_exempt %}bg-warning{% elif progress.is_protected %}bg-info{% elif progress.percentage >= 100 %}bg-success{% else %}bg-warning{% endif %}">
-                                {{ progress.status }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    {% else %}
-                    <tr>
-                        <td colspan="7" class="text-center py-4 text-white-50">
-                            <i class="fas fa-calendar-times fa-2x mb-2 d-block" style="color: var(--tf-purple-accent);"></i>
-                            No member progress data available for this cycle.
-                        </td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+  </div>
 </div>
+
+<!-- Standings Table -->
+<div class="nx-card">
+  {{ nx_card_header(
+      title="Roster Quota Standings",
+      subtitle="Real-time points and rank quota requirements",
+      icon="award",
+      badge_text=total_members ~ " TRACKED",
+      badge_variant="cyan"
+  ) }}
+
+  <div class="p-0">
+    {% if member_progress %}
+    <div class="table-responsive">
+      <table class="table nx-table align-middle">
+        <thead>
+          <tr>
+            <th style="width: 15%;">Rank</th>
+            <th style="width: 20%;">Operative</th>
+            <th style="width: 10%;">Quota</th>
+            <th style="width: 10%;">Points</th>
+            <th style="width: 22%;">Compliance Progress</th>
+            <th style="width: 15%;">Activity Breakdown</th>
+            <th style="width: 8%;" class="text-end">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for progress in member_progress %}
+          {% set row_state = 'protected' if (progress.is_exempt or progress.is_protected) else ('passed' if progress.percentage >= 100 else ('at_risk' if progress.percentage < 50 else 'in_progress')) %}
+          <tr class="nx-ac-row" data-state="{{ row_state }}">
+            <td>
+              {{ nx_badge(progress.member.current_rank, variant="cyan", mono=True) }}
+            </td>
+            <td>
+              <a href="{{ url_for('public_member', member_id=progress.member.id) }}" class="fw-semibold nx-text-primary">
+                {{ progress.member.discord_username }}
+              </a>
+            </td>
+            <td class="nx-mono nx-text-secondary">
+              {{ progress.quota }} pts
+            </td>
+            <td>
+              <span class="nx-badge nx-badge--cyan nx-mono">{{ progress.points|round(1) }}</span>
+            </td>
+            <td style="min-width: 170px;">
+              {{ nx_progress_bar(percentage=progress.percentage, is_exempt=progress.is_exempt, is_protected=progress.is_protected) }}
+            </td>
+            <td>
+              <div class="d-flex flex-wrap gap-1">
+                {% for type in activity_types %}
+                  {% if progress.activity_summary.get(type) %}
+                  <span class="nx-badge nx-badge--neutral nx-mono">
+                    {{ progress.activity_summary[type].count }}x {{ type }} ({{ progress.activity_summary[type].points|round(1) }})
+                  </span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </td>
+            <td class="text-end">
+              {% set st_var = 'warning' if progress.is_exempt else ('cyan' if progress.is_protected else ('success' if progress.percentage >= 100 else 'warning')) %}
+              {{ nx_badge(progress.status, variant=st_var, mono=True) }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4">
+      {{ nx_empty_state(
+          icon="calendar-x",
+          title="No Active Cycle Data",
+          description="No member progress data is currently available for this cycle."
+      ) }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const searchInput = document.getElementById("nx-ac-search");
+    const filterBtns = document.querySelectorAll(".nx-status-filter");
+    const rows = document.querySelectorAll(".nx-ac-row");
+    let activeFilter = "all";
+
+    function applyFilters() {
+      const q = (searchInput ? searchInput.value : "").toLowerCase().trim();
+      rows.forEach(row => {
+        const matchesSearch = !q || row.innerText.toLowerCase().includes(q);
+        const matchesState = activeFilter === "all" || row.dataset.state === activeFilter;
+        row.style.display = (matchesSearch && matchesState) ? "" : "none";
+      });
+    }
+
+    if (searchInput) searchInput.addEventListener("input", applyFilters);
+    filterBtns.forEach(btn => {
+      btn.addEventListener("click", function () {
+        filterBtns.forEach(b => {
+          b.classList.remove("nx-btn-primary");
+          b.classList.add("nx-btn-secondary");
+        });
+        this.classList.remove("nx-btn-secondary");
+        this.classList.add("nx-btn-primary");
+        activeFilter = this.dataset.filter;
+        applyFilters();
+      });
+    });
+  });
+</script>
 {% endblock %}

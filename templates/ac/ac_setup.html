@@ -1,12 +1,34 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_empty_state %}
 
-{% block title %}AC Setup{% endblock %}
+{% block title %}AC Cycle Setup — Nexus{% endblock %}
 
 {% block content %}
-<h3>No active AC period</h3>
-{% if is_staff %}
-  <a href="{{ url_for('create_ac_period') }}" class="btn btn-primary">Create AC Period</a>
-{% else %}
-  <p>Only staff can create AC periods.</p>
-{% endif %}
+{{ nx_page_header(
+    title="Activity Check Cycle Setup",
+    subtitle="Initialize an active reporting period to begin tracking sector quotas and operational points.",
+    eyebrow="ADMINISTRATION // AC INITIALIZATION",
+    icon="calendar-plus"
+) }}
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    {% if is_staff or is_hct %}
+      {{ nx_empty_state(
+          icon="calendar-clock",
+          title="No Active Activity Check Cycle",
+          description="Create an operational reporting period with a start and end date to enable point logging and quota compliance tracking.",
+          action_url=url_for('create_ac_period'),
+          action_label="Create New AC Cycle",
+          action_icon="plus"
+      ) }}
+    {% else %}
+      {{ nx_empty_state(
+          icon="lock",
+          title="No Active Activity Check Cycle",
+          description="High Command has not yet opened an active reporting cycle for this sector."
+      ) }}
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

@@ -1,84 +1,193 @@
 {% extends "base.html" %}
-{% block title %}AC Quick Log{% endblock %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header, nx_badge, nx_empty_state %}
+
+{% block title %}Quick Log Matrix — {{ current_group_name or 'Nexus' }}{% endblock %}
+
 {% block content %}
-<h3 style="color: white;">Quick Log — {{ current_period.period_name if current_period else '' }}</h3>
-<p style="color: white;">Today: {{ today }}</p>
+{% call nx_page_header(
+    title="Tactical Quick-Log Matrix",
+    subtitle="Rapid-dispatch activity logging, redaction, and IA / Exemption controls for cycle " ~ (current_period.period_name if current_period else 'Active Period') ~ ".",
+    eyebrow="ACTIVITIES // RAPID DISPATCH MATRIX (" ~ today ~ ")",
+    icon="zap"
+) %}
+  <a href="{{ url_for('log_ac_activity') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="plus-circle"></i>
+    <span>Detailed Entry Form</span>
+  </a>
+  <a href="{{ url_for('ac_dashboard') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="arrow-left"></i>
+    <span>AC Console</span>
+  </a>
+{% endcall %}
 
-<table class="table">
-  <thead>
-    <tr>
-      <th style="color: white;">Member</th>
-      <th style="color: white;">Activity Summary</th>
-      <th style="color: white;">Recent Activities</th>
-      <th style="color: white;">Quick Actions</th>
-      <th style="color: white;">Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for m in members %}
-    {% set recent = member_activities.get(m.id, []) %}
-    {% set counts = member_activity_counts.get(m.id, {}) %}
-    <tr id="member-row-{{ m.id }}">
-      <td>
-        <a href="{{ url_for('ac_member_detail', member_id=m.id) }}">{{ m.discord_username }}</a>
-        <div class="text-muted small">{{ m.current_rank }}</div>
-      </td>
-      <td>
-        {% for type in activity_types %}
-        {% if counts.get(type, 0) > 0 %}
-        <div class="badge bg-secondary me-1 mb-1">
-          {{ counts.get(type, 0) }} {{ type }}
+<!-- Search & Filter Bar -->
+<div class="nx-card mb-3">
+  <div class="nx-card-body py-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-6">
+        <div class="input-group">
+          <span class="input-group-text"><i data-lucide="search" style="width: 15px; height: 15px;"></i></span>
+          <input type="search" id="nx-quicklog-search" class="form-control nx-input"
+                 placeholder="Filter matrix by operative username or rank...">
         </div>
-        {% endif %}
-        {% endfor %}
-      </td>
-      <td style="max-width: 300px">
-        {% if recent %}
-        {% for activity in recent %}
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <span>{{ activity.activity_date.strftime('%Y-%m-%d') }} — {{ activity.activity_type }} ({{ activity.points
-            }})</span>
-          <button type="button" class="btn btn-sm btn-outline-danger delete-activity-btn" data-activity-id="{{ activity.id }}">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-        {% endfor %}
-        {% else %}
-        <span class="text-muted">No recent activities</span>
-        {% endif %}
-      </td>
-      <td>
-        {% for t in activity_types %}
-        <button class="btn btn-sm btn-outline-secondary quick-log-btn mb-1" data-member="{{ m.id }}"
-          data-activity="{{ t }}">{{ t }}</button>
-        {% endfor %}
-        <br>
-        <button
-          class="btn btn-sm {% if member_ia_status.get(m.id, False) %}btn-info{% else %}btn-outline-info{% endif %} quick-log-ia-btn mb-1"
-          data-member="{{ m.id }}">{% if member_ia_status.get(m.id, False) %}IA ✓{% else %}IA{% endif %}</button>
-        <button
-          class="btn btn-sm {% if member_exempt_status.get(m.id, False) %}btn-primary{% else %}btn-outline-primary{% endif %} quick-log-exempt-btn mb-1"
-          data-member="{{ m.id }}">{% if member_exempt_status.get(m.id, False) %}Exempt ✓{% else %}Exempt{% endif
-          %}</button>
-      </td>
+      </div>
+      <div class="col-md-6 text-md-end">
+        <span class="nx-mono nx-text-secondary" style="font-size: 0.78rem;">
+          DATE STAMP: <strong class="nx-text-cyan">{{ today }}</strong> &bull;
+          OPERATIVES: <strong class="nx-text-primary" id="nx-quicklog-count">{{ members|length }}</strong>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
 
-      <td>
-        {% if is_staff %}
-        <form method="post" action="{{ url_for('clear_member_activities', member_id=m.id) }}" class="d-inline"
-          onsubmit="return confirm('Clear all activities for {{ m.discord_username }} in this period?');">
-          <input type="hidden" name="period_id" value="{{ current_period.id if current_period }}">
-          <button type="submit" class="btn btn-sm btn-danger">Clear All</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<!-- Quick Log Matrix Table -->
+<div class="nx-card">
+  {{ nx_card_header(
+      title="Personnel Activity Matrix",
+      subtitle="Click an activity chip to credit points immediately to the active cycle",
+      icon="clipboard-list",
+      badge_text=(current_period.period_name if current_period else 'ACTIVE CYCLE'),
+      badge_variant="cyan"
+  ) }}
+
+  <div class="p-0">
+    {% if members %}
+    <div class="table-responsive">
+      <table class="table nx-table align-middle">
+        <thead>
+          <tr>
+            <th style="width: 20%;">Operative</th>
+            <th style="width: 18%;">Cycle Summary</th>
+            <th style="width: 24%;">Recent Entries</th>
+            <th style="width: 28%;">Rapid Log &amp; Protections</th>
+            <th style="width: 10%;" class="text-end">Reset</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in members %}
+          {% set recent = member_activities.get(m.id, []) %}
+          {% set counts = member_activity_counts.get(m.id, {}) %}
+          {% set has_ia = member_ia_status.get(m.id, False) %}
+          {% set has_exempt = member_exempt_status.get(m.id, False) %}
+          <tr id="member-row-{{ m.id }}" class="nx-quicklog-row">
+            <td>
+              <a href="{{ url_for('ac_member_detail', member_id=m.id) }}" class="fw-semibold nx-text-primary d-block">
+                {{ m.discord_username }}
+              </a>
+              <span class="nx-mono nx-text-secondary" style="font-size: 0.72rem;">{{ m.current_rank }}</span>
+            </td>
+
+            <td>
+              <div class="d-flex flex-wrap gap-1">
+                {% set ns = namespace(has_counts=False) %}
+                {% for type in activity_types %}
+                  {% if counts.get(type, 0) > 0 %}
+                    {% set ns.has_counts = True %}
+                    <span class="nx-badge nx-badge--cyan nx-mono">{{ counts.get(type, 0) }}x {{ type }}</span>
+                  {% endif %}
+                {% endfor %}
+                {% if not ns.has_counts %}
+                  <span class="nx-mono nx-text-muted" style="font-size: 0.75rem;">0 logged</span>
+                {% endif %}
+              </div>
+            </td>
+
+            <td style="max-width: 280px;">
+              {% if recent %}
+              <div class="d-flex flex-column gap-1">
+                {% for activity in recent %}
+                <div class="d-flex justify-content-between align-items-center px-2 py-1 rounded"
+                     style="background: var(--nx-bg); border: 1px solid var(--nx-border); font-size: 0.75rem;">
+                  <span class="text-truncate me-2">
+                    <span class="nx-mono nx-text-secondary">{{ activity.activity_date.strftime('%m/%d') }}</span>
+                    <strong class="nx-text-primary ms-1">{{ activity.activity_type }}</strong>
+                    <span class="nx-mono nx-text-cyan">({{ activity.points }})</span>
+                  </span>
+                  <button type="button" class="nx-btn nx-btn-danger nx-btn-sm py-0 px-1.5 delete-activity-btn"
+                          data-activity-id="{{ activity.id }}" title="Redact Entry" style="min-height: 20px;">
+                    &times;
+                  </button>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <span class="nx-text-muted" style="font-size: 0.75rem;">No recent entries</span>
+              {% endif %}
+            </td>
+
+            <td>
+              <div class="d-flex flex-wrap gap-1 mb-1.5">
+                {% for t in activity_types %}
+                <button type="button" class="nx-btn nx-btn-secondary nx-btn-sm quick-log-btn"
+                        data-member="{{ m.id }}" data-activity="{{ t }}">
+                  + {{ t }}
+                </button>
+                {% endfor %}
+              </div>
+              <div class="d-flex flex-wrap gap-1 mt-1">
+                <button type="button"
+                        class="nx-btn nx-btn-sm quick-log-ia-btn {{ 'nx-btn-primary' if has_ia else 'nx-btn-secondary' }}"
+                        data-member="{{ m.id }}">
+                  {{ 'IA Protected ✓' if has_ia else 'IA' }}
+                </button>
+                <button type="button"
+                        class="nx-btn nx-btn-sm quick-log-exempt-btn {{ 'nx-btn-warning' if has_exempt else 'nx-btn-secondary' }}"
+                        data-member="{{ m.id }}">
+                  {{ 'Exempt ✓' if has_exempt else 'Exempt' }}
+                </button>
+              </div>
+            </td>
+
+            <td class="text-end">
+              {% if is_staff %}
+              <form method="post" action="{{ url_for('clear_member_activities', member_id=m.id) }}" class="d-inline"
+                    onsubmit="return confirm('Clear all activities for {{ m.discord_username }} in this period?');">
+                <input type="hidden" name="period_id" value="{{ current_period.id if current_period else '' }}">
+                <button type="submit" class="nx-btn nx-btn-danger nx-btn-sm">Clear</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4">
+      {{ nx_empty_state(
+          icon="users",
+          title="No Operatives Available",
+          description="Add operatives to the sector roster before logging cycle activities."
+      ) }}
+    </div>
+    {% endif %}
+  </div>
+</div>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    // Quick-log activity buttons
+    // 1. Live Matrix Search Filter
+    const searchInput = document.getElementById('nx-quicklog-search');
+    const rows = document.querySelectorAll('.nx-quicklog-row');
+    const countEl = document.getElementById('nx-quicklog-count');
+    if (searchInput && rows.length) {
+      searchInput.addEventListener('input', function () {
+        const q = this.value.toLowerCase().trim();
+        let visible = 0;
+        rows.forEach(r => {
+          if (!q || r.innerText.toLowerCase().includes(q)) {
+            r.style.display = '';
+            visible++;
+          } else {
+            r.style.display = 'none';
+          }
+        });
+        if (countEl) countEl.textContent = visible;
+      });
+    }
+
+    // 2. Quick-log activity buttons
     document.querySelectorAll('.quick-log-btn').forEach(btn => {
       btn.addEventListener('click', async function () {
         const memberId = Number(this.dataset.member);
@@ -87,15 +196,20 @@
         try {
           const res = await fetch("{{ url_for('quick_log_activity') }}", {
             method: 'POST',
-            headers: { 
+            headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
               'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({ member_id: memberId, activity_type: activityType, activity_date: "{{ today }}", logged_by: "HC Team" })
+            body: JSON.stringify({
+              member_id: memberId,
+              activity_type: activityType,
+              activity_date: "{{ today }}",
+              logged_by: "HC Team"
+            })
           });
           let data = null;
-          try { data = await res.json(); } catch(e) {}
+          try { data = await res.json(); } catch (e) {}
           if (res.ok && data && data.success) {
             window.location.reload();
           } else {
@@ -105,24 +219,26 @@
         } catch (err) {
           console.error(err);
           alert('Request failed: ' + (err.message || 'Network error'));
-        } finally { this.disabled = false; }
+        } finally {
+          this.disabled = false;
+        }
       });
     });
 
-    // Delete activity buttons - no confirmation, stay on page
+    // 3. Delete activity buttons
     document.querySelectorAll('.delete-activity-btn').forEach(btn => {
       btn.addEventListener('click', async function () {
         const activityId = Number(this.dataset.activityId);
         try {
           const res = await fetch("{{ url_for('delete_ac_activity', activity_id=0) }}".replace('/0', '/' + activityId), {
             method: 'POST',
-            headers: { 
+            headers: {
               'Accept': 'application/json',
               'X-Requested-With': 'XMLHttpRequest'
             }
           });
           let data = null;
-          try { data = await res.json(); } catch(e) {}
+          try { data = await res.json(); } catch (e) {}
           if (res.ok && data && data.success) {
             this.closest('.d-flex').remove();
           } else {
@@ -136,7 +252,7 @@
       });
     });
 
-    // IA toggle buttons
+    // 4. IA toggle buttons
     document.querySelectorAll('.quick-log-ia-btn').forEach(btn => {
       btn.addEventListener('click', async function () {
         const memberId = Number(this.dataset.member);
@@ -144,7 +260,7 @@
         try {
           const res = await fetch("{{ url_for('quick_log_ia') }}", {
             method: 'POST',
-            headers: { 
+            headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
               'X-Requested-With': 'XMLHttpRequest'
@@ -152,7 +268,7 @@
             body: JSON.stringify({ member_id: memberId, reason: 'Quick log IA', approved_by: 'HC Team' })
           });
           let data = null;
-          try { data = await res.json(); } catch(e) {}
+          try { data = await res.json(); } catch (e) {}
           if (res.ok && data && data.success) {
             window.location.reload();
           } else {
@@ -162,11 +278,13 @@
         } catch (err) {
           console.error(err);
           alert('Request failed: ' + (err.message || 'Network error'));
-        } finally { this.disabled = false; }
+        } finally {
+          this.disabled = false;
+        }
       });
     });
 
-    // Exempt toggle buttons
+    // 5. Exempt toggle buttons
     document.querySelectorAll('.quick-log-exempt-btn').forEach(btn => {
       btn.addEventListener('click', async function () {
         const memberId = Number(this.dataset.member);
@@ -174,7 +292,7 @@
         try {
           const res = await fetch("{{ url_for('quick_log_exempt') }}", {
             method: 'POST',
-            headers: { 
+            headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
               'X-Requested-With': 'XMLHttpRequest'
@@ -182,7 +300,7 @@
             body: JSON.stringify({ member_id: memberId, reason: 'Quick log exemption', approved_by: 'HC Team' })
           });
           let data = null;
-          try { data = await res.json(); } catch(e) {}
+          try { data = await res.json(); } catch (e) {}
           if (res.ok && data && data.success) {
             window.location.reload();
           } else {
@@ -192,34 +310,11 @@
         } catch (err) {
           console.error(err);
           alert('Request failed: ' + (err.message || 'Network error'));
-        } finally { this.disabled = false; }
+        } finally {
+          this.disabled = false;
+        }
       });
     });
-
   });
-
-  // example quick-log fetch
-  async function quickLog(memberId, activityType) {
-    const res = await fetch("{{ url_for('log_activity') }}", {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      credentials: 'same-origin',
-      body: JSON.stringify({ member_id: memberId, activity_type: activityType })
-    });
-
-    if (res.status === 401) {
-      alert('Authentication required. Please login.');
-      return;
-    }
-    const data = await res.json().catch(() => null);
-    if (res.ok && data && data.success) {
-      window.location.reload();
-    } else {
-      alert(data?.message || 'Error logging activity');
-    }
-  }
 </script>
 {% endblock %}

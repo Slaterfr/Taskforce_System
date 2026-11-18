@@ -1,0 +1,153 @@
+{# ============================================================================
+   NEXUS // TACTICAL OPERATIONS UI PRIMITIVES (Jinja2 Macros)
+   Usage: {% from "components/_macros.html" import nx_page_header, nx_stat_card, ... %}
+   ============================================================================ #}
+
+{# 1. Page / Module Header #}
+{% macro nx_page_header(title, subtitle="", eyebrow="", icon="") %}
+<header class="nx-page-header">
+  <div class="nx-page-header__main">
+    {% if icon %}
+    <div class="nx-page-header__icon" aria-hidden="true">
+      <i data-lucide="{{ icon }}"></i>
+    </div>
+    {% endif %}
+    <div class="nx-page-header__text">
+      {% if eyebrow %}
+      <div class="nx-eyebrow">{{ eyebrow }}</div>
+      {% endif %}
+      <h1 class="nx-title">{{ title }}</h1>
+      {% if subtitle %}
+      <p class="nx-subtitle">{{ subtitle }}</p>
+      {% endif %}
+    </div>
+  </div>
+  {% if caller is defined %}
+  <div class="nx-page-header__actions">
+    {{ caller() }}
+  </div>
+  {% endif %}
+</header>
+{% endmacro %}
+
+
+{# 2. Balanced-Density Telemetry / Stat Card #}
+{% macro nx_stat_card(label, value, meta="", icon="activity", accent="cyan", mono=True) %}
+<div class="nx-stat-card nx-stat-card--{{ accent }}">
+  <div class="nx-stat-card__body">
+    <div class="nx-stat-card__label">{{ label }}</div>
+    <div class="nx-stat-card__value {{ 'nx-mono' if mono else '' }}">{{ value }}</div>
+    {% if meta %}
+    <div class="nx-stat-card__meta">{{ meta | safe }}</div>
+    {% endif %}
+  </div>
+  {% if icon %}
+  <div class="nx-stat-card__icon" aria-hidden="true">
+    <i data-lucide="{{ icon }}"></i>
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# 3. Card Header Bar #}
+{% macro nx_card_header(title, subtitle="", icon="", badge_text="", badge_variant="neutral") %}
+<div class="nx-card-header">
+  <div class="nx-card-header__title-wrap">
+    {% if icon %}
+    <i data-lucide="{{ icon }}" class="nx-card-header__icon"></i>
+    {% endif %}
+    <div>
+      <h2 class="nx-card-title">{{ title }}</h2>
+      {% if subtitle %}
+      <div class="nx-card-subtitle">{{ subtitle }}</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="nx-card-header__actions">
+    {% if badge_text %}
+    <span class="nx-badge nx-badge--{{ badge_variant }} nx-mono">{{ badge_text }}</span>
+    {% endif %}
+    {% if caller is defined %}
+    {{ caller() }}
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+
+{# 4. Semantic Status Badge #}
+{% macro nx_badge(text, variant="neutral", icon="", mono=False) %}
+<span class="nx-badge nx-badge--{{ variant }} {{ 'nx-mono' if mono else '' }}">
+  {% if icon %}<i data-lucide="{{ icon }}" class="nx-badge__icon"></i>{% endif %}
+  {{ text }}
+</span>
+{% endmacro %}
+
+
+{# 5. Status Indicator Dot #}
+{% macro nx_status_dot(variant="success", label="") %}
+<span class="nx-status-indicator">
+  <span class="nx-status-dot nx-status-dot--{{ variant }}"></span>
+  {% if label %}<span>{{ label }}</span>{% endif %}
+</span>
+{% endmacro %}
+
+
+{# 6. Precision Quota Progress Bar #}
+{% macro nx_progress_bar(percentage, is_exempt=False, is_protected=False, show_label=True) %}
+{% set pct = (percentage or 0)|round(0)|int %}
+{% set clamped = 100 if pct > 100 else (0 if pct < 0 else pct) %}
+{% if is_exempt %}
+  {% set bar_variant = "warning" %}
+  {% set label_text = "EXEMPT" %}
+{% elif is_protected %}
+  {% set bar_variant = "cyan" %}
+  {% set label_text = "IA PROTECTED" %}
+{% elif pct >= 100 %}
+  {% set bar_variant = "success" %}
+  {% set label_text = pct ~ "%" %}
+{% elif pct >= 50 %}
+  {% set bar_variant = "cyan" %}
+  {% set label_text = pct ~ "%" %}
+{% else %}
+  {% set bar_variant = "danger" %}
+  {% set label_text = pct ~ "%" %}
+{% endif %}
+<div class="nx-progress-wrap">
+  <div class="nx-progress" role="progressbar" aria-valuenow="{{ clamped }}" aria-valuemin="0" aria-valuemax="100">
+    <div class="nx-progress__bar nx-progress__bar--{{ bar_variant }}" style="width: {{ 100 if (is_exempt or is_protected) else clamped }}%;"></div>
+  </div>
+  {% if show_label %}
+  <span class="nx-progress__label nx-mono nx-text-{{ bar_variant }}">{{ label_text }}</span>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# 7. Structured Empty State #}
+{% macro nx_empty_state(icon="inbox", title="No Records Found", description="", action_url="", action_label="", action_icon="plus") %}
+<div class="nx-empty-state">
+  <div class="nx-empty-state__icon" aria-hidden="true">
+    <i data-lucide="{{ icon }}"></i>
+  </div>
+  <h3 class="nx-empty-state__title">{{ title }}</h3>
+  {% if description %}
+  <p class="nx-empty-state__desc">{{ description }}</p>
+  {% endif %}
+  {% if action_url and action_label %}
+  <div class="nx-empty-state__actions">
+    <a href="{{ action_url }}" class="nx-btn nx-btn-primary">
+      {% if action_icon %}<i data-lucide="{{ action_icon }}"></i>{% endif %}
+      <span>{{ action_label }}</span>
+    </a>
+  </div>
+  {% endif %}
+  {% if caller is defined %}
+  <div class="nx-empty-state__actions">
+    {{ caller() }}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+

@@ -1,106 +1,155 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header, nx_badge, nx_empty_state %}
 
 {% block title %}{{ current_group_name }} Roster — Nexus{% endblock %}
 
 {% block content %}
-<div class="row mb-4 align-items-center">
-  <div class="col-md-7">
-    <div class="d-flex align-items-center">
-      <div class="me-3 d-flex align-items-center justify-content-center" style="width: 52px; height: 52px; border-radius: 14px; background: rgba(168, 85, 247, 0.15); border: 1px solid var(--tf-border); box-shadow: 0 0 20px rgba(168, 85, 247, 0.2);">
-        <i class="fas fa-users fa-lg" style="color: var(--tf-purple-accent);"></i>
+{% call nx_page_header(
+    title=(current_group_name or 'Sector') ~ " Personnel Roster",
+    subtitle="Official operative directory and rank assignments for " ~ (current_group_name or 'active sector') ~ ".",
+    eyebrow="OPERATIONS // PERSONNEL ROSTER",
+    icon="users"
+) %}
+  {% if is_staff or is_hct %}
+  <a href="{{ url_for('members') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="user-cog"></i>
+    <span>Manage Registry</span>
+  </a>
+  {% endif %}
+{% endcall %}
+
+<!-- Search & Filter Toolbar -->
+<div class="nx-card mb-3">
+  <div class="nx-card-body py-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-6">
+        <form method="get" class="d-flex gap-2">
+          <div class="input-group">
+            <span class="input-group-text"><i data-lucide="search" style="width: 15px; height: 15px;"></i></span>
+            <input type="search" id="nx-roster-search" class="form-control nx-input" name="search"
+                   value="{{ search or '' }}" placeholder="Filter operatives by username or rank...">
+          </div>
+          <button class="nx-btn nx-btn-primary" type="submit">Search</button>
+          {% if search %}
+          <a href="{{ url_for('public_roster') }}" class="nx-btn nx-btn-secondary">Reset</a>
+          {% endif %}
+        </form>
       </div>
-      <div>
-        <h2 class="text-white mb-0 fw-bold" style="letter-spacing: -0.02em;">{{ current_group_name }} Roster</h2>
-        <p class="text-white-50 mb-0 small">Official personnel directory and rank registry for {{ current_group_name }}.</p>
+      <div class="col-md-6 text-md-end">
+        <span class="nx-mono nx-text-secondary" style="font-size: 0.78rem;">
+          SHOWING <strong class="nx-text-primary" id="nx-roster-count">{{ members|length }}</strong> OPERATIVES
+        </span>
       </div>
     </div>
-  </div>
-  <div class="col-md-5 mt-3 mt-md-0">
-    <form method="get">
-      <div class="input-group">
-        <input class="form-control" name="search" value="{{ search or '' }}" placeholder="Search members by username or rank...">
-        <button class="btn btn-tf-primary" type="submit">
-          <i class="fas fa-search me-1"></i>Search
-        </button>
-      </div>
-    </form>
   </div>
 </div>
 
-<div class="tf-card">
-  <div class="tf-card-header d-flex justify-content-between align-items-center">
-    <div class="d-flex align-items-center">
-      <i class="fas fa-id-card me-2" style="color: var(--tf-purple-accent);"></i>
-      <h5 class="mb-0 text-white fw-bold">Active Members</h5>
-    </div>
-    <span class="badge" style="background: rgba(168, 85, 247, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-family: var(--tf-font-mono);">
-      {{ members|length }} Registered
-    </span>
-  </div>
+<!-- Personnel Table Card -->
+<div class="nx-card">
+  {{ nx_card_header(
+      title="Active Sector Operatives",
+      subtitle="Synchronized directory records",
+      icon="shield",
+      badge_text=(members|length) ~ " REGISTERED",
+      badge_variant="cyan"
+  ) }}
+
   <div class="p-0">
+    {% if members %}
     <div class="table-responsive">
-      <table class="table tf-table align-middle">
+      <table class="table nx-table align-middle" id="nx-roster-table">
         <thead>
           <tr>
-            <th style="width: 25%;">Rank</th>
-            <th style="width: 35%;">Discord User</th>
-            <th style="width: 25%;">Roblox Profile</th>
-            <th style="width: 15%;" class="text-end">Actions</th>
+            <th style="width: 24%;">Assigned Rank</th>
+            <th style="width: 34%;">Operative / Discord</th>
+            <th style="width: 27%;">Roblox Identity</th>
+            <th style="width: 15%;" class="text-end">Dossier</th>
           </tr>
         </thead>
         <tbody>
           {% for m in members %}
-          <tr>
+          <tr class="nx-roster-row">
             <td>
-              <span class="badge" style="background: rgba(126, 34, 206, 0.25); border: 1px solid rgba(168, 85, 247, 0.4); color: #e9d5ff; font-weight: 600; padding: 0.35rem 0.75rem; border-radius: 8px;">
-                <i class="fas fa-shield-alt me-1" style="color: var(--tf-purple-accent);"></i>{{ m.current_rank }}
-              </span>
+              {{ nx_badge(m.current_rank, variant="cyan", icon="shield", mono=True) }}
             </td>
             <td>
-              <div class="d-flex align-items-center">
-                <div class="me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(88, 101, 242, 0.2); border: 1px solid rgba(88, 101, 242, 0.4);">
-                  <i class="fab fa-discord" style="color: #5865f2;"></i>
+              <div class="d-flex align-items-center gap-2">
+                <div class="nx-user-avatar" style="width: 28px; height: 28px; font-size: 0.68rem;">
+                  {{ (m.discord_username or 'OP')[:2]|upper }}
                 </div>
                 {% if is_staff %}
-                <a href="{{ url_for('member_detail', member_id=m.id) }}" class="text-white fw-bold text-decoration-none hover-glow">
+                <a href="{{ url_for('member_detail', member_id=m.id) }}" class="fw-semibold nx-text-primary">
                   {{ m.discord_username }}
                 </a>
                 {% else %}
-                <a href="{{ url_for('public_member', member_id=m.id) }}" class="text-white fw-bold text-decoration-none hover-glow">
+                <a href="{{ url_for('public_member', member_id=m.id) }}" class="fw-semibold nx-text-primary">
                   {{ m.discord_username }}
                 </a>
                 {% endif %}
               </div>
             </td>
             <td>
-              <div class="d-flex align-items-center text-white-50">
-                <i class="fas fa-cube me-2" style="color: #cbd5e1;"></i>
-                <span class="text-white">{{ m.roblox_username or 'N/A' }}</span>
-              </div>
+              {% if m.roblox_username %}
+              <span class="nx-mono nx-text-primary">
+                <i class="fa-brands fa-roblox nx-text-secondary me-1"></i>{{ m.roblox_username }}
+              </span>
+              {% else %}
+              <span class="nx-mono nx-text-muted">UNLINKED</span>
+              {% endif %}
             </td>
             <td class="text-end">
               {% if is_staff %}
-              <a class="btn btn-sm btn-tf-outline" href="{{ url_for('edit_member', member_id=m.id) }}" title="Edit Member">
-                <i class="fas fa-edit me-1"></i>Edit
+              <a class="nx-btn nx-btn-secondary nx-btn-sm" href="{{ url_for('member_detail', member_id=m.id) }}">
+                <i data-lucide="file-text"></i>
+                <span>Dossier</span>
               </a>
               {% else %}
-              <a class="btn btn-sm btn-tf-outline" href="{{ url_for('public_member', member_id=m.id) }}" title="View Profile">
-                <i class="fas fa-eye me-1"></i>View
+              <a class="nx-btn nx-btn-secondary nx-btn-sm" href="{{ url_for('public_member', member_id=m.id) }}">
+                <i data-lucide="user"></i>
+                <span>Profile</span>
               </a>
               {% endif %}
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="4" class="text-center py-4 text-white-50">
-              <i class="fas fa-search fa-2x mb-2 d-block" style="color: var(--tf-purple-accent);"></i>
-              No members found matching your query.
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% else %}
+    <div class="p-4">
+      {{ nx_empty_state(
+          icon="search-x",
+          title="No Operatives Found",
+          description="No personnel records matched your query.",
+          action_url=url_for('public_roster') if search else '',
+          action_label="Clear Search Filter" if search else '',
+          action_icon="rotate-ccw"
+      ) }}
+    </div>
+    {% endif %}
   </div>
 </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const searchInput = document.getElementById("nx-roster-search");
+    const rows = document.querySelectorAll(".nx-roster-row");
+    const countEl = document.getElementById("nx-roster-count");
+    if (searchInput && rows.length) {
+      searchInput.addEventListener("input", function () {
+        const q = this.value.toLowerCase().trim();
+        let visible = 0;
+        rows.forEach(row => {
+          if (!q || row.innerText.toLowerCase().includes(q)) {
+            row.style.display = "";
+            visible++;
+          } else {
+            row.style.display = "none";
+          }
+        });
+        if (countEl) countEl.textContent = visible;
+      });
+    }
+  });
+</script>
 {% endblock %}

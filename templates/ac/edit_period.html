@@ -1,19 +1,46 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header %}
 
-{% block title %}Edit AC Period{% endblock %}
+{% block title %}Edit AC Cycle — Nexus{% endblock %}
 
 {% block content %}
-<h3 style="color: white;">Edit AC Period</h3>
-<form method="post">
-  <div class="mb-3">
-    <label style="color: white;">Period Name</label>
-    <input name="period_name" class="form-control" value="{{ period.period_name }}" required>
+{% call nx_page_header(
+    title="Edit Activity Check Cycle",
+    subtitle="Update the designation of the active reporting period.",
+    eyebrow="ADMINISTRATION // EDIT CYCLE",
+    icon="edit-3"
+) %}
+  <a href="{{ url_for('ac_dashboard') }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="arrow-left"></i>
+    <span>Back to AC Console</span>
+  </a>
+{% endcall %}
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="nx-card">
+      {{ nx_card_header(
+          title="Cycle Designation",
+          subtitle="Active window: " ~ period.start_date.strftime('%Y-%m-%d') ~ " to " ~ period.end_date.strftime('%Y-%m-%d'),
+          icon="calendar"
+      ) }}
+      <div class="nx-card-body">
+        <form method="post">
+          <div class="mb-4">
+            <label class="form-label">Cycle Designation / Name</label>
+            <input name="period_name" class="form-control nx-input" value="{{ period.period_name }}" required>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 pt-2 border-top" style="border-color: var(--nx-border) !important;">
+            <a href="{{ url_for('ac_dashboard') }}" class="nx-btn nx-btn-secondary">Cancel</a>
+            <button class="nx-btn nx-btn-primary" type="submit">
+              <i data-lucide="check"></i>
+              <span>Update Cycle Name</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
-  <div class="mb-3">
-    <small style="color: white;">Current period: {{ period.start_date.strftime('%Y-%m-%d') }} to {{
-      period.end_date.strftime('%Y-%m-%d') }}</small>
-  </div>
-  <button class="btn btn-primary" type="submit">Update Name</button>
-  <a href="{{ url_for('ac_dashboard') }}" class="btn btn-secondary">Cancel</a>
-</form>
+</div>
 {% endblock %}

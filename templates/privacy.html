@@ -1,60 +1,62 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_badge %}
 
-{% block title %}Privacy Policy - Cortex System{% endblock %}
+{% block title %}Privacy Policy — Nexus Operations{% endblock %}
+{% block breadcrumb %}Compliance / Privacy Policy{% endblock %}
 
 {% block content %}
+{{ nx_page_header(
+    title="Privacy Policy",
+    subtitle="Data protection, OAuth 2.0 scope transparency, and retention protocols for Taskforce Nexus.",
+    tag="COMPLIANCE // DATA GOVERNANCE",
+    icon="shield-check"
+) }}
+
 <div class="row justify-content-center">
-  <div class="col-lg-9 col-xl-8">
-    <div class="card shadow-lg rounded-4 overflow-hidden border-0 mb-5">
-      <div class="card-header py-4 px-4 px-md-5 d-flex align-items-center justify-content-between">
-        <div class="d-flex align-items-center gap-3">
-          <div class="d-flex align-items-center justify-content-center rounded-3 p-2" style="background: rgba(37, 99, 235, 0.15); border: 1px solid rgba(37, 99, 235, 0.3);">
-            <i class="fa-solid fa-shield-halved fs-5" style="color: var(--tf-purple-accent, #3b82f6);"></i>
-          </div>
-          <div>
-            <h4 class="fw-bold mb-0">Privacy Policy</h4>
-            <span class="text-muted small">Cortex / Nexus Management Network</span>
-          </div>
+  <div class="col-lg-10 col-xl-9">
+    <div class="nx-card mb-4">
+      <div class="nx-card-header">
+        <div class="nx-card-title">
+          <i data-lucide="lock" style="width:16px;height:16px;color:var(--nx-accent);"></i>
+          <span>Nexus Operational Data Protection Notice</span>
         </div>
-        <span class="badge px-3 py-1.5 text-uppercase" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.75rem;">
-          Effective: September 2026
-        </span>
+        {{ nx_badge("EFFECTIVE: SEP 2026", variant="success", mono=True) }}
       </div>
 
-      <div class="card-body p-4 p-md-5">
-        <div class="alert alert-info d-flex align-items-center gap-3 mb-4" style="background: rgba(37, 99, 235, 0.1); border: 1px solid rgba(37, 99, 235, 0.25); color: var(--tf-text-primary);">
-          <i class="fa-solid fa-circle-info fs-5" style="color: var(--tf-purple-accent, #3b82f6);"></i>
-          <div class="small">
-            <strong>Summary:</strong> We only access your public Roblox User ID and Username via OAuth 2.0 to authenticate your membership. We never collect passwords, private messages, or billing details.
+      <div class="nx-card-body">
+        <div class="p-3 mb-4 d-flex align-items-start gap-3" style="background:var(--nx-accent-muted);border:1px solid var(--nx-accent-border);border-radius:var(--nx-radius-md);">
+          <i data-lucide="info" style="width:18px;height:18px;color:var(--nx-accent);flex-shrink:0;margin-top:2px;"></i>
+          <div style="font-size:0.84rem;color:var(--nx-text-primary);">
+            <strong>Executive Summary:</strong> We only access your public Roblox User ID and Username via OAuth 2.0 to authenticate your sector membership. We never collect passwords, private messages, or billing details.
           </div>
         </div>
 
         <section class="mb-4">
-          <h5 class="fw-bold mb-2">1. Overview</h5>
-          <p class="text-muted">
-            This Privacy Policy explains how the <strong>Cortex / Nexus Management System</strong> ("Nexus501", "we", "us") collects, uses, and safeguards information when users authenticate and interact with our operational management platform.
+          <h5 class="fw-bold mb-2" style="font-size:0.95rem;color:var(--nx-text-primary);">1. Overview</h5>
+          <p style="font-size:0.875rem;color:var(--nx-text-secondary);line-height:1.6;">
+            This Privacy Policy explains how the <strong style="color:var(--nx-text-primary);">Taskforce Nexus Management System</strong> ("Nexus501", "we", "us") collects, uses, and safeguards information when users authenticate and interact with our operational management platform.
           </p>
         </section>
 
         <section class="mb-4">
-          <h5 class="fw-bold mb-2">2. Information We Collect via Roblox OAuth 2.0</h5>
-          <p class="text-muted">
+          <h5 class="fw-bold mb-2" style="font-size:0.95rem;color:var(--nx-text-primary);">2. Information We Collect via Roblox OAuth 2.0</h5>
+          <p style="font-size:0.875rem;color:var(--nx-text-secondary);line-height:1.6;">
             When you sign in using <em>Log In with Roblox</em>, we request access exclusively to standard identity scopes (<code>openid</code> and <code>profile</code>). Through these scopes, we retrieve:
           </p>
-          <ul class="text-muted">
-            <li><strong>Roblox User ID:</strong> To verify your identity and group membership.</li>
-            <li><strong>Roblox Username & Display Name:</strong> To display your callsign and link activity logs to your profile.</li>
-            <li><strong>Avatar Thumbnail URL:</strong> To display your operative card within the roster.</li>
+          <ul style="font-size:0.875rem;color:var(--nx-text-secondary);line-height:1.7;">
+            <li><strong style="color:var(--nx-text-primary);">Roblox User ID:</strong> To verify your identity and group membership.</li>
+            <li><strong style="color:var(--nx-text-primary);">Roblox Username &amp; Display Name:</strong> To display your callsign and link activity logs to your profile.</li>
+            <li><strong style="color:var(--nx-text-primary);">Avatar Thumbnail URL:</strong> To display your operative card within the roster.</li>
           </ul>
-          <p class="text-muted small">
-            <strong>What we DO NOT collect:</strong> We cannot and do not collect your Roblox password, email address, payment information, personal location, or private communication.
+          <p class="mb-0" style="font-size:0.82rem;color:var(--nx-text-secondary);">
+            <strong style="color:var(--nx-text-primary);">What we DO NOT collect:</strong> We cannot and do not collect your Roblox password, email address, payment information, personal location, or private communication.
           </p>
         </section>
 
         <section class="mb-4">
-          <h5 class="fw-bold mb-2">3. How We Use Your Information</h5>
-          <p class="text-muted">The collected information is used solely to:</p>
-          <ul class="text-muted">
+          <h5 class="fw-bold mb-2" style="font-size:0.95rem;color:var(--nx-text-primary);">3. How We Use Your Information</h5>
+          <p style="font-size:0.875rem;color:var(--nx-text-secondary);line-height:1.6;">The collected information is used solely to:</p>
+          <ul style="font-size:0.875rem;color:var(--nx-text-secondary);line-height:1.7;">
             <li>Verify your authorization tier (Operative, Staff, or High Command).</li>
             <li>Maintain group activity records, training points, and mission completion logs.</li>
             <li>Enable self-service access to your personal quota and progress dashboards.</li>
@@ -62,22 +64,22 @@
         </section>
 
         <section class="mb-4">
-          <h5 class="fw-bold mb-2">4. Data Sharing & Third Parties</h5>
-          <p class="text-muted">
-            We do <strong>not</strong> sell, rent, monetize, or distribute your information to any third parties or commercial entities. All data remains strictly within the operational sector database.
+          <h5 class="fw-bold mb-2" style="font-size:0.95rem;color:var(--nx-text-primary);">4. Data Sharing &amp; Third Parties</h5>
+          <p style="font-size:0.875rem;color:var(--nx-text-secondary);line-height:1.6;">
+            We do <strong style="color:var(--nx-text-primary);">not</strong> sell, rent, monetize, or distribute your information to any third parties or commercial entities. All data remains strictly within the operational sector database.
           </p>
         </section>
 
         <section class="mb-4">
-          <h5 class="fw-bold mb-2">5. Data Retention & Revocation</h5>
-          <p class="text-muted">
-            You may revoke access to the Nexus501 application at any time directly through your <a href="https://www.roblox.com/my/account#!/security" target="_blank" class="text-decoration-none" style="color: var(--tf-purple-accent, #3b82f6);">Roblox Account Settings &rarr; Authorized Applications</a>. Upon revocation, your access token is immediately invalidated.
+          <h5 class="fw-bold mb-2" style="font-size:0.95rem;color:var(--nx-text-primary);">5. Data Retention &amp; Revocation</h5>
+          <p style="font-size:0.875rem;color:var(--nx-text-secondary);line-height:1.6;">
+            You may revoke access to the Nexus501 application at any time directly through your <a href="https://www.roblox.com/my/account#!/security" target="_blank" rel="noopener" style="color:var(--nx-accent);text-decoration:none;">Roblox Account Settings &rarr; Authorized Applications</a>. Upon revocation, your access token is immediately invalidated.
           </p>
         </section>
 
         <section class="mb-0">
-          <h5 class="fw-bold mb-2">6. Contact & Inquiries</h5>
-          <p class="text-muted mb-0">
+          <h5 class="fw-bold mb-2" style="font-size:0.95rem;color:var(--nx-text-primary);">6. Contact &amp; Inquiries</h5>
+          <p class="mb-0" style="font-size:0.875rem;color:var(--nx-text-secondary);line-height:1.6;">
             For data inquiries, access questions, or deletion requests, please contact Sector Command via the official Taskforce Discord communications server.
           </p>
         </section>

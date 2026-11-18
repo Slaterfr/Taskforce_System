@@ -1,23 +1,56 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header %}
 
-{% block title %}Edit {{ member.discord_username }}{% endblock %}
+{% block title %}Edit {{ member.discord_username }} — Nexus{% endblock %}
 
 {% block content %}
-<h3 style="color: white;">Edit Member</h3>
-<form method="post">
-  <div class="mb-3"><label style="color: white;">Discord</label><input name="discord_username" class="form-control"
-      value="{{ member.discord_username }}"></div>
-  <div class="mb-3"><label style="color: white;">Roblox</label><input name="roblox_username" class="form-control"
-      value="{{ member.roblox_username }}"></div>
-  <div class="mb-3">
-    <label style="color: white;">Rank</label>
-    <select name="current_rank" class="form-select">
-      {% for rank in available_ranks %}
-      <option value="{{ rank }}" {% if member.current_rank==rank %}selected{% endif %}>{{ rank }}</option>
-      {% endfor %}
-    </select>
+{% call nx_page_header(
+    title="Edit Operative: " ~ member.discord_username,
+    subtitle="Modify identity handles and rank assignment for registry record #" ~ member.id ~ ".",
+    eyebrow="PERSONNEL // EDIT RECORD",
+    icon="edit-3"
+) %}
+  <a href="{{ url_for('member_detail', member_id=member.id) }}" class="nx-btn nx-btn-secondary">
+    <i data-lucide="arrow-left"></i>
+    <span>Back to Dossier</span>
+  </a>
+{% endcall %}
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="nx-card">
+      {{ nx_card_header(title="Operative Attributes", subtitle="Changes sync automatically with Roblox when linked", icon="user-cog") }}
+      <div class="nx-card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Operative Handle / Discord Username</label>
+            <input name="discord_username" class="form-control nx-input" value="{{ member.discord_username }}" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Roblox Username</label>
+            <input name="roblox_username" class="form-control nx-input nx-mono" value="{{ member.roblox_username or '' }}">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Assigned Sector Rank</label>
+            <select name="current_rank" class="form-select nx-input">
+              {% for rank in available_ranks %}
+              <option value="{{ rank }}" {% if member.current_rank == rank %}selected{% endif %}>{{ rank }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 pt-2 border-top" style="border-color: var(--nx-border) !important;">
+            <a class="nx-btn nx-btn-secondary" href="{{ url_for('member_detail', member_id=member.id) }}">Cancel</a>
+            <button class="nx-btn nx-btn-primary" type="submit">
+              <i data-lucide="check"></i>
+              <span>Save Changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
-  <button class="btn btn-primary" type="submit">Save</button>
-  <a class="btn btn-secondary" href="{{ url_for('member_detail', member_id=member.id) }}">Cancel</a>
-</form>
+</div>
 {% endblock %}

@@ -1,26 +1,38 @@
 {% extends "base.html" %}
+{% from "components/_macros.html" import nx_page_header, nx_card_header %}
 
-{% block title %}Confirm Remove Member - Taskforce Management{% endblock %}
+{% block title %}Confirm Deactivation — {{ member.discord_username }}{% endblock %}
 
 {% block content %}
+{{ nx_page_header(
+    title="Confirm Personnel Deactivation",
+    subtitle="Deactivate operative record from the active command sector roster.",
+    eyebrow="PERSONNEL // DEACTIVATION CONFIRMATION",
+    icon="user-minus"
+) }}
+
 <div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-danger text-white">
-                <h4 class="mb-0">
-                    <i class="fas fa-user-slash me-2"></i>Remove Member
-                </h4>
-            </div>
-            <div class="card-body">
-                <p>Are you sure you want to remove <strong>{{ member.discord_username }}</strong> from the active members list? This will mark the member as inactive.</p>
-                <form method="POST">
-                    <div class="d-flex justify-content-end">
-                        <a href="{{ url_for('member_detail', member_id=member.id) }}" class="btn btn-outline-secondary me-2">Cancel</a>
-                        <button type="submit" class="btn btn-danger">Yes, Remove</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+  <div class="col-md-7 col-lg-5">
+    <div class="nx-card" style="border-color: var(--nx-danger-border) !important;">
+      {{ nx_card_header(title="Remove Operative", icon="alert-triangle", badge_text="DESTRUCTIVE", badge_variant="danger") }}
+      <div class="nx-card-body">
+        <p class="nx-text-primary mb-2">
+          Are you sure you want to remove <strong>{{ member.discord_username }}</strong> from the active roster?
+        </p>
+        <p class="nx-text-secondary mb-4" style="font-size: 0.8125rem;">
+          This action marks the operative as inactive while preserving historical audit logs.
+        </p>
+        <form method="POST">
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{{ url_for('member_detail', member_id=member.id) }}" class="nx-btn nx-btn-secondary">Cancel</a>
+            <button type="submit" class="nx-btn nx-btn-danger">
+              <i data-lucide="trash-2"></i>
+              <span>Confirm Removal</span>
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
+  </div>
 </div>
 {% endblock %}
